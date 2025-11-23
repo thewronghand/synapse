@@ -26,7 +26,7 @@ export default function MarkdownEditor({
         })
       ]}
       placeholder={placeholder}
-      className="border rounded-lg overflow-hidden"
+      className="h-full"
       basicSetup={{
         lineNumbers: true,
         highlightActiveLineGutter: true,
@@ -35,7 +35,7 @@ export default function MarkdownEditor({
       }}
       style={{
         fontSize: "14px",
-        minHeight: "500px",
+        height: "100%",
       }}
     />
   );
