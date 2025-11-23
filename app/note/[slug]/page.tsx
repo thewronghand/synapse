@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
-import { Document } from "@/types";
+import ForceGraphView from "@/components/graph/ForceGraphView";
+import { Document, Graph } from "@/types";
 import { Button } from "@/components/ui/button";
+import { Slider } from "@/components/ui/slider";
 
 export default function NotePage() {
   const params = useParams();
@@ -12,19 +14,50 @@ export default function NotePage() {
   const slug = params.slug as string;
 
   const [document, setDocument] = useState<Document | null>(null);
+  const [graph, setGraph] = useState<Graph | null>(null);
+  const [depth, setDepth] = useState<number>(2);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [graphHeight, setGraphHeight] = useState(320);
+
+  // Calculate responsive graph height
+  useEffect(() => {
+    const calculateHeight = () => {
+      if (typeof window !== 'undefined') {
+        // Use viewport height minus some offset for better responsiveness
+        const vh = window.innerHeight;
+        const minHeight = 280;
+        const maxHeight = 500;
+        const calculatedHeight = Math.max(minHeight, Math.min(maxHeight, vh * 0.4));
+        setGraphHeight(calculatedHeight);
+      }
+    };
+
+    calculateHeight();
+    window.addEventListener('resize', calculateHeight);
+    return () => window.removeEventListener('resize', calculateHeight);
+  }, []);
 
   useEffect(() => {
-    async function fetchDocument() {
+    async function fetchData() {
       try {
-        const res = await fetch(`/api/documents/${slug}`);
-        const data = await res.json();
+        // Fetch document and graph in parallel
+        const [docRes, graphRes] = await Promise.all([
+          fetch(`/api/documents/${slug}`),
+          fetch(`/api/graph`),
+        ]);
 
-        if (data.success) {
-          setDocument(data.data.document);
+        const docData = await docRes.json();
+        const graphData = await graphRes.json();
+
+        if (docData.success) {
+          setDocument(docData.data.document);
         } else {
           setError("Document not found");
+        }
+
+        if (graphData.success) {
+          setGraph(graphData.data);
         }
       } catch (err) {
         setError("Failed to load document");
@@ -33,7 +66,7 @@ export default function NotePage() {
       }
     }
 
-    fetchDocument();
+    fetchData();
   }, [slug]);
 
   function handleWikiLinkClick(pageName: string) {
@@ -92,12 +125,58 @@ export default function NotePage() {
       </header>
 
       {/* Content */}
-      <main className="flex-1 container mx-auto max-w-4xl py-8 px-4">
-        <div className="prose prose-lg dark:prose-invert max-w-none">
-          <MarkdownViewer
-            content={document.contentWithoutFrontmatter}
-            onWikiLinkClick={handleWikiLinkClick}
-          />
+      <main className="flex-1 container mx-auto py-8 px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Main Content */}
+          <div className="lg:col-span-2">
+            <div className="prose prose-lg dark:prose-invert max-w-none">
+              <MarkdownViewer
+                content={document.contentWithoutFrontmatter}
+                onWikiLinkClick={handleWikiLinkClick}
+              />
+            </div>
+          </div>
+
+          {/* Local Graph Sidebar */}
+          {graph && graph.nodes && graph.links && (
+            <div className="lg:col-span-1">
+              <div className="sticky top-20 bg-white border rounded-lg p-4 shadow-sm overflow-hidden">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-sm font-semibold text-gray-800">Local Graph</h3>
+
+                  {/* Compact Depth Slider */}
+                  <div className="flex items-center gap-3">
+                    <span className="text-xs font-medium text-gray-600">Depth:</span>
+                    <div className="flex items-center gap-2">
+                      {[1, 2, 3].map((level) => (
+                        <button
+                          key={level}
+                          onClick={() => setDepth(level)}
+                          className={`
+                            w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200
+                            ${depth === level
+                              ? 'bg-blue-500 text-white shadow-md scale-110'
+                              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                            }
+                          `}
+                        >
+                          {level}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Graph */}
+                <ForceGraphView
+                  graphData={graph as any}
+                  currentNodeUrl={`/${slug}`}
+                  depth={depth}
+                  height={graphHeight}
+                />
+              </div>
+            </div>
+          )}
         </div>
       </main>
 
