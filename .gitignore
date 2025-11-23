@@ -57,3 +57,10 @@ firebase-debug.log
 Thumbs.db
 
 /docs
+
+# Test notes and scripts
+/scripts/generate-test-notes.js
+/notes/*.md
+!/notes/getting-started.md
+!/notes/how-to-use-wiki-links.md
+!/notes/index.md

@@ -21,6 +21,7 @@ export interface Frontmatter {
 
 // Graph types
 
+// Legacy format (for D3ForceGraph)
 export interface GraphNode {
   id: string; // document slug
   label: string; // document title
@@ -29,13 +30,27 @@ export interface GraphNode {
 }
 
 export interface GraphEdge {
-  source: string; // source document slug
-  target: string; // target document slug
+  source: string | number; // source document slug or ID
+  target: string | number; // target document slug or ID
+}
+
+// Digital Garden format
+export interface DigitalGardenNode {
+  id: number; // numeric ID
+  title: string; // document title
+  url: string; // document URL (e.g., "/getting-started")
+  neighbors: string[]; // bidirectional connections
+  backLinks: string[]; // incoming links
+  size: number; // node size (2-7)
+  color: string; // node color
+  hide: boolean; // visibility flag
+  tags?: string[]; // document tags
 }
 
 export interface Graph {
-  nodes: GraphNode[];
-  edges: GraphEdge[];
+  nodes: { [url: string]: DigitalGardenNode } | GraphNode[]; // Support both formats
+  links?: GraphEdge[]; // Digital Garden format
+  edges?: GraphEdge[]; // Legacy format
 }
 
 // API Response types
