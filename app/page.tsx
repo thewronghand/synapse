@@ -2,187 +2,112 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Document } from "@/types";
+import ForceGraphView from "@/components/graph/ForceGraphView";
+import { Graph } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 export default function Home() {
   const router = useRouter();
-  const [documents, setDocuments] = useState<Document[]>([]);
+  const [graph, setGraph] = useState<Graph | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [newNoteTitle, setNewNoteTitle] = useState("");
+  const [windowHeight, setWindowHeight] = useState(0);
 
+  // Initialize and track window height
   useEffect(() => {
-    fetchDocuments();
+    const handleResize = () => {
+      setWindowHeight(window.innerHeight);
+    };
+
+    // Set initial height
+    handleResize();
+
+    // Add resize listener
+    window.addEventListener('resize', handleResize);
+
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  async function fetchDocuments() {
+  useEffect(() => {
+    fetchGraph();
+  }, []);
+
+  async function fetchGraph() {
     try {
-      const res = await fetch("/api/documents");
+      const res = await fetch("/api/graph");
       const data = await res.json();
 
       if (data.success) {
-        setDocuments(data.data.documents);
+        setGraph(data.data);
       }
     } catch (err) {
-      console.error("Failed to fetch documents:", err);
+      console.error("Failed to fetch graph:", err);
     } finally {
       setIsLoading(false);
     }
   }
 
-  async function createNewNote() {
-    if (!newNoteTitle.trim()) return;
-
-    const slug = newNoteTitle.toLowerCase().replace(/\s+/g, "-");
-    const content = `---
-title: ${newNoteTitle}
-tags: []
----
-
-# ${newNoteTitle}
-
-Start writing...
-`;
-
-    try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, content }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        router.push(`/editor/${slug}`);
-      } else {
-        alert(data.error);
-      }
-    } catch (err) {
-      console.error("Failed to create note:", err);
-    }
-  }
-
-  const filteredDocuments = documents.filter(
-    (doc) =>
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.slug.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading...</p>
+        <p className="text-lg text-gray-600">Loading graph...</p>
       </div>
     );
   }
 
+  if (!graph) {
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-red-600">Failed to load graph</p>
+      </div>
+    );
+  }
+
+  // Calculate node and link counts
+  const nodeCount = graph.nodes ? (Array.isArray(graph.nodes) ? graph.nodes.length : Object.keys(graph.nodes).length) : 0;
+  const linkCount = (graph.links || graph.edges || []).length;
+
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="flex flex-col h-screen overflow-hidden">
       {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold mb-2">Synapse</h1>
-        <p className="text-gray-600">Your local-first markdown notes</p>
-      </div>
-
-      {/* Actions */}
-      <div className="mb-6 flex gap-4">
-        <Input
-          type="text"
-          placeholder="Search notes..."
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="flex-1"
-        />
-        <Button onClick={() => setIsCreating(!isCreating)}>
-          {isCreating ? "Cancel" : "+ New Note"}
-        </Button>
-      </div>
-
-      {/* Create Note Form */}
-      {isCreating && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Create New Note</CardTitle>
-            <div className="flex gap-2 mt-4">
-              <Input
-                type="text"
-                placeholder="Note title..."
-                value={newNoteTitle}
-                onChange={(e) => setNewNoteTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") createNewNote();
-                }}
-                autoFocus
-              />
-              <Button onClick={createNewNote}>Create</Button>
-            </div>
-          </CardHeader>
-        </Card>
-      )}
-
-      {/* Stats */}
-      <div className="mb-6 text-sm text-gray-600">
-        {filteredDocuments.length} {filteredDocuments.length === 1 ? "note" : "notes"}
-        {searchQuery && ` matching "${searchQuery}"`}
-      </div>
-
-      {/* Documents List */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {filteredDocuments.map((doc) => (
-          <Card
-            key={doc.slug}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => router.push(`/note/${doc.slug}`)}
-          >
-            <CardHeader>
-              <CardTitle className="text-lg">{doc.title}</CardTitle>
-              <CardDescription>
-                <div className="flex flex-col gap-1 text-xs">
-                  <span>Updated: {new Date(doc.updatedAt).toLocaleDateString()}</span>
-                  {doc.links.length > 0 && (
-                    <span>{doc.links.length} links</span>
-                  )}
-                  {doc.backlinks.length > 0 && (
-                    <span>{doc.backlinks.length} backlinks</span>
-                  )}
-                  {doc.frontmatter.tags && doc.frontmatter.tags.length > 0 && (
-                    <div className="flex gap-1 flex-wrap mt-2">
-                      {doc.frontmatter.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className="px-2 py-0.5 bg-gray-100 rounded text-xs"
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
-
-      {/* Empty State */}
-      {filteredDocuments.length === 0 && !searchQuery && (
-        <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">No notes yet. Create your first note!</p>
-          <Button onClick={() => setIsCreating(true)}>+ New Note</Button>
+      <header className="border-b bg-white p-4 flex-shrink-0">
+        <div className="container mx-auto flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">Synapse</h1>
+            <p className="text-sm text-gray-600">
+              {nodeCount} notes, {linkCount} connections
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" onClick={() => router.push("/documents")}>
+              View List
+            </Button>
+            <Button onClick={() => router.push("/documents")}>
+              + New Note
+            </Button>
+          </div>
         </div>
-      )}
+      </header>
 
-      {/* No Search Results */}
-      {filteredDocuments.length === 0 && searchQuery && (
-        <div className="text-center py-12">
-          <p className="text-gray-600">No notes found matching "{searchQuery}"</p>
+      {/* Graph View */}
+      <main className="flex-1 bg-gray-50 overflow-hidden">
+        <div className="w-full h-full">
+          {windowHeight > 0 && graph && graph.nodes && graph.links && (
+            <ForceGraphView
+              graphData={graph as any}
+              height={windowHeight - 120}
+              showSearchFilter={true}
+            />
+          )}
         </div>
-      )}
+      </main>
+
+      {/* Quick Tips */}
+      <div className="border-t bg-white p-3 flex-shrink-0">
+        <div className="container mx-auto text-center text-sm text-gray-600">
+          <span className="font-semibold">Tips:</span> Click a node to view note
+          • Hover to see connections • Larger nodes = more connections
+        </div>
+      </div>
     </div>
   );
 }
