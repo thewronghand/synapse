@@ -4,11 +4,15 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --destructive: 0 84.2% 60.2%;
+  --destructive-foreground: 210 40% 98%;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-destructive: hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }

@@ -81,7 +81,7 @@ export default function Home() {
             <Button variant="outline" onClick={() => router.push("/documents")}>
               View List
             </Button>
-            <Button onClick={() => router.push("/documents")}>
+            <Button onClick={() => router.push("/editor/new")}>
               + New Note
             </Button>
           </div>

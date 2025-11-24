@@ -8,6 +8,8 @@ import {
   calculateBacklinks,
 } from '@/lib/document-parser';
 import { Document } from '@/types';
+import { tagCache } from '@/lib/tag-cache';
+import { documentCache } from '@/lib/document-cache';
 
 const NOTES_DIR = path.join(process.cwd(), 'notes');
 
@@ -80,6 +82,18 @@ export async function PUT(
     // Write updated content
     await fs.writeFile(filePath, content, 'utf-8');
 
+    // Update tag cache with new tags
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
+      tagCache.addTags(frontmatter.tags);
+      console.log(`[TagCache] Added tags from updated document: ${frontmatter.tags.join(', ')}`);
+    }
+
+    // Update document cache with new title
+    const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+    documentCache.updateDocument(slug, title);
+    console.log(`[DocumentCache] Updated document: ${slug} - ${title}`);
+
     // Get updated document
     const document = await getDocumentBySlug(slug);
 
@@ -126,6 +140,14 @@ export async function DELETE(
 
     // Delete file
     await fs.unlink(filePath);
+
+    // Remove document from cache
+    documentCache.removeDocument(slug);
+    console.log(`[DocumentCache] Removed document: ${slug}`);
+
+    // Refresh tag cache since we don't know which tags are no longer used
+    await tagCache.refreshTags();
+    console.log(`[TagCache] Refreshed tags after document deletion`);
 
     return NextResponse.json({
       success: true,

@@ -12,8 +12,6 @@ export default function Home() {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
-  const [isCreating, setIsCreating] = useState(false);
-  const [newNoteTitle, setNewNoteTitle] = useState("");
 
   useEffect(() => {
     fetchDocuments();
@@ -31,39 +29,6 @@ export default function Home() {
       console.error("Failed to fetch documents:", err);
     } finally {
       setIsLoading(false);
-    }
-  }
-
-  async function createNewNote() {
-    if (!newNoteTitle.trim()) return;
-
-    const slug = newNoteTitle.toLowerCase().replace(/\s+/g, "-");
-    const content = `---
-title: ${newNoteTitle}
-tags: []
----
-
-# ${newNoteTitle}
-
-Start writing...
-`;
-
-    try {
-      const res = await fetch("/api/documents", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, content }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        router.push(`/editor/${slug}`);
-      } else {
-        alert(data.error);
-      }
-    } catch (err) {
-      console.error("Failed to create note:", err);
     }
   }
 
@@ -103,32 +68,10 @@ Start writing...
           onChange={(e) => setSearchQuery(e.target.value)}
           className="flex-1"
         />
-        <Button onClick={() => setIsCreating(!isCreating)}>
-          {isCreating ? "Cancel" : "+ New Note"}
+        <Button onClick={() => router.push("/editor/new")}>
+          + New Note
         </Button>
       </div>
-
-      {/* Create Note Form */}
-      {isCreating && (
-        <Card className="mb-6">
-          <CardHeader>
-            <CardTitle>Create New Note</CardTitle>
-            <div className="flex gap-2 mt-4">
-              <Input
-                type="text"
-                placeholder="Note title..."
-                value={newNoteTitle}
-                onChange={(e) => setNewNoteTitle(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") createNewNote();
-                }}
-                autoFocus
-              />
-              <Button onClick={createNewNote}>Create</Button>
-            </div>
-          </CardHeader>
-        </Card>
-      )}
 
       {/* Stats */}
       <div className="mb-6 text-sm text-gray-600">
@@ -178,7 +121,7 @@ Start writing...
       {filteredDocuments.length === 0 && !searchQuery && (
         <div className="text-center py-12">
           <p className="text-gray-600 mb-4">No notes yet. Create your first note!</p>
-          <Button onClick={() => setIsCreating(true)}>+ New Note</Button>
+          <Button onClick={() => router.push("/editor/new")}>+ New Note</Button>
         </div>
       )}
 

@@ -74,6 +74,25 @@ export default function NotePage() {
     router.push(`/note/${normalizedSlug}`);
   }
 
+  async function handleDelete() {
+    if (!document || !confirm(`"${document.title}" 문서를 삭제하시겠습니까?`)) {
+      return;
+    }
+
+    try {
+      const res = await fetch(`/api/documents/${slug}`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        router.push("/documents");
+      }
+    } catch (err) {
+      console.error("Failed to delete:", err);
+      alert("문서 삭제에 실패했습니다.");
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -118,9 +137,14 @@ export default function NotePage() {
               )}
             </div>
           </div>
-          <Button onClick={() => router.push(`/editor/${slug}`)}>
-            Edit
-          </Button>
+          <div className="flex gap-2">
+            <Button onClick={() => router.push(`/editor/${slug}`)}>
+              Edit
+            </Button>
+            <Button variant="destructive" onClick={handleDelete}>
+              Delete
+            </Button>
+          </div>
         </div>
       </header>
 
