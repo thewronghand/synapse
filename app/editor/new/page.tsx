@@ -34,7 +34,7 @@ export default function NewNotePage() {
     fetchTags();
   }, []);
 
-  // Initialize content with frontmatter and heading on first title input
+  // Initialize content with frontmatter on first title input
   useEffect(() => {
     if (title.trim() && !isInitialized && !content.trim()) {
       const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
@@ -42,8 +42,6 @@ export default function NewNotePage() {
 title: ${title}
 tags: ${tagsYaml}
 ---
-
-# ${title}
 
 `;
       setContent(initialContent);
@@ -91,6 +89,16 @@ ${bodyContent}`;
   async function saveDocument() {
     if (!title.trim()) {
       setError("제목을 입력해주세요");
+      return;
+    }
+
+    // Check if there's actual content (excluding frontmatter)
+    const frontmatterRegex = /^---\n[\s\S]*?\n---\n([\s\S]*)$/;
+    const match = content.match(frontmatterRegex);
+    const bodyContent = match ? match[1].trim() : content.trim();
+
+    if (!bodyContent) {
+      setError("내용을 입력해주세요");
       return;
     }
 
