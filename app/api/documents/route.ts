@@ -9,6 +9,9 @@ import {
   getSlugFromFilePath,
 } from '@/lib/document-parser';
 import { Document } from '@/types';
+import { tagCache } from '@/lib/tag-cache';
+import { documentCache } from '@/lib/document-cache';
+import { moveImagesFromTemp } from '@/lib/image-utils';
 
 const NOTES_DIR = path.join(process.cwd(), 'notes');
 
@@ -74,8 +77,23 @@ export async function POST(request: NextRequest) {
       // File doesn't exist, proceed
     }
 
-    // Write file
-    await fs.writeFile(filePath, content, 'utf-8');
+    // Move temp images to permanent location and update content
+    const updatedContent = await moveImagesFromTemp(content);
+
+    // Write file with updated content
+    await fs.writeFile(filePath, updatedContent, 'utf-8');
+
+    // Update tag cache with new tags
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
+      tagCache.addTags(frontmatter.tags);
+      console.log(`[TagCache] Added tags from new document: ${frontmatter.tags.join(', ')}`);
+    }
+
+    // Update document cache with new document
+    const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+    documentCache.addDocument(slug, title);
+    console.log(`[DocumentCache] Added document: ${slug} - ${title}`);
 
     // Get the created document
     const document = await getDocumentBySlug(slug);
