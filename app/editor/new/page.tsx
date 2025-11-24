@@ -36,7 +36,7 @@ export default function NewNotePage() {
 
   // Initialize content with frontmatter and heading on first title input
   useEffect(() => {
-    if (title.trim() && !isInitialized) {
+    if (title.trim() && !isInitialized && !content.trim()) {
       const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
       const initialContent = `---
 title: ${title}
@@ -49,11 +49,27 @@ tags: ${tagsYaml}
       setContent(initialContent);
       setIsInitialized(true);
     }
-  }, [title, tags, isInitialized]);
+  }, [title, tags, isInitialized, content]);
 
   // Update frontmatter when title or tags change (preserving body content)
   useEffect(() => {
-    if (!title.trim() || !isInitialized) return;
+    if (!title.trim()) return;
+
+    // If content exists but not initialized yet, add frontmatter to existing content
+    if (!isInitialized && content.trim()) {
+      const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
+      const newContent = `---
+title: ${title}
+tags: ${tagsYaml}
+---
+
+${content}`;
+      setContent(newContent);
+      setIsInitialized(true);
+      return;
+    }
+
+    if (!isInitialized) return;
 
     const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
     const match = content.match(frontmatterRegex);
@@ -188,7 +204,24 @@ ${bodyContent}`;
         <div className="flex flex-col h-full overflow-hidden">
           <h2 className="text-lg font-semibold mb-2">Editor</h2>
           <div className="flex-1 overflow-y-auto border rounded-lg">
-            <MarkdownEditor value={content} onChange={setContent} />
+            <MarkdownEditor
+              value={(() => {
+                // Extract body content without frontmatter
+                const frontmatterRegex = /^---\n[\s\S]*?\n---\n([\s\S]*)$/;
+                const match = content.match(frontmatterRegex);
+                return match ? match[1] : content;
+              })()}
+              onChange={(newBody) => {
+                // Update content with frontmatter + new body
+                const frontmatterRegex = /^(---\n[\s\S]*?\n---\n)/;
+                const match = content.match(frontmatterRegex);
+                if (match) {
+                  setContent(match[1] + newBody);
+                } else {
+                  setContent(newBody);
+                }
+              }}
+            />
           </div>
         </div>
 
