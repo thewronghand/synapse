@@ -126,12 +126,13 @@ export default function NotePage() {
               {document.frontmatter.tags && document.frontmatter.tags.length > 0 && (
                 <div className="flex gap-1 mt-1">
                   {document.frontmatter.tags.map((tag) => (
-                    <span
+                    <button
                       key={tag}
-                      className="text-xs px-2 py-0.5 bg-gray-100 rounded"
+                      onClick={() => router.push(`/documents?tags=${encodeURIComponent(tag)}`)}
+                      className="text-xs px-2 py-0.5 bg-gray-100 hover:bg-gray-200 rounded cursor-pointer transition-colors"
                     >
                       {tag}
-                    </span>
+                    </button>
                   ))}
                 </div>
               )}

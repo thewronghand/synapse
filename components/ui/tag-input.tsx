@@ -10,6 +10,8 @@ interface TagInputProps {
   onChange: (tags: string[]) => void;
   suggestions?: string[];
   placeholder?: string;
+  variant?: "include" | "exclude";
+  showHelper?: boolean;
 }
 
 export function TagInput({
@@ -17,7 +19,12 @@ export function TagInput({
   onChange,
   suggestions = [],
   placeholder = "태그 추가...",
+  variant = "include",
+  showHelper = false,
 }: TagInputProps) {
+  const colorClasses = variant === "include"
+    ? "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200 hover:bg-blue-300"
+    : "bg-red-50 text-red-700 hover:bg-red-100 border-red-200 hover:bg-red-200";
   const [inputValue, setInputValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -98,19 +105,36 @@ export function TagInput({
     }
   };
 
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    setIsComposing(false);
+    // After Korean input is complete, check for delimiters
+    const value = e.currentTarget.value;
+    if (value.includes(",") || value.includes(" ")) {
+      // Extract the tag before the delimiter
+      const parts = value.split(/[,\s]+/);
+      const tagToAdd = parts[0].trim();
+      if (tagToAdd) {
+        addTag(tagToAdd);
+        // Keep any remaining text after delimiter
+        const remaining = parts.slice(1).join(" ").trim();
+        setInputValue(remaining);
+      }
+    }
+  };
+
   return (
     <div className="relative">
       <div className="flex flex-wrap gap-2 p-2 border rounded-lg min-h-[42px] focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-gray-400">
         {tags.map((tag) => (
           <Badge
             key={tag}
-            className="flex items-center gap-1 px-2 py-1 bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200"
+            className={`flex items-center gap-1 px-2 py-1 ${colorClasses}`}
           >
             {tag}
             <button
               type="button"
               onClick={() => removeTag(tag)}
-              className="ml-1 hover:bg-blue-300 rounded-full p-0.5 transition-colors"
+              className="ml-1 rounded-full p-0.5 transition-colors"
             >
               <X className="h-3 w-3" />
             </button>
@@ -123,7 +147,7 @@ export function TagInput({
           onChange={(e) => setInputValue(e.target.value)}
           onKeyDown={handleKeyDown}
           onCompositionStart={() => setIsComposing(true)}
-          onCompositionEnd={() => setIsComposing(false)}
+          onCompositionEnd={handleCompositionEnd}
           onFocus={() => setShowSuggestions(true)}
           onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
           placeholder={tags.length === 0 ? placeholder : ""}
@@ -152,9 +176,11 @@ export function TagInput({
         </div>
       )}
 
-      <p className="text-xs text-gray-500 mt-1">
-        Enter, 쉼표, 스페이스로 태그 추가
-      </p>
+      {showHelper && (
+        <p className="text-xs text-gray-500 mt-1">
+          Enter, 쉼표, 스페이스로 태그 추가
+        </p>
+      )}
     </div>
   );
 }

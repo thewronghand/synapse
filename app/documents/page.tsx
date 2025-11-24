@@ -1,21 +1,49 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { TagInput } from "@/components/ui/tag-input";
+import { X } from "lucide-react";
 
 export default function Home() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [excludedTags, setExcludedTags] = useState<string[]>([]);
+  const [availableTags, setAvailableTags] = useState<string[]>([]);
 
   useEffect(() => {
     fetchDocuments();
+    fetchTags();
   }, []);
+
+  // Read tags from URL params
+  useEffect(() => {
+    const tagsParam = searchParams.get("tags");
+    const excludeParam = searchParams.get("exclude");
+
+    if (tagsParam) {
+      const tags = tagsParam.split(",").filter(Boolean).map(decodeURIComponent);
+      setSelectedTags(tags);
+    } else {
+      setSelectedTags([]);
+    }
+
+    if (excludeParam) {
+      const excluded = excludeParam.split(",").filter(Boolean).map(decodeURIComponent);
+      setExcludedTags(excluded);
+    } else {
+      setExcludedTags([]);
+    }
+  }, [searchParams]);
 
   async function fetchDocuments() {
     try {
@@ -32,11 +60,74 @@ export default function Home() {
     }
   }
 
-  const filteredDocuments = documents.filter(
-    (doc) =>
+  async function fetchTags() {
+    try {
+      const res = await fetch("/api/tags");
+      const data = await res.json();
+      if (data.success) {
+        setAvailableTags(data.data.tags);
+      }
+    } catch (err) {
+      console.error("Failed to fetch tags:", err);
+    }
+  }
+
+  function handleTagClick(tag: string, event: React.MouseEvent) {
+    event.stopPropagation(); // Prevent card click
+    const newTags = selectedTags.includes(tag)
+      ? selectedTags.filter((t) => t !== tag)
+      : [...selectedTags, tag];
+    updateFiltersInURL(newTags, excludedTags);
+  }
+
+  function handleTagsChange(tags: string[]) {
+    updateFiltersInURL(tags, excludedTags);
+  }
+
+  function handleExcludedTagsChange(tags: string[]) {
+    updateFiltersInURL(selectedTags, tags);
+  }
+
+  function updateFiltersInURL(includeTags: string[], excludeTags: string[]) {
+    const params = new URLSearchParams();
+
+    if (includeTags.length > 0) {
+      params.set("tags", includeTags.map(encodeURIComponent).join(","));
+    }
+
+    if (excludeTags.length > 0) {
+      params.set("exclude", excludeTags.map(encodeURIComponent).join(","));
+    }
+
+    const queryString = params.toString();
+    router.push(queryString ? `/documents?${queryString}` : "/documents");
+  }
+
+  function removeTag(tagToRemove: string) {
+    const newTags = selectedTags.filter((tag) => tag !== tagToRemove);
+    updateFiltersInURL(newTags, excludedTags);
+  }
+
+  const filteredDocuments = documents.filter((doc) => {
+    // Text search filter
+    const matchesSearch =
       doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.slug.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      doc.slug.toLowerCase().includes(searchQuery.toLowerCase());
+
+    // Include tags filter (AND logic - document must have ALL selected tags)
+    const matchesIncludeTags =
+      selectedTags.length === 0
+        ? true
+        : selectedTags.every((tag) => doc.frontmatter.tags?.includes(tag));
+
+    // Exclude tags filter (document must NOT have ANY excluded tags)
+    const matchesExcludeTags =
+      excludedTags.length === 0
+        ? true
+        : !excludedTags.some((tag) => doc.frontmatter.tags?.includes(tag));
+
+    return matchesSearch && matchesIncludeTags && matchesExcludeTags;
+  });
 
   if (isLoading) {
     return (
@@ -54,12 +145,17 @@ export default function Home() {
           <h1 className="text-4xl font-bold mb-2">Synapse</h1>
           <p className="text-gray-600">Your local-first markdown notes</p>
         </div>
-        <Button variant="outline" onClick={() => router.push("/")}>
-          View Graph
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" onClick={() => router.push("/tags")}>
+            태그 관리
+          </Button>
+          <Button variant="outline" onClick={() => router.push("/")}>
+            그래프 뷰
+          </Button>
+        </div>
       </div>
 
-      {/* Actions */}
+      {/* Search and Actions */}
       <div className="mb-6 flex gap-4">
         <Input
           type="text"
@@ -73,10 +169,47 @@ export default function Home() {
         </Button>
       </div>
 
+      {/* Tag Filter Inputs */}
+      <div className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Include Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              포함 태그 (AND)
+            </label>
+            <TagInput
+              tags={selectedTags}
+              onChange={handleTagsChange}
+              suggestions={availableTags}
+              placeholder="포함할 태그를 선택하세요..."
+            />
+          </div>
+
+          {/* Exclude Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              제외 태그 (NOT)
+            </label>
+            <TagInput
+              tags={excludedTags}
+              onChange={handleExcludedTagsChange}
+              suggestions={availableTags}
+              placeholder="제외할 태그를 선택하세요..."
+              variant="exclude"
+            />
+          </div>
+        </div>
+        <p className="text-xs text-gray-500 mt-2">
+          💡 Enter, 쉼표, 스페이스로 태그 추가
+        </p>
+      </div>
+
       {/* Stats */}
       <div className="mb-6 text-sm text-gray-600">
         {filteredDocuments.length} {filteredDocuments.length === 1 ? "note" : "notes"}
         {searchQuery && ` matching "${searchQuery}"`}
+        {selectedTags.length > 0 && ` with tags: ${selectedTags.join(", ")}`}
+        {excludedTags.length > 0 && ` excluding: ${excludedTags.join(", ")}`}
       </div>
 
       {/* Documents List */}
@@ -101,12 +234,17 @@ export default function Home() {
                   {doc.frontmatter.tags && doc.frontmatter.tags.length > 0 && (
                     <div className="flex gap-1 flex-wrap mt-2">
                       {doc.frontmatter.tags.map((tag) => (
-                        <span
+                        <Badge
                           key={tag}
-                          className="px-2 py-0.5 bg-gray-100 rounded text-xs"
+                          className={`cursor-pointer hover:opacity-80 text-xs ${
+                            selectedTags.includes(tag)
+                              ? "bg-blue-100 text-blue-800 border-blue-200"
+                              : "bg-gray-100 text-gray-700 border-gray-200"
+                          }`}
+                          onClick={(e) => handleTagClick(tag, e)}
                         >
                           {tag}
-                        </span>
+                        </Badge>
                       ))}
                     </div>
                   )}
@@ -117,18 +255,19 @@ export default function Home() {
         ))}
       </div>
 
-      {/* Empty State */}
-      {filteredDocuments.length === 0 && !searchQuery && (
+      {/* Empty State - No documents at all */}
+      {documents.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-600 mb-4">No notes yet. Create your first note!</p>
           <Button onClick={() => router.push("/editor/new")}>+ New Note</Button>
         </div>
       )}
 
-      {/* No Search Results */}
-      {filteredDocuments.length === 0 && searchQuery && (
+      {/* No Filter Results */}
+      {documents.length > 0 && filteredDocuments.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600">No notes found matching "{searchQuery}"</p>
+          <p className="text-gray-700 font-medium mb-2">현재 조건에 해당하는 문서가 없습니다</p>
+          <p className="text-sm text-gray-500">필터를 변경하거나 새 문서를 작성해보세요</p>
         </div>
       )}
     </div>

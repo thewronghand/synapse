@@ -14,6 +14,7 @@ export default function NewNotePage() {
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,11 +34,11 @@ export default function NewNotePage() {
     fetchTags();
   }, []);
 
-  // Update content when title or tags change
+  // Initialize content with frontmatter and heading on first title input
   useEffect(() => {
-    if (title.trim()) {
+    if (title.trim() && !isInitialized && !content.trim()) {
       const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
-      const frontmatter = `---
+      const initialContent = `---
 title: ${title}
 tags: ${tagsYaml}
 ---
@@ -45,7 +46,45 @@ tags: ${tagsYaml}
 # ${title}
 
 `;
-      setContent(frontmatter);
+      setContent(initialContent);
+      setIsInitialized(true);
+    }
+  }, [title, tags, isInitialized, content]);
+
+  // Update frontmatter when title or tags change (preserving body content)
+  useEffect(() => {
+    if (!title.trim()) return;
+
+    // If content exists but not initialized yet, add frontmatter to existing content
+    if (!isInitialized && content.trim()) {
+      const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
+      const newContent = `---
+title: ${title}
+tags: ${tagsYaml}
+---
+
+${content}`;
+      setContent(newContent);
+      setIsInitialized(true);
+      return;
+    }
+
+    if (!isInitialized) return;
+
+    const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+    const match = content.match(frontmatterRegex);
+
+    if (match) {
+      const bodyContent = match[2]; // Everything after frontmatter
+      const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
+
+      const newContent = `---
+title: ${title}
+tags: ${tagsYaml}
+---
+${bodyContent}`;
+
+      setContent(newContent);
     }
   }, [title, tags]);
 
@@ -153,6 +192,7 @@ tags: ${tagsYaml}
               onChange={setTags}
               suggestions={availableTags}
               placeholder="태그를 입력하세요..."
+              showHelper={true}
             />
           </div>
         </div>
@@ -164,7 +204,24 @@ tags: ${tagsYaml}
         <div className="flex flex-col h-full overflow-hidden">
           <h2 className="text-lg font-semibold mb-2">Editor</h2>
           <div className="flex-1 overflow-y-auto border rounded-lg">
-            <MarkdownEditor value={content} onChange={setContent} />
+            <MarkdownEditor
+              value={(() => {
+                // Extract body content without frontmatter
+                const frontmatterRegex = /^---\n[\s\S]*?\n---\n([\s\S]*)$/;
+                const match = content.match(frontmatterRegex);
+                return match ? match[1] : content;
+              })()}
+              onChange={(newBody) => {
+                // Update content with frontmatter + new body
+                const frontmatterRegex = /^(---\n[\s\S]*?\n---\n)/;
+                const match = content.match(frontmatterRegex);
+                if (match) {
+                  setContent(match[1] + newBody);
+                } else {
+                  setContent(newBody);
+                }
+              }}
+            />
           </div>
         </div>
 
