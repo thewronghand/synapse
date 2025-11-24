@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
+import { Search } from "lucide-react";
 import { DigitalGardenNode, GraphEdge } from "@/types";
 
 interface ForceGraphViewProps {
@@ -35,10 +36,40 @@ export default function ForceGraphView({
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
 
   // Search and filter states
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchInput, setSearchInput] = useState(""); // User input (immediate)
+  const [searchQuery, setSearchQuery] = useState(""); // Debounced search value
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
   const [showTagSuggestions, setShowTagSuggestions] = useState(false);
+  const [availableTitles, setAvailableTitles] = useState<string[]>([]);
+  const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
+  const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
+  const [selectedTagIndex, setSelectedTagIndex] = useState(0);
+
+  // Fetch available titles for autocomplete
+  useEffect(() => {
+    async function fetchTitles() {
+      try {
+        const res = await fetch("/api/titles");
+        const data = await res.json();
+        if (data.success) {
+          setAvailableTitles(data.data.titles);
+        }
+      } catch (err) {
+        console.error("Failed to fetch titles:", err);
+      }
+    }
+    fetchTitles();
+  }, []);
+
+  // Debounce search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setSearchQuery(searchInput);
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchInput]);
 
   // Collapse legend automatically when graph is small
   useEffect(() => {
@@ -65,6 +96,15 @@ export default function ForceGraphView({
           tag.toLowerCase().includes(tagInput.toLowerCase()) &&
           !selectedTags.includes(tag)
       )
+    : [];
+
+  // Get search suggestions based on input
+  const searchSuggestions = searchInput
+    ? availableTitles
+        .filter(title =>
+          title.toLowerCase().includes(searchInput.toLowerCase())
+        )
+        .slice(0, 5) // Limit to 5 suggestions
     : [];
 
   // Filter graph data by depth, search, and tags
@@ -397,13 +437,62 @@ export default function ForceGraphView({
         <div className="absolute top-2 left-2 w-64">
           <div className="flex flex-col gap-2">
             {/* Search Bar */}
-            <input
-              type="text"
-              placeholder="Search notes..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="px-3 py-1.5 text-sm bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 z-10 pointer-events-none" />
+              <input
+                type="text"
+                placeholder="Search notes..."
+                value={searchInput}
+                onChange={(e) => {
+                  setSearchInput(e.target.value);
+                  setSelectedSearchIndex(0);
+                }}
+                onFocus={() => setShowSearchSuggestions(true)}
+                onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
+                onKeyDown={(e) => {
+                  if (!showSearchSuggestions || searchSuggestions.length === 0) return;
+
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSelectedSearchIndex((prev) =>
+                      prev < searchSuggestions.length - 1 ? prev + 1 : prev
+                    );
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSelectedSearchIndex((prev) => (prev > 0 ? prev - 1 : 0));
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    setSearchInput(searchSuggestions[selectedSearchIndex]);
+                    setShowSearchSuggestions(false);
+                  } else if (e.key === "Escape") {
+                    setShowSearchSuggestions(false);
+                  }
+                }}
+                className="w-full pl-10 pr-3 py-1.5 text-sm bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+
+              {/* Search Suggestions Dropdown */}
+              {showSearchSuggestions && searchSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                  {searchSuggestions.map((title, index) => (
+                    <button
+                      key={title}
+                      onClick={() => {
+                        setSearchInput(title);
+                        setShowSearchSuggestions(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-sm text-left transition-colors ${
+                        index === selectedSearchIndex
+                          ? "bg-blue-50 text-blue-700"
+                          : "hover:bg-gray-100"
+                      }`}
+                    >
+                      {title}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
 
             {/* Tag Input with Autocomplete */}
             <div className="relative">
@@ -414,12 +503,26 @@ export default function ForceGraphView({
                 onChange={(e) => {
                   setTagInput(e.target.value);
                   setShowTagSuggestions(true);
+                  setSelectedTagIndex(0);
                 }}
                 onFocus={() => setShowTagSuggestions(true)}
                 onBlur={() => setTimeout(() => setShowTagSuggestions(false), 200)}
                 onKeyDown={(e) => {
-                  if (e.key === 'Enter' && tagSuggestions.length > 0) {
-                    handleAddTag(tagSuggestions[0]);
+                  if (!showTagSuggestions || tagSuggestions.length === 0) return;
+
+                  if (e.key === "ArrowDown") {
+                    e.preventDefault();
+                    setSelectedTagIndex((prev) =>
+                      prev < tagSuggestions.length - 1 ? prev + 1 : prev
+                    );
+                  } else if (e.key === "ArrowUp") {
+                    e.preventDefault();
+                    setSelectedTagIndex((prev) => (prev > 0 ? prev - 1 : 0));
+                  } else if (e.key === "Enter") {
+                    e.preventDefault();
+                    handleAddTag(tagSuggestions[selectedTagIndex]);
+                  } else if (e.key === "Escape") {
+                    setShowTagSuggestions(false);
                   }
                 }}
                 className="w-full px-3 py-1.5 text-sm bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -428,11 +531,15 @@ export default function ForceGraphView({
               {/* Tag Suggestions Dropdown */}
               {showTagSuggestions && tagSuggestions.length > 0 && (
                 <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto z-10">
-                  {tagSuggestions.map((tag) => (
+                  {tagSuggestions.map((tag, index) => (
                     <button
                       key={tag}
                       onClick={() => handleAddTag(tag)}
-                      className="w-full px-3 py-1.5 text-sm text-left hover:bg-gray-100 transition-colors"
+                      className={`w-full px-3 py-1.5 text-sm text-left transition-colors ${
+                        index === selectedTagIndex
+                          ? "bg-blue-50 text-blue-700"
+                          : "hover:bg-gray-100"
+                      }`}
                     >
                       {tag}
                     </button>
