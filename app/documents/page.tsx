@@ -170,33 +170,38 @@ export default function Home() {
       </div>
 
       {/* Tag Filter Inputs */}
-      <div className="mb-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-        {/* Include Tags */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            포함 태그 (AND)
-          </label>
-          <TagInput
-            tags={selectedTags}
-            onChange={handleTagsChange}
-            suggestions={availableTags}
-            placeholder="포함할 태그를 선택하세요..."
-          />
-        </div>
+      <div className="mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Include Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              포함 태그 (AND)
+            </label>
+            <TagInput
+              tags={selectedTags}
+              onChange={handleTagsChange}
+              suggestions={availableTags}
+              placeholder="포함할 태그를 선택하세요..."
+            />
+          </div>
 
-        {/* Exclude Tags */}
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
-            제외 태그 (NOT)
-          </label>
-          <TagInput
-            tags={excludedTags}
-            onChange={handleExcludedTagsChange}
-            suggestions={availableTags}
-            placeholder="제외할 태그를 선택하세요..."
-            variant="exclude"
-          />
+          {/* Exclude Tags */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              제외 태그 (NOT)
+            </label>
+            <TagInput
+              tags={excludedTags}
+              onChange={handleExcludedTagsChange}
+              suggestions={availableTags}
+              placeholder="제외할 태그를 선택하세요..."
+              variant="exclude"
+            />
+          </div>
         </div>
+        <p className="text-xs text-gray-500 mt-2">
+          💡 Enter, 쉼표, 스페이스로 태그 추가
+        </p>
       </div>
 
       {/* Stats */}
@@ -231,8 +236,11 @@ export default function Home() {
                       {doc.frontmatter.tags.map((tag) => (
                         <Badge
                           key={tag}
-                          variant={selectedTags.includes(tag) ? "default" : "secondary"}
-                          className="cursor-pointer hover:opacity-80 text-xs"
+                          className={`cursor-pointer hover:opacity-80 text-xs ${
+                            selectedTags.includes(tag)
+                              ? "bg-blue-100 text-blue-800 border-blue-200"
+                              : "bg-gray-100 text-gray-700 border-gray-200"
+                          }`}
                           onClick={(e) => handleTagClick(tag, e)}
                         >
                           {tag}
