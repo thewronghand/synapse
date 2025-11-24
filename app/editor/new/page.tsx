@@ -14,6 +14,7 @@ export default function NewNotePage() {
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
+  const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -33,11 +34,11 @@ export default function NewNotePage() {
     fetchTags();
   }, []);
 
-  // Update content when title or tags change
+  // Initialize content with frontmatter and heading on first title input
   useEffect(() => {
-    if (title.trim()) {
+    if (title.trim() && !isInitialized) {
       const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
-      const frontmatter = `---
+      const initialContent = `---
 title: ${title}
 tags: ${tagsYaml}
 ---
@@ -45,7 +46,29 @@ tags: ${tagsYaml}
 # ${title}
 
 `;
-      setContent(frontmatter);
+      setContent(initialContent);
+      setIsInitialized(true);
+    }
+  }, [title, tags, isInitialized]);
+
+  // Update frontmatter when title or tags change (preserving body content)
+  useEffect(() => {
+    if (!title.trim() || !isInitialized) return;
+
+    const frontmatterRegex = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/;
+    const match = content.match(frontmatterRegex);
+
+    if (match) {
+      const bodyContent = match[2]; // Everything after frontmatter
+      const tagsYaml = tags.length > 0 ? `[${tags.map(t => `"${t}"`).join(", ")}]` : "[]";
+
+      const newContent = `---
+title: ${title}
+tags: ${tagsYaml}
+---
+${bodyContent}`;
+
+      setContent(newContent);
     }
   }, [title, tags]);
 
@@ -153,6 +176,7 @@ tags: ${tagsYaml}
               onChange={setTags}
               suggestions={availableTags}
               placeholder="태그를 입력하세요..."
+              showHelper={true}
             />
           </div>
         </div>
