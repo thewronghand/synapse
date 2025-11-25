@@ -9,6 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { X, Search } from "lucide-react";
+import AppHeader from "@/components/layout/AppHeader";
 
 function DocumentsContent() {
   const router = useRouter();
@@ -319,19 +320,21 @@ function DocumentsContent() {
   return (
     <div className="container mx-auto py-8 px-4">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">Synapse</h1>
-          <p className="text-gray-600">Your local-first markdown notes</p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
-            태그 관리
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
-            그래프 뷰
-          </Button>
-        </div>
+      <div className="mb-8">
+        <AppHeader
+          title="Synapse"
+          subtitle="Your local-first markdown notes"
+          actions={
+            <>
+              <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
+                태그 관리
+              </Button>
+              <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+                그래프 뷰
+              </Button>
+            </>
+          }
+        />
       </div>
 
       {/* Search and Actions */}
@@ -392,7 +395,7 @@ function DocumentsContent() {
             </div>
           )}
         </div>
-        <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">
+        <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
           + 새 노트
         </Button>
       </div>
@@ -507,7 +510,7 @@ function DocumentsContent() {
       {documents.length === 0 && (
         <div className="text-center py-12">
           <p className="text-gray-600 mb-4">아직 노트가 없습니다. 첫 노트를 만들어보세요!</p>
-          <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">+ 새 노트</Button>
+          <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">+ 새 노트</Button>
         </div>
       )}
 
