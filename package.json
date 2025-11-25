@@ -10,7 +10,7 @@
     "lint": "eslint",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
     "electron:build": "next build && npm run copy-assets && electron-builder",
-    "copy-assets": "cp -r .next/static .next/standalone/.next/static && cp -r public .next/standalone/public"
+    "copy-assets": "node scripts/copy-assets.js"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.0",
@@ -65,7 +65,11 @@
       "public/**/*",
       "notes/**/*"
     ],
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/.next/standalone/**/*",
+      "**/notes/**/*"
+    ],
     "directories": {
       "buildResources": "assets"
     },
