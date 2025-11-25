@@ -49,7 +49,7 @@ export default function Home() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading graph...</p>
+        <p className="text-lg text-gray-600">그래프 로딩 중...</p>
       </div>
     );
   }
@@ -57,7 +57,7 @@ export default function Home() {
   if (!graph) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-red-600">Failed to load graph</p>
+        <p className="text-lg text-red-600">그래프를 불러올 수 없습니다</p>
       </div>
     );
   }
@@ -74,15 +74,15 @@ export default function Home() {
           <div>
             <h1 className="text-2xl font-bold">Synapse</h1>
             <p className="text-sm text-gray-600">
-              {nodeCount} notes, {linkCount} connections
+              {nodeCount}개 노트, {linkCount}개 연결
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => router.push("/documents")}>
-              View List
+            <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
+              목록 보기
             </Button>
-            <Button onClick={() => router.push("/editor/new")}>
-              + New Note
+            <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">
+              + 새 노트
             </Button>
           </div>
         </div>
@@ -104,8 +104,8 @@ export default function Home() {
       {/* Quick Tips */}
       <div className="border-t bg-white p-3 flex-shrink-0">
         <div className="container mx-auto text-center text-sm text-gray-600">
-          <span className="font-semibold">Tips:</span> Click a node to view note
-          • Hover to see connections • Larger nodes = more connections
+          <span className="font-semibold">팁:</span> 노드를 클릭하여 노트 보기
+          • 마우스를 올려 연결 확인 • 큰 노드 = 더 많은 연결
         </div>
       </div>
     </div>

@@ -160,8 +160,8 @@ ${bodyContent}`;
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4 flex-1">
-              <Button variant="outline" onClick={handleCancel}>
-                ← Cancel
+              <Button variant="outline" onClick={handleCancel} className="cursor-pointer">
+                ← 취소
               </Button>
               <div className="flex-1 max-w-md">
                 <Input
@@ -184,6 +184,7 @@ ${bodyContent}`;
               <Button
                 onClick={saveDocument}
                 disabled={isSaving || !title.trim()}
+                className="cursor-pointer"
               >
                 {isSaving ? "저장 중..." : "저장"}
               </Button>

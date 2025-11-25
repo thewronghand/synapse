@@ -325,10 +325,10 @@ function DocumentsContent() {
           <p className="text-gray-600">Your local-first markdown notes</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/tags")}>
+          <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
             태그 관리
           </Button>
-          <Button variant="outline" onClick={() => router.push("/")}>
+          <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
             그래프 뷰
           </Button>
         </div>
@@ -340,7 +340,7 @@ function DocumentsContent() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10 pointer-events-none" />
           <Input
             type="text"
-            placeholder="Search notes..."
+            placeholder="노트 검색..."
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
@@ -392,8 +392,8 @@ function DocumentsContent() {
             </div>
           )}
         </div>
-        <Button onClick={() => router.push("/editor/new")}>
-          + New Note
+        <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">
+          + 새 노트
         </Button>
       </div>
 
@@ -506,8 +506,8 @@ function DocumentsContent() {
       {/* Empty State - No documents at all */}
       {documents.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">No notes yet. Create your first note!</p>
-          <Button onClick={() => router.push("/editor/new")}>+ New Note</Button>
+          <p className="text-gray-600 mb-4">아직 노트가 없습니다. 첫 노트를 만들어보세요!</p>
+          <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">+ 새 노트</Button>
         </div>
       )}
 
