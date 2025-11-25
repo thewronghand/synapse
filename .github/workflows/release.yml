@@ -30,7 +30,34 @@ jobs:
         run: npm ci
 
       - name: Build Electron app
+        if: matrix.os == 'windows-latest'
         run: npm run electron:build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build macOS app (without DMG)
+        if: matrix.os == 'macos-latest'
+        run: |
+          npm run build
+          npm run copy-assets
+          npx electron-builder --mac --dir
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign macOS app (ad-hoc)
+        if: matrix.os == 'macos-latest'
+        run: |
+          # Find and sign all .app bundles with ad-hoc signature
+          find dist -name "*.app" -type d | while read app; do
+            echo "Signing $app"
+            codesign --force --deep --sign - "$app"
+          done
+
+      - name: Create macOS DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          npx electron-builder --mac dmg --prepackaged "dist/mac-arm64/Synapse.app"
+          npx electron-builder --mac dmg --prepackaged "dist/mac-x64/Synapse.app" --x64
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
