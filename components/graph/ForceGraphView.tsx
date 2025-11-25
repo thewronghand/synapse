@@ -477,7 +477,7 @@ export default function ForceGraphView({
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 z-10 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search notes..."
+                placeholder="노트 검색..."
                 value={searchInput}
                 onChange={(e) => {
                   setSearchInput(e.target.value);
@@ -534,7 +534,7 @@ export default function ForceGraphView({
             <div className="relative">
               <input
                 type="text"
-                placeholder="Add tag filter..."
+                placeholder="태그 필터 추가..."
                 value={tagInput}
                 onChange={(e) => {
                   setTagInput(e.target.value);
@@ -609,7 +609,7 @@ export default function ForceGraphView({
       <div className="absolute top-2 right-2 flex flex-col gap-1">
         <button
           onClick={handleZoomIn}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center"
+          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
           title="Zoom In"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -618,7 +618,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomOut}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center"
+          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
           title="Zoom Out"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -627,7 +627,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomReset}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center"
+          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
           title="Reset View"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -640,9 +640,9 @@ export default function ForceGraphView({
       <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs">
         <button
           onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-          className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-gray-50 rounded-lg transition-colors"
+          className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
         >
-          <div className="font-semibold text-gray-700">Legend</div>
+          <div className="font-semibold text-gray-700">범례</div>
           <svg
             className={`w-3 h-3 text-gray-500 transition-transform ${isLegendExpanded ? 'rotate-180' : ''}`}
             fill="none"
@@ -658,15 +658,15 @@ export default function ForceGraphView({
             {/* Tag-based colors */}
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-[#3b82f6] flex-shrink-0"></div>
-              <span className="text-gray-600">Guide/Tutorial</span>
+              <span className="text-gray-600">가이드/튜토리얼</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-[#10b981] flex-shrink-0"></div>
-              <span className="text-gray-600">Getting Started</span>
+              <span className="text-gray-600">시작하기</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6] flex-shrink-0"></div>
-              <span className="text-gray-600">Features</span>
+              <span className="text-gray-600">기능</span>
             </div>
 
             {/* Divider */}
@@ -675,15 +675,15 @@ export default function ForceGraphView({
             {/* Connection-based colors */}
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444] flex-shrink-0"></div>
-              <span className="text-gray-600">Highly Connected (3+)</span>
+              <span className="text-gray-600">많은 연결 (3+)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] flex-shrink-0"></div>
-              <span className="text-gray-600">Connected (1-2)</span>
+              <span className="text-gray-600">연결됨 (1-2)</span>
             </div>
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-full bg-[#6b7280] flex-shrink-0"></div>
-              <span className="text-gray-600">Default</span>
+              <span className="text-gray-600">기본</span>
             </div>
           </div>
         )}

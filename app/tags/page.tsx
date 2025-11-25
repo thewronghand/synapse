@@ -78,10 +78,10 @@ export default function TagsPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/documents")}>
+          <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
             문서 목록
           </Button>
-          <Button variant="outline" onClick={() => router.push("/")}>
+          <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
             그래프 뷰
           </Button>
         </div>
@@ -93,6 +93,7 @@ export default function TagsPage() {
           variant={sortBy === "count" ? "default" : "outline"}
           onClick={() => setSortBy("count")}
           size="sm"
+          className="cursor-pointer"
         >
           사용 빈도순
         </Button>
@@ -100,6 +101,7 @@ export default function TagsPage() {
           variant={sortBy === "name" ? "default" : "outline"}
           onClick={() => setSortBy("name")}
           size="sm"
+          className="cursor-pointer"
         >
           이름순
         </Button>
