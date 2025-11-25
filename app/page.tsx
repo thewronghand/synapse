@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import ForceGraphView from "@/components/graph/ForceGraphView";
-import { Graph } from "@/types";
+import { Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 
 export default function Home() {
@@ -93,7 +93,7 @@ export default function Home() {
         <div className="w-full h-full">
           {windowHeight > 0 && graph && graph.nodes && graph.links && (
             <ForceGraphView
-              graphData={graph as any}
+              graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
               height={windowHeight - 120}
               showSearchFilter={true}
             />

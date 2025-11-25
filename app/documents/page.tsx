@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { X, Search } from "lucide-react";
 
-export default function Home() {
+function DocumentsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
@@ -519,5 +519,17 @@ export default function Home() {
         </div>
       )}
     </div>
+  );
+}
+
+export default function DocumentsPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-gray-600">Loading...</p>
+      </div>
+    }>
+      <DocumentsContent />
+    </Suspense>
   );
 }

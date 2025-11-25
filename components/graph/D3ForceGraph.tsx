@@ -49,7 +49,17 @@ export default function D3ForceGraph({
   }, [height]);
 
   useEffect(() => {
-    if (!svgRef.current || !graph.nodes.length) return;
+    // Convert nodes to array if it's an object (Digital Garden format)
+    const nodesArray: GraphNode[] = Array.isArray(graph.nodes)
+      ? graph.nodes
+      : Object.values(graph.nodes).map((node) => ({
+          id: node.url.replace(/^\//, ''), // Remove leading slash from URL
+          label: node.title,
+          size: node.size,
+          color: node.color,
+        }));
+
+    if (!svgRef.current || !nodesArray.length) return;
 
     const svg = d3.select(svgRef.current);
     svg.selectAll("*").remove(); // Clear previous render
@@ -61,13 +71,15 @@ export default function D3ForceGraph({
 
     // Calculate link counts for each node
     const linkCountMap = new Map<string, number>();
-    graph.edges.forEach((edge) => {
-      linkCountMap.set(edge.source, (linkCountMap.get(edge.source) || 0) + 1);
-      linkCountMap.set(edge.target, (linkCountMap.get(edge.target) || 0) + 1);
+    (graph.edges || []).forEach((edge) => {
+      const sourceId = String(edge.source);
+      const targetId = String(edge.target);
+      linkCountMap.set(sourceId, (linkCountMap.get(sourceId) || 0) + 1);
+      linkCountMap.set(targetId, (linkCountMap.get(targetId) || 0) + 1);
     });
 
     // Transform data for D3
-    const nodes: D3Node[] = graph.nodes.map((node) => ({
+    const nodes: D3Node[] = nodesArray.map((node) => ({
       id: node.id,
       label: node.label,
       color: node.color || "#9f4ff3",
@@ -75,9 +87,9 @@ export default function D3ForceGraph({
       linkedNodesCount: linkCountMap.get(node.id) || 0,
     }));
 
-    const links: D3Link[] = graph.edges.map((edge) => ({
-      source: edge.source,
-      target: edge.target,
+    const links: D3Link[] = (graph.edges || []).map((edge) => ({
+      source: String(edge.source),
+      target: String(edge.target),
     }));
 
     // Calculate link distance based on connectivity (from vitriol)
@@ -145,7 +157,10 @@ export default function D3ForceGraph({
       .on("click", (event, d) => {
         event.stopPropagation();
         if (onNodeClick) {
-          onNodeClick(graph.nodes.find((n) => n.id === d.id)!);
+          const node = nodesArray.find((n) => n.id === d.id);
+          if (node) {
+            onNodeClick(node);
+          }
         } else {
           router.push(`/note/${d.id}`);
         }
@@ -269,7 +284,7 @@ export default function D3ForceGraph({
           .transition()
           .duration(750)
           .call(
-            zoom.transform as any,
+            zoom.transform as (selection: any, transform: d3.ZoomTransform) => void,
             d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
           );
       }
