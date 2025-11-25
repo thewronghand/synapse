@@ -1,0 +1,35 @@
+import { NextResponse } from 'next/server';
+import { documentCache } from '@/lib/document-cache';
+
+/**
+ * GET /api/titles
+ * Get all document titles from cache
+ */
+export async function GET() {
+  try {
+    // Ensure cache is initialized
+    if (!documentCache.isReady()) {
+      await documentCache.initialize();
+    }
+
+    const titles = documentCache.getTitles();
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        titles,
+        cached: true,
+        count: titles.length
+      },
+    });
+  } catch (error) {
+    console.error('Error fetching titles:', error);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'Failed to fetch titles',
+      },
+      { status: 500 }
+    );
+  }
+}

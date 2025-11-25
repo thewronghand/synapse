@@ -3,8 +3,12 @@
 # dependencies
 /node_modules
 /.pnp
-.pnp.js
-.yarn/install-state.gz
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
 
 # testing
 /coverage
@@ -24,6 +28,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+.pnpm-debug.log*
 
 # local env files
 .env*.local
@@ -52,3 +57,18 @@ firebase-debug.log
 Thumbs.db
 
 /docs
+
+# Test notes and scripts
+/scripts/generate-test-notes.js
+/notes/*.md
+!/notes/getting-started.md
+!/notes/how-to-use-wiki-links.md
+!/notes/index.md
+/notes/images/
+
+# Electron
+/dist
+*.dmg
+*.exe
+*.AppImage
+*.deb
