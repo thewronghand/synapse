@@ -8,6 +8,9 @@ on:
       - 'fix/**'  # Test builds on fix branches
   workflow_dispatch:  # Manual trigger
 
+permissions:
+  contents: write
+
 jobs:
   build:
     runs-on: macos-latest
