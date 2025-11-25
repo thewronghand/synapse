@@ -11,7 +11,7 @@ jobs:
 
     strategy:
       matrix:
-        os: [macos-latest, ubuntu-latest, windows-latest]
+        os: [macos-latest, windows-latest]
 
     steps:
       - name: Checkout code
@@ -45,15 +45,6 @@ jobs:
           name: windows-installer
           path: dist/*.exe
 
-      - name: Upload artifacts (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: linux-packages
-          path: |
-            dist/*.AppImage
-            dist/*.deb
-
   release:
     needs: build
     runs-on: ubuntu-latest
@@ -78,8 +69,6 @@ jobs:
           files: |
             artifacts/macos-dmg/*.dmg
             artifacts/windows-installer/*.exe
-            artifacts/linux-packages/*.AppImage
-            artifacts/linux-packages/*.deb
           draft: false
           prerelease: false
           generate_release_notes: true
