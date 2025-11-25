@@ -34,12 +34,19 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Package macOS DMG
+        if: matrix.os == 'macos-latest'
+        run: |
+          cd dist
+          zip -ry ../macos-installers.zip *.dmg
+          cd ..
+
       - name: Upload artifacts (macOS)
         if: matrix.os == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: dist/*.dmg
+          path: macos-installers.zip
 
       - name: Upload artifacts (Windows)
         if: matrix.os == 'windows-latest'
@@ -63,6 +70,13 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: Extract macOS DMG
+        run: |
+          cd artifacts/macos-dmg
+          unzip macos-installers.zip
+          rm macos-installers.zip
+          cd ../..
 
       - name: Display artifact structure
         run: ls -R artifacts/
