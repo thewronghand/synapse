@@ -119,9 +119,11 @@ npm run electron:build
 
 빌드된 앱은 `dist/` 폴더에 생성됩니다.
 
-### 릴리즈
+### 릴리즈 (Maintainers)
 
-새 버전을 릴리즈하려면 태그를 생성하고 푸시하세요:
+> 일반 사용자는 [Releases](https://github.com/thewronghand/synapse/releases) 페이지에서 빌드된 설치 파일을 다운로드하세요.
+
+**프로젝트 관리자용:** 새 버전을 릴리즈하려면 태그를 생성하고 푸시하세요:
 
 ```bash
 # 태그 생성
