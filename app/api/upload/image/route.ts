@@ -2,9 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { randomBytes } from 'crypto';
+import { getImagesDir, getTempImagesDir } from '@/lib/notes-path';
 
-const IMAGES_DIR = path.join(process.cwd(), 'notes', 'images');
-const TEMP_DIR = path.join(IMAGES_DIR, 'temp');
+const IMAGES_DIR = getImagesDir();
+const TEMP_DIR = getTempImagesDir();
 
 /**
  * POST /api/upload/image

@@ -12,8 +12,9 @@ import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
 import { documentCache } from '@/lib/document-cache';
 import { moveImagesFromTemp } from '@/lib/image-utils';
+import { getNotesDir } from '@/lib/notes-path';
 
-const NOTES_DIR = path.join(process.cwd(), 'notes');
+const NOTES_DIR = getNotesDir();
 
 /**
  * GET /api/documents

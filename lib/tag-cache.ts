@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { parseFrontmatter } from './document-parser';
+import { getNotesDir } from './notes-path';
 
-const NOTES_DIR = path.join(process.cwd(), 'notes');
+const NOTES_DIR = getNotesDir();
 
 /**
  * In-memory tag cache for fast tag lookups

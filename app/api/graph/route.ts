@@ -8,9 +8,10 @@ import {
   calculateBacklinks,
   getSlugFromFilePath,
 } from '@/lib/document-parser';
-import { Graph, GraphNode, GraphEdge } from '@/types';
+import { Graph, GraphNode, GraphEdge, DigitalGardenNode } from '@/types';
+import { getNotesDir } from '@/lib/notes-path';
 
-const NOTES_DIR = path.join(process.cwd(), 'notes');
+const NOTES_DIR = getNotesDir();
 
 /**
  * GET /api/graph
@@ -68,7 +69,7 @@ async function buildGraph(): Promise<Graph> {
   const backlinksMap = calculateBacklinks(documents);
 
   // Build nodes as object (Digital Garden format)
-  const nodesObject: { [url: string]: any } = {};
+  const nodesObject: { [url: string]: DigitalGardenNode } = {};
   const links: GraphEdge[] = [];
   let nodeId = 0;
 
