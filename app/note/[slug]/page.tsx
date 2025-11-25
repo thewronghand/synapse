@@ -7,6 +7,7 @@ import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { isPublishedMode } from "@/lib/env";
 
 export default function NotePage() {
   const params = useParams();
@@ -138,14 +139,16 @@ export default function NotePage() {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => router.push(`/editor/${slug}`)} className="cursor-pointer">
-              편집
-            </Button>
-            <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
-              삭제
-            </Button>
-          </div>
+          {!isPublishedMode() && (
+            <div className="flex gap-2">
+              <Button onClick={() => router.push(`/editor/${slug}`)} className="cursor-pointer">
+                편집
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
+                삭제
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 

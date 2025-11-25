@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { X, Search } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
+import { isPublishedMode } from "@/lib/env";
 
 function DocumentsContent() {
   const router = useRouter();
@@ -395,9 +396,11 @@ function DocumentsContent() {
             </div>
           )}
         </div>
-        <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
-          + 새 노트
-        </Button>
+        {!isPublishedMode() && (
+          <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+            + 새 노트
+          </Button>
+        )}
       </div>
 
       {/* Tag Filter Inputs */}
@@ -509,8 +512,14 @@ function DocumentsContent() {
       {/* Empty State - No documents at all */}
       {documents.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">아직 노트가 없습니다. 첫 노트를 만들어보세요!</p>
-          <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">+ 새 노트</Button>
+          <p className="text-gray-600 mb-4">
+            {isPublishedMode()
+              ? "아직 노트가 없습니다."
+              : "아직 노트가 없습니다. 첫 노트를 만들어보세요!"}
+          </p>
+          {!isPublishedMode() && (
+            <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">+ 새 노트</Button>
+          )}
         </div>
       )}
 

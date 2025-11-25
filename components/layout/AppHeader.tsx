@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Settings } from "lucide-react";
 import { ReactNode } from "react";
+import { isPublishedMode } from "@/lib/env";
 
 interface AppHeaderProps {
   title?: string | ReactNode;
@@ -44,7 +45,7 @@ export default function AppHeader({
         {/* Right side: Actions and Settings */}
         <div className="flex gap-2">
           {actions}
-          {showSettings && (
+          {showSettings && !isPublishedMode() && (
             <Button
               variant="outline"
               size="icon"

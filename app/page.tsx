@@ -6,6 +6,7 @@ import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/layout/AppHeader";
+import { isPublishedMode } from "@/lib/env";
 
 export default function Home() {
   const router = useRouter();
@@ -83,9 +84,11 @@ export default function Home() {
               <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
                 목록 보기
               </Button>
-              <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
-                + 새 노트
-              </Button>
+              {!isPublishedMode() && (
+                <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+                  + 새 노트
+                </Button>
+              )}
             </>
           }
         />
