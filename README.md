@@ -1,36 +1,138 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Synapse
 
-## Getting Started
+**Synapse**는 로컬 마크다운 파일 기반의 개인 지식 관리 시스템입니다. 위키링크와 태그를 사용하여 생각을 연결하고, 시각적인 그래프 뷰로 아이디어 간의 관계를 탐색할 수 있습니다.
 
-First, run the development server:
+## 주요 기능
+
+- 📝 **마크다운 기반 노트 작성**: 익숙한 마크다운 문법으로 빠르게 작성
+- 🔗 **위키링크**: `[[문서명]]` 형식으로 문서 간 연결
+- 🏷️ **태그 시스템**: 프론트매터를 통한 체계적인 분류
+- 🕸️ **인터랙티브 그래프 뷰**: D3.js 기반의 시각적 지식 네트워크
+- 🔍 **실시간 검색**: 문서 제목 및 내용 검색
+- 🖼️ **이미지 지원**: 드래그 앤 드롭으로 간편한 이미지 첨부
+- 💻 **데스크톱 앱**: Electron 기반 크로스 플랫폼 지원 (macOS, Windows, Linux)
+- 💾 **로컬 저장**: 모든 데이터는 사용자 문서 폴더에 안전하게 저장
+
+## 설치 방법
+
+### 데스크톱 앱 (권장)
+
+[Releases](https://github.com/thewronghand/synapse/releases) 페이지에서 운영체제에 맞는 설치 파일을 다운로드하세요:
+
+- **macOS**: `Synapse-{version}-arm64.dmg` (Apple Silicon) 또는 `Synapse-{version}-x64.dmg` (Intel)
+- **Windows**: `Synapse Setup {version}.exe`
+- **Linux**: `Synapse-{version}.AppImage` 또는 `synapse_{version}_amd64.deb`
+
+노트는 자동으로 `~/Documents/Synapse/notes/`에 저장됩니다.
+
+### 개발 환경 설정
 
 ```bash
+# 저장소 클론
+git clone https://github.com/thewronghand/synapse.git
+cd synapse
+
+# 의존성 설치
+npm install
+
+# 개발 서버 실행 (웹)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+
+# Electron 개발 모드 실행 (데스크톱)
+npm run electron:dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+## 사용 방법
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### 노트 작성
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. **새 노트 만들기**: 홈 화면에서 "+ 새 노트" 버튼 클릭
+2. **위키링크 만들기**: `[[링크할 문서명]]` 입력
+3. **태그 추가**: 프론트매터에 `tags: [태그1, 태그2]` 추가
+4. **이미지 첨부**: 에디터에 이미지 파일 드래그 앤 드롭
 
-## Learn More
+### 프론트매터 예시
 
-To learn more about Next.js, take a look at the following resources:
+```markdown
+---
+title: 문서 제목
+tags: [개발, Next.js, 메모]
+---
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# 문서 내용 시작
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### 그래프 뷰
 
-## Deploy on Vercel
+- 메뉴에서 "Graph" 선택
+- 노드 클릭으로 해당 문서 이동
+- 드래그로 그래프 이동, 스크롤로 확대/축소
+- 노드 크기는 연결된 문서 수를 반영
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 기술 스택
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+### 프론트엔드
+- **Next.js 16** - React 프레임워크
+- **React 19** - UI 라이브러리
+- **TypeScript** - 타입 안전성
+- **Tailwind CSS** - 스타일링
+- **CodeMirror** - 마크다운 에디터
+- **D3.js** - 그래프 시각화
+
+### 데스크톱
+- **Electron** - 크로스 플랫폼 데스크톱 앱
+
+### 데이터
+- **로컬 파일 시스템** - 마크다운 파일 저장
+- **gray-matter** - 프론트매터 파싱
+- **remark** - 마크다운 처리
+
+## 개발
+
+### 프로젝트 구조
+
+```
+synapse/
+├── app/                  # Next.js App Router
+│   ├── api/             # API 라우트
+│   ├── documents/       # 문서 목록 페이지
+│   ├── editor/          # 에디터 페이지
+│   ├── note/            # 노트 상세 페이지
+│   └── tags/            # 태그 페이지
+├── components/          # React 컴포넌트
+├── lib/                 # 유틸리티 함수
+├── electron/            # Electron 메인 프로세스
+├── notes/               # 기본 노트 (개발용)
+├── public/              # 정적 파일
+└── types/               # TypeScript 타입 정의
+```
+
+### 빌드
+
+```bash
+# 웹 빌드
+npm run build
+
+# Electron 앱 빌드
+npm run electron:build
+```
+
+빌드된 앱은 `dist/` 폴더에 생성됩니다.
+
+### 릴리즈
+
+새 버전을 릴리즈하려면 태그를 생성하고 푸시하세요:
+
+```bash
+# 태그 생성
+git tag v0.2.0
+
+# 태그 푸시
+git push origin v0.2.0
+```
+
+GitHub Actions가 자동으로 멀티 플랫폼 빌드를 실행하고 Release를 생성합니다.
+
+## 라이선스
+
+MIT License
