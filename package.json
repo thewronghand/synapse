@@ -58,6 +58,7 @@
   "build": {
     "appId": "com.synapse.app",
     "productName": "Synapse",
+    "publish": null,
     "files": [
       "electron/**/*",
       ".next/standalone/**/*",
