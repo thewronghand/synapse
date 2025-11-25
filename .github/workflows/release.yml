@@ -10,11 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
+    runs-on: macos-latest
 
     steps:
       - name: Checkout code
@@ -30,58 +26,21 @@ jobs:
         run: npm ci
 
       - name: Build Electron app
-        if: matrix.os == 'windows-latest'
         run: npm run electron:build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build macOS app (without DMG)
-        if: matrix.os == 'macos-latest'
-        run: |
-          npm run build
-          npm run copy-assets
-          npx electron-builder --mac --arm64 --dir
-          npx electron-builder --mac --x64 --dir
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Sign macOS app (ad-hoc)
-        if: matrix.os == 'macos-latest'
-        run: |
-          # Find and sign all .app bundles with ad-hoc signature
-          find dist -name "*.app" -type d | while read app; do
-            echo "Signing $app"
-            codesign --force --deep --sign - "$app"
-          done
-
-      - name: Create macOS DMG
-        if: matrix.os == 'macos-latest'
-        run: |
-          npx electron-builder --mac dmg --prepackaged "dist/mac-arm64/Synapse.app"
-          npx electron-builder --mac dmg --prepackaged "dist/mac/Synapse.app" --x64
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Package macOS DMG
-        if: matrix.os == 'macos-latest'
         run: |
           cd dist
           zip -ry ../macos-installers.zip *.dmg
           cd ..
 
-      - name: Upload artifacts (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
           path: macos-installers.zip
-
-      - name: Upload artifacts (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: dist/*.exe
 
   release:
     needs: build
@@ -112,9 +71,7 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/macos-dmg/*.dmg
-            artifacts/windows-installer/*.exe
+          files: artifacts/macos-dmg/*.dmg
           draft: false
           prerelease: false
           generate_release_notes: true
