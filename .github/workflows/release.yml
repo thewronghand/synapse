@@ -40,7 +40,8 @@ jobs:
         run: |
           npm run build
           npm run copy-assets
-          npx electron-builder --mac --dir
+          npx electron-builder --mac --arm64 --dir
+          npx electron-builder --mac --x64 --dir
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
