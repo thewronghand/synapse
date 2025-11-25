@@ -67,8 +67,8 @@
     ],
     "asar": true,
     "asarUnpack": [
-      "**/.next/standalone/**/*",
-      "**/notes/**/*"
+      ".next/standalone/**",
+      "notes/**"
     ],
     "directories": {
       "buildResources": "assets"
