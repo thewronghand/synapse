@@ -65,11 +65,7 @@
       "public/**/*",
       "notes/**/*"
     ],
-    "asar": true,
-    "asarUnpack": [
-      ".next/standalone/**",
-      "notes/**"
-    ],
+    "asar": false,
     "directories": {
       "buildResources": "assets"
     },
