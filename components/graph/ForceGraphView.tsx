@@ -6,6 +6,34 @@ import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
 import { DigitalGardenNode, GraphEdge } from "@/types";
 
+// ForceGraph instance type definition
+interface ForceGraphInstance {
+  graphData: (data: { nodes: DigitalGardenNode[]; links: GraphEdge[] }) => ForceGraphInstance;
+  nodeId: (accessor: string | ((node: DigitalGardenNode) => string | number)) => ForceGraphInstance;
+  nodeLabel: (accessor: string | ((node: DigitalGardenNode) => string)) => ForceGraphInstance;
+  nodeVal: (accessor: (node: DigitalGardenNode) => number) => ForceGraphInstance;
+  nodeColor: (accessor: (node: DigitalGardenNode) => string) => ForceGraphInstance;
+  nodeCanvasObject: (renderer: (node: DigitalGardenNode, ctx: CanvasRenderingContext2D, globalScale: number) => void) => ForceGraphInstance;
+  nodeCanvasObjectMode: (mode: () => string) => ForceGraphInstance;
+  linkColor: (accessor: (link: GraphEdge) => string) => ForceGraphInstance;
+  linkWidth: (accessor: (link: GraphEdge) => number) => ForceGraphInstance;
+  linkDirectionalArrowLength: (length: number) => ForceGraphInstance;
+  autoPauseRedraw: (enabled: boolean) => ForceGraphInstance;
+  onNodeClick: (handler: (node: DigitalGardenNode) => void) => ForceGraphInstance;
+  onNodeHover: (handler: (node: DigitalGardenNode | null) => void) => ForceGraphInstance;
+  width: (width: number) => ForceGraphInstance;
+  height: (height: number) => ForceGraphInstance;
+  zoom: (scale?: number, duration?: number) => number | ForceGraphInstance;
+  centerAt: (x: number, y: number, duration?: number) => ForceGraphInstance;
+  d3Force: (forceName: string) => any;
+  _destructor: () => void;
+}
+
+interface FilteredGraphData {
+  nodes: { [url: string]: DigitalGardenNode };
+  links: GraphEdge[];
+}
+
 interface ForceGraphViewProps {
   graphData: {
     nodes: { [url: string]: DigitalGardenNode };
@@ -28,11 +56,11 @@ export default function ForceGraphView({
 }: ForceGraphViewProps) {
   const router = useRouter();
   const containerRef = useRef<HTMLDivElement>(null);
-  const graphRef = useRef<any>(null);
-  const [filteredData, setFilteredData] = useState<any>(null);
-  const hoveredNodeRef = useRef<any>(null);
-  const highlightNodesRef = useRef<Set<any>>(new Set());
-  const highlightLinksRef = useRef<Set<any>>(new Set());
+  const graphRef = useRef<ForceGraphInstance | null>(null);
+  const [filteredData, setFilteredData] = useState<FilteredGraphData | null>(null);
+  const hoveredNodeRef = useRef<DigitalGardenNode | null>(null);
+  const highlightNodesRef = useRef<Set<DigitalGardenNode>>(new Set());
+  const highlightLinksRef = useRef<Set<GraphEdge>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
 
   // Search and filter states
@@ -85,7 +113,7 @@ export default function ForceGraphView({
   const allTags = Array.from(
     new Set(
       Object.values(graphData?.nodes || {})
-        .flatMap((node: any) => node.tags || [])
+        .flatMap((node: DigitalGardenNode) => node.tags || [])
     )
   ).sort();
 
@@ -115,8 +143,8 @@ export default function ForceGraphView({
     const clonedGraphData = {
       nodes: JSON.parse(JSON.stringify(graphData.nodes)),
       links: graphData.links.map(link => ({
-        source: typeof link.source === 'object' ? link.source.id : link.source,
-        target: typeof link.target === 'object' ? link.target.id : link.target,
+        source: link.source,
+        target: link.target,
       }))
     };
 
@@ -129,9 +157,9 @@ export default function ForceGraphView({
 
     // Apply search and tag filters
     if (searchQuery || selectedTags.length > 0) {
-      const filteredNodes: any = {};
+      const filteredNodes: { [url: string]: DigitalGardenNode } = {};
 
-      Object.entries(filtered.nodes).forEach(([url, node]: [string, any]) => {
+      (Object.entries(filtered.nodes) as [string, DigitalGardenNode][]).forEach(([url, node]) => {
         // Check search query (title match)
         const matchesSearch = !searchQuery ||
           node.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -147,16 +175,16 @@ export default function ForceGraphView({
 
       // Filter links to only include visible nodes
       const visibleUrls = Object.keys(filteredNodes);
-      const filteredLinks = filtered.links.filter((link: any) => {
-        const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-        const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+      const filteredLinks = filtered.links.filter((link: GraphEdge) => {
+        const sourceId = link.source;
+        const targetId = link.target;
 
-        const sourceNode = Object.values(filtered.nodes).find((n: any) => n.id === sourceId);
-        const targetNode = Object.values(filtered.nodes).find((n: any) => n.id === targetId);
+        const sourceNode = (Object.values(filtered.nodes) as DigitalGardenNode[]).find(n => n.id === sourceId);
+        const targetNode = (Object.values(filtered.nodes) as DigitalGardenNode[]).find(n => n.id === targetId);
 
         return sourceNode && targetNode &&
-               visibleUrls.includes((sourceNode as any).url) &&
-               visibleUrls.includes((targetNode as any).url);
+               visibleUrls.includes(sourceNode.url) &&
+               visibleUrls.includes(targetNode.url);
       });
 
       filtered = {
@@ -241,14 +269,15 @@ export default function ForceGraphView({
       }
 
       // Create graph instance
-      const graph = ForceGraph()(containerRef.current!)
+      const graph = (ForceGraph as any)()(containerRef.current!)
       .graphData({ nodes: nodesArray, links: linksArray })
       .nodeId("id")
       .nodeLabel("title")
-      .nodeVal((node: any) => node.size)
-      .nodeColor((node: any) => node.color || "#9f4ff3")
-      .nodeCanvasObject((node: any, ctx: CanvasRenderingContext2D) => {
-        const { x, y, title, size, url } = node;
+      .nodeVal((node: DigitalGardenNode) => node.size)
+      .nodeColor((node: DigitalGardenNode) => node.color || "#9f4ff3")
+      .nodeCanvasObject((node: DigitalGardenNode, ctx: CanvasRenderingContext2D) => {
+        const nodeWithPos = node as any;
+        const { x, y, title, size, url } = nodeWithPos;
         const radius = size || 2;
         const isCurrent = url === currentNodeUrl;
         const isHighlighted = !hoveredNodeRef.current || highlightNodesRef.current.has(node);
@@ -291,19 +320,19 @@ export default function ForceGraphView({
         ctx.fillText(displayLabel, x, y + radius + 5);
       })
       .nodeCanvasObjectMode(() => "replace")
-      .linkColor((link: any) => {
+      .linkColor((link: GraphEdge) => {
         // Highlight links connected to hovered node
         if (!hoveredNodeRef.current) return "#d3d3d3";
         return highlightLinksRef.current.has(link) ? "#6b7280" : "#e5e7eb"; // gray-500 : gray-200
       })
-      .linkWidth((link: any) => {
+      .linkWidth((link: GraphEdge) => {
         // Make highlighted links slightly thicker
         if (!hoveredNodeRef.current) return 1;
         return highlightLinksRef.current.has(link) ? 1.5 : 0.5;
       })
       .linkDirectionalArrowLength(2)
       .autoPauseRedraw(false)
-      .onNodeClick((node: any) => {
+      .onNodeClick((node: DigitalGardenNode) => {
         if (onNodeClick) {
           onNodeClick(node);
         } else {
@@ -312,27 +341,34 @@ export default function ForceGraphView({
           router.push(`/note/${slug}`);
         }
       })
-      .onNodeHover((node: any) => {
+      .onNodeHover((node: DigitalGardenNode | null) => {
         // Update cursor
-        containerRef.current!.style.cursor = node ? "pointer" : "default";
+        if (containerRef.current) {
+          containerRef.current.style.cursor = node ? "pointer" : "default";
+        }
 
         // Update hover state using refs
         hoveredNodeRef.current = node;
 
         if (node) {
           // Find all connected nodes and links
-          const connectedNodes = new Set<any>();
-          const connectedLinks = new Set<any>();
+          const connectedNodes = new Set<DigitalGardenNode>();
+          const connectedLinks = new Set<GraphEdge>();
 
           connectedNodes.add(node);
 
-          linksArray.forEach((link: any) => {
-            if (link.source === node || link.source.id === node.id) {
-              connectedNodes.add(link.target);
+          linksArray.forEach((link: GraphEdge) => {
+            const sourceNode = typeof link.source === 'object' ? link.source as DigitalGardenNode : null;
+            const targetNode = typeof link.target === 'object' ? link.target as DigitalGardenNode : null;
+            const sourceId = sourceNode ? sourceNode.id : link.source;
+            const targetId = targetNode ? targetNode.id : link.target;
+
+            if (sourceId === node.id) {
+              if (targetNode) connectedNodes.add(targetNode);
               connectedLinks.add(link);
             }
-            if (link.target === node || link.target.id === node.id) {
-              connectedNodes.add(link.source);
+            if (targetId === node.id) {
+              if (sourceNode) connectedNodes.add(sourceNode);
               connectedLinks.add(link);
             }
           });
@@ -346,7 +382,7 @@ export default function ForceGraphView({
 
         // Trigger re-render of the graph
         if (graphRef.current) {
-          graphRef.current.nodeColor(graphRef.current.nodeColor());
+          (graphRef.current as any).nodeColor((graphRef.current as any).nodeColor());
         }
       })
       .width(containerWidth)
@@ -409,14 +445,14 @@ export default function ForceGraphView({
   // Zoom controls
   const handleZoomIn = () => {
     if (graphRef.current) {
-      const currentZoom = graphRef.current.zoom();
+      const currentZoom = graphRef.current.zoom() as number;
       graphRef.current.zoom(currentZoom * 1.3, 400);
     }
   };
 
   const handleZoomOut = () => {
     if (graphRef.current) {
-      const currentZoom = graphRef.current.zoom();
+      const currentZoom = graphRef.current.zoom() as number;
       graphRef.current.zoom(currentZoom / 1.3, 400);
     }
   };
@@ -695,13 +731,11 @@ function filterLocalGraphData(
   const visibleUrls = Object.keys(existing);
 
   const filteredLinks = graphData.links.filter((link) => {
-    // link.source and link.target can be either IDs (numbers) or node objects
-    // ForceGraph converts them to objects internally
-    const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-    const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+    const sourceId = link.source;
+    const targetId = link.target;
 
-    const sourceNode = Object.values(graphData.nodes).find(n => n.id === sourceId);
-    const targetNode = Object.values(graphData.nodes).find(n => n.id === targetId);
+    const sourceNode = (Object.values(graphData.nodes) as DigitalGardenNode[]).find(n => n.id === sourceId);
+    const targetNode = (Object.values(graphData.nodes) as DigitalGardenNode[]).find(n => n.id === targetId);
 
     return sourceNode && targetNode &&
            visibleUrls.includes(sourceNode.url) &&

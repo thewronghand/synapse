@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { getImagesDir } from '@/lib/notes-path';
 
-const IMAGES_DIR = path.join(process.cwd(), 'notes', 'images');
+const IMAGES_DIR = getImagesDir();
 
 /**
  * GET /api/images/[...path]

@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
+import { getImagesDir, getTempImagesDir } from './notes-path';
 
-const IMAGES_DIR = path.join(process.cwd(), 'notes', 'images');
-const TEMP_DIR = path.join(IMAGES_DIR, 'temp');
+const IMAGES_DIR = getImagesDir();
+const TEMP_DIR = getTempImagesDir();
 
 /**
  * Move images from temp to permanent storage

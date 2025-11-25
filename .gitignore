@@ -65,3 +65,10 @@ Thumbs.db
 !/notes/how-to-use-wiki-links.md
 !/notes/index.md
 /notes/images/
+
+# Electron
+/dist
+*.dmg
+*.exe
+*.AppImage
+*.deb

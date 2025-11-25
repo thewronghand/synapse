@@ -16,7 +16,7 @@ export interface Document {
 export interface Frontmatter {
   title?: string;
   tags?: string[];
-  [key: string]: any; // 기타 커스텀 필드
+  [key: string]: string | string[] | number | boolean | undefined; // 기타 커스텀 필드
 }
 
 // Graph types

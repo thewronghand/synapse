@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import ForceGraphView from "@/components/graph/ForceGraphView";
-import { Document, Graph } from "@/types";
+import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 
@@ -194,7 +194,7 @@ export default function NotePage() {
 
                 {/* Graph */}
                 <ForceGraphView
-                  graphData={graph as any}
+                  graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
                   currentNodeUrl={`/${slug}`}
                   depth={depth}
                   height={graphHeight}
