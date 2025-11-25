@@ -19,11 +19,19 @@
 
 [Releases](https://github.com/thewronghand/synapse/releases) 페이지에서 운영체제에 맞는 설치 파일을 다운로드하세요:
 
-- **macOS**: `Synapse-{version}-arm64.dmg` (Apple Silicon) 또는 `Synapse-{version}-x64.dmg` (Intel)
-- **Windows**: `Synapse Setup {version}.exe`
-- **Linux**: `Synapse-{version}.AppImage` 또는 `synapse_{version}_amd64.deb`
+- **macOS**: `Synapse-{version}-arm64.dmg` (Apple Silicon) 또는 `Synapse-{version}.dmg` (Intel)
 
 노트는 자동으로 `~/Documents/Synapse/notes/`에 저장됩니다.
+
+#### macOS 보안 경고 해결
+
+macOS에서 "손상되어 열 수 없습니다" 또는 "확인할 수 없습니다" 경고가 나타나면, 터미널에서 다음 명령어를 실행하세요:
+
+```bash
+xattr -cr /Applications/Synapse.app
+```
+
+그 후 앱을 다시 실행하면 정상적으로 열립니다.
 
 ### 개발 환경 설정
 

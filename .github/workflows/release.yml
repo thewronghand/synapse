@@ -4,14 +4,13 @@ on:
   push:
     tags:
       - 'v*.*.*'  # Triggers on version tags like v0.1.0, v1.2.3, etc.
+    branches:
+      - 'fix/**'  # Test builds on fix branches
+  workflow_dispatch:  # Manual trigger
 
 jobs:
   build:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
+    runs-on: macos-latest
 
     steps:
       - name: Checkout code
@@ -31,22 +30,21 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload artifacts (macOS)
-        if: matrix.os == 'macos-latest'
+      - name: Package macOS DMG
+        run: |
+          cd dist
+          zip -ry ../macos-installers.zip *.dmg
+          cd ..
+
+      - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: macos-dmg
-          path: dist/*.dmg
-
-      - name: Upload artifacts (Windows)
-        if: matrix.os == 'windows-latest'
-        uses: actions/upload-artifact@v4
-        with:
-          name: windows-installer
-          path: dist/*.exe
+          path: macos-installers.zip
 
   release:
     needs: build
+    if: startsWith(github.ref, 'refs/tags/')  # Only create release for tags
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -60,15 +58,20 @@ jobs:
         with:
           path: artifacts
 
+      - name: Extract macOS DMG
+        run: |
+          cd artifacts/macos-dmg
+          unzip macos-installers.zip
+          rm macos-installers.zip
+          cd ../..
+
       - name: Display artifact structure
         run: ls -R artifacts/
 
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: |
-            artifacts/macos-dmg/*.dmg
-            artifacts/windows-installer/*.exe
+          files: artifacts/macos-dmg/*.dmg
           draft: false
           prerelease: false
           generate_release_notes: true
