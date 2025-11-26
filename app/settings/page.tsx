@@ -7,6 +7,33 @@ import { useState } from "react";
 export default function SettingsPage() {
   const router = useRouter();
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportResult, setExportResult] = useState<{ documentsCount?: number; tagsCount?: number } | null>(null);
+
+  async function handleExport() {
+    setIsExporting(true);
+    setExportResult(null);
+
+    try {
+      const response = await fetch('/api/export', {
+        method: 'POST',
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setExportResult(result.data);
+        alert(`Export 완료!\n문서 ${result.data.documentsCount}개, 태그 ${result.data.tagsCount}개가 export되었습니다.`);
+      } else {
+        alert(`Export 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      alert('Export 중 오류가 발생했습니다.');
+    } finally {
+      setIsExporting(false);
+    }
+  }
 
   async function handlePublish() {
     setIsPublishing(true);
@@ -53,19 +80,42 @@ export default function SettingsPage() {
               </div>
             </div>
 
-            {/* Publish Button */}
-            <div className="pt-4">
-              <Button
-                onClick={handlePublish}
-                disabled={isPublishing}
-                className="cursor-pointer w-full sm:w-auto"
-                size="lg"
-              >
-                {isPublishing ? "Publishing..." : "Publish to Vercel"}
-              </Button>
-              <p className="text-sm text-gray-500 mt-2">
-                처음 publish 시 Vercel 계정 연동이 필요합니다
-              </p>
+            {/* Export Button */}
+            <div className="pt-4 space-y-4">
+              <div>
+                <Button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  variant="outline"
+                  className="cursor-pointer w-full sm:w-auto"
+                  size="lg"
+                >
+                  {isExporting ? "Exporting..." : "Export to JSON"}
+                </Button>
+                <p className="text-sm text-gray-500 mt-2">
+                  모든 문서와 그래프 데이터를 JSON 파일로 export합니다
+                </p>
+                {exportResult && (
+                  <p className="text-sm text-green-600 mt-2">
+                    ✓ Export 완료: 문서 {exportResult.documentsCount}개, 태그 {exportResult.tagsCount}개
+                  </p>
+                )}
+              </div>
+
+              {/* Publish Button */}
+              <div>
+                <Button
+                  onClick={handlePublish}
+                  disabled={isPublishing}
+                  className="cursor-pointer w-full sm:w-auto"
+                  size="lg"
+                >
+                  {isPublishing ? "Publishing..." : "Publish to Vercel"}
+                </Button>
+                <p className="text-sm text-gray-500 mt-2">
+                  처음 publish 시 Vercel 계정 연동이 필요합니다
+                </p>
+              </div>
             </div>
           </div>
         </section>

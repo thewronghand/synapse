@@ -72,3 +72,6 @@ Thumbs.db
 *.exe
 *.AppImage
 *.deb
+
+# Exported data for published mode
+/public/data
