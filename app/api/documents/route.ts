@@ -13,6 +13,7 @@ import { tagCache } from '@/lib/tag-cache';
 import { documentCache } from '@/lib/document-cache';
 import { moveImagesFromTemp } from '@/lib/image-utils';
 import { getNotesDir } from '@/lib/notes-path';
+import { isPublishedMode } from '@/lib/env';
 
 const NOTES_DIR = getNotesDir();
 
@@ -119,6 +120,14 @@ export async function POST(request: NextRequest) {
  * Helper: Get all documents
  */
 async function getAllDocuments(): Promise<Document[]> {
+  // In published mode, read from JSON file
+  if (isPublishedMode()) {
+    const jsonPath = path.join(process.cwd(), 'public', 'data', 'documents.json');
+    const jsonData = await fs.readFile(jsonPath, 'utf-8');
+    return JSON.parse(jsonData);
+  }
+
+  // In normal mode, read from markdown files
   const files = await fs.readdir(NOTES_DIR);
   const markdownFiles = files.filter((file) => file.endsWith('.md'));
 
@@ -164,6 +173,14 @@ async function getAllDocuments(): Promise<Document[]> {
  * Helper: Get single document by slug
  */
 async function getDocumentBySlug(slug: string): Promise<Document> {
+  // In published mode, read from JSON file
+  if (isPublishedMode()) {
+    const jsonPath = path.join(process.cwd(), 'public', 'data', 'docs', `${slug}.json`);
+    const jsonData = await fs.readFile(jsonPath, 'utf-8');
+    return JSON.parse(jsonData);
+  }
+
+  // In normal mode, read from markdown file
   const filePath = path.join(NOTES_DIR, `${slug}.md`);
   const content = await fs.readFile(filePath, 'utf-8');
   const stats = await fs.stat(filePath);

@@ -47,4 +47,4 @@ Create connections between notes using [[wiki-links]]:
 - Explore the [[Graph View]]
 - Read the [[Publishing Guide]]
 
-Back to [[index]]
+Back to [[Welcome to Synapse]]

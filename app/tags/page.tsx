@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import AppHeader from "@/components/layout/AppHeader";
 
 interface TagStats {
   tag: string;
@@ -70,21 +71,21 @@ export default function TagsPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       {/* Header */}
-      <div className="mb-8 flex items-start justify-between">
-        <div>
-          <h1 className="text-4xl font-bold mb-2">태그 관리</h1>
-          <p className="text-gray-600">
-            총 {sortedTags.length}개의 태그 · {documents.length}개의 문서
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
-            문서 목록
-          </Button>
-          <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
-            그래프 뷰
-          </Button>
-        </div>
+      <div className="mb-8">
+        <AppHeader
+          title="태그 관리"
+          subtitle={`총 ${sortedTags.length}개의 태그 · ${documents.length}개의 문서`}
+          actions={
+            <>
+              <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
+                문서 목록
+              </Button>
+              <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+                그래프 뷰
+              </Button>
+            </>
+          }
+        />
       </div>
 
       {/* Sort Controls */}
