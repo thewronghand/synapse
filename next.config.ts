@@ -1,8 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Empty config for Vercel deployment
-  // No 'output' setting means default server-side rendering
+  // Use standalone output for Electron builds
+  // For Vercel deployment, this is ignored (Vercel uses its own settings)
+  output: 'standalone',
 };
 
 export default nextConfig;
