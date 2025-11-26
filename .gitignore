@@ -75,3 +75,7 @@ Thumbs.db
 
 # Exported data for published mode
 /public/data
+
+# OAuth tokens
+.vercel-token.json
+.github-token.json
