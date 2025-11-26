@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { parseFrontmatter, extractTitle, getSlugFromFilePath } from './document-parser';
 import { getNotesDir } from './notes-path';
+import { isPublishedMode } from './env';
 
 const NOTES_DIR = getNotesDir();
 
@@ -22,6 +23,13 @@ class DocumentCache {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
+      return;
+    }
+
+    // Skip initialization in published mode
+    if (isPublishedMode()) {
+      console.log('[DocumentCache] Skipping initialization in published mode');
+      this.isInitialized = true;
       return;
     }
 

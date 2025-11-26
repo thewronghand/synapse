@@ -143,7 +143,7 @@ tags: ${tagsYaml}
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <p className="text-lg text-red-600 mb-4">{error}</p>
-          <Button onClick={() => router.push("/")}>Go Home</Button>
+          <Button onClick={() => router.push("/")} className="cursor-pointer">홈으로</Button>
         </div>
       </div>
     );
@@ -154,30 +154,32 @@ tags: ${tagsYaml}
       {/* Header */}
       <header className="border-b bg-white p-4">
         <div className="container mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex-1 max-w-md">
-              <Input
-                type="text"
-                placeholder="문서 제목을 입력하세요..."
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="text-lg font-bold"
-              />
-              <p className="text-sm text-gray-500 mt-1">
-                {isSaving ? (
-                  "Saving..."
-                ) : lastSaved ? (
-                  `Last saved: ${lastSaved.toLocaleTimeString()}`
-                ) : (
-                  "All changes saved"
-                )}
-              </p>
+          <div className="mb-4">
+            <div className="flex items-center justify-between">
+              <div className="flex-1 max-w-md">
+                <Input
+                  type="text"
+                  placeholder="문서 제목을 입력하세요..."
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="text-lg font-bold"
+                />
+              </div>
+              <div className="flex gap-2">
+                <Button onClick={handleDone} className="cursor-pointer">
+                  완료
+                </Button>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Button onClick={handleDone}>
-                Done
-              </Button>
-            </div>
+            <p className="text-sm text-gray-500 mt-1">
+              {isSaving ? (
+                "저장 중..."
+              ) : lastSaved ? (
+                `마지막 저장: ${lastSaved.toLocaleTimeString()}`
+              ) : (
+                "모든 변경사항 저장됨"
+              )}
+            </p>
           </div>
 
           {/* Tags Section */}
@@ -199,7 +201,7 @@ tags: ${tagsYaml}
       <div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden">
         {/* Editor */}
         <div className="flex flex-col h-full overflow-hidden">
-          <h2 className="text-lg font-semibold mb-2">Editor</h2>
+          <h2 className="text-lg font-semibold mb-2">편집기</h2>
           <div className="flex-1 overflow-y-auto border rounded-lg">
             <MarkdownEditor
               value={contentWithoutMetadata}

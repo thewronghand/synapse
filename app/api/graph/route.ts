@@ -10,6 +10,7 @@ import {
 } from '@/lib/document-parser';
 import { Graph, GraphNode, GraphEdge, DigitalGardenNode } from '@/types';
 import { getNotesDir } from '@/lib/notes-path';
+import { isPublishedMode } from '@/lib/env';
 
 const NOTES_DIR = getNotesDir();
 
@@ -42,6 +43,14 @@ export async function GET() {
  * Digital Garden format: nodes as object with neighbors array
  */
 async function buildGraph(): Promise<Graph> {
+  // In published mode, read from JSON file
+  if (isPublishedMode()) {
+    const jsonPath = path.join(process.cwd(), 'public', 'data', 'graph.json');
+    const jsonData = await fs.readFile(jsonPath, 'utf-8');
+    return JSON.parse(jsonData);
+  }
+
+  // In normal mode, build from markdown files
   const files = await fs.readdir(NOTES_DIR);
   const markdownFiles = files.filter((file) => file.endsWith('.md'));
 

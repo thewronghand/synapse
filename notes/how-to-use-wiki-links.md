@@ -53,4 +53,4 @@ All your wiki links are visualized in the [[Graph View]].
 
 - [[Getting Started]]
 - [[Graph View]]
-- Back to [[index]]
+- Back to [[Welcome to Synapse]]

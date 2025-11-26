@@ -7,6 +7,7 @@ import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
+import { isPublishedMode } from "@/lib/env";
 
 export default function NotePage() {
   const params = useParams();
@@ -105,8 +106,8 @@ export default function NotePage() {
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-red-600 mb-4">{error || "Document not found"}</p>
-          <Button onClick={() => router.push("/")}>Go Home</Button>
+          <p className="text-lg text-red-600 mb-4">{error || "문서를 찾을 수 없습니다"}</p>
+          <Button onClick={() => router.push("/")} className="cursor-pointer">홈으로</Button>
         </div>
       </div>
     );
@@ -118,8 +119,8 @@ export default function NotePage() {
       <header className="border-b bg-white p-4 sticky top-0 z-10">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.push("/")}>
-              ← Back
+            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+              ← 뒤로
             </Button>
             <div>
               <h1 className="text-xl font-bold">{document.title}</h1>
@@ -138,14 +139,16 @@ export default function NotePage() {
               )}
             </div>
           </div>
-          <div className="flex gap-2">
-            <Button onClick={() => router.push(`/editor/${slug}`)}>
-              Edit
-            </Button>
-            <Button variant="destructive" onClick={handleDelete}>
-              Delete
-            </Button>
-          </div>
+          {!isPublishedMode() && (
+            <div className="flex gap-2">
+              <Button onClick={() => router.push(`/editor/${slug}`)} className="cursor-pointer">
+                편집
+              </Button>
+              <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
+                삭제
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 
@@ -167,18 +170,18 @@ export default function NotePage() {
             <div className="lg:col-span-1">
               <div className="sticky top-20 bg-white border rounded-lg p-4 shadow-sm overflow-hidden">
                 <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold text-gray-800">Local Graph</h3>
+                  <h3 className="text-sm font-semibold text-gray-800">로컬 그래프</h3>
 
                   {/* Compact Depth Slider */}
                   <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-gray-600">Depth:</span>
+                    <span className="text-xs font-medium text-gray-600">깊이:</span>
                     <div className="flex items-center gap-2">
                       {[1, 2, 3].map((level) => (
                         <button
                           key={level}
                           onClick={() => setDepth(level)}
                           className={`
-                            w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200
+                            w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer
                             ${depth === level
                               ? 'bg-blue-500 text-white shadow-md scale-110'
                               : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
@@ -210,11 +213,11 @@ export default function NotePage() {
         <div className="container mx-auto max-w-4xl">
           <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 mb-4">
             <div>
-              <span className="font-semibold">Created:</span>{" "}
+              <span className="font-semibold">생성일:</span>{" "}
               {new Date(document.createdAt).toLocaleString()}
             </div>
             <div>
-              <span className="font-semibold">Updated:</span>{" "}
+              <span className="font-semibold">수정일:</span>{" "}
               {new Date(document.updatedAt).toLocaleString()}
             </div>
           </div>
@@ -223,14 +226,14 @@ export default function NotePage() {
           {document.links.length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2">
-                Links ({document.links.length})
+                링크 ({document.links.length})
               </h3>
               <div className="flex gap-2 flex-wrap">
                 {document.links.map((link) => (
                   <button
                     key={link}
                     onClick={() => router.push(`/note/${link}`)}
-                    className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200"
+                    className="text-sm px-3 py-1 bg-blue-100 text-blue-700 rounded-full hover:bg-blue-200 cursor-pointer"
                   >
                     {link}
                   </button>
@@ -243,14 +246,14 @@ export default function NotePage() {
           {document.backlinks.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">
-                Backlinks ({document.backlinks.length})
+                역링크 ({document.backlinks.length})
               </h3>
               <div className="flex gap-2 flex-wrap">
                 {document.backlinks.map((backlink) => (
                   <button
                     key={backlink}
                     onClick={() => router.push(`/note/${backlink}`)}
-                    className="text-sm px-3 py-1 bg-green-100 text-green-700 rounded-full hover:bg-green-200"
+                    className="text-sm px-3 py-1 bg-green-100 text-green-700 rounded-full hover:bg-green-200 cursor-pointer"
                   >
                     {backlink}
                   </button>
