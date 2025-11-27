@@ -1,9 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 
-export default function OAuthCallbackPage() {
+function OAuthCallbackContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [status, setStatus] = useState<'processing' | 'success' | 'error'>('processing');
@@ -81,19 +81,32 @@ export default function OAuthCallbackPage() {
   }, [searchParams, router]);
 
   return (
+    <div className="text-center p-8">
+      {status === 'processing' && (
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
+      )}
+      {status === 'success' && (
+        <div className="text-4xl mb-4">✓</div>
+      )}
+      {status === 'error' && (
+        <div className="text-4xl mb-4">✕</div>
+      )}
+      <p className="text-lg">{message}</p>
+    </div>
+  );
+}
+
+export default function OAuthCallbackPage() {
+  return (
     <div className="flex items-center justify-center min-h-screen bg-background">
-      <div className="text-center p-8">
-        {status === 'processing' && (
+      <Suspense fallback={
+        <div className="text-center p-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4" />
-        )}
-        {status === 'success' && (
-          <div className="text-4xl mb-4">✓</div>
-        )}
-        {status === 'error' && (
-          <div className="text-4xl mb-4">✕</div>
-        )}
-        <p className="text-lg">{message}</p>
-      </div>
+          <p className="text-lg">OAuth 처리 중...</p>
+        </div>
+      }>
+        <OAuthCallbackContent />
+      </Suspense>
     </div>
   );
 }
