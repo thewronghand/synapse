@@ -22,14 +22,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (state) {
     try {
       statePayload = JSON.parse(Buffer.from(state as string, 'base64url').toString());
-      callbackUrl = statePayload.callback || defaultCallback;
+      if (statePayload) {
+        callbackUrl = statePayload.callback || defaultCallback;
 
-      // Verify CSRF token from cookie
-      const cookies = req.headers.cookie || '';
-      const storedState = cookies.match(/vercel_oauth_state=([^;]+)/)?.[1];
+        // Verify CSRF token from cookie
+        const cookies = req.headers.cookie || '';
+        const storedState = cookies.match(/vercel_oauth_state=([^;]+)/)?.[1];
 
-      if (!storedState || storedState !== statePayload.csrf) {
-        return res.redirect(`${callbackUrl}?error=csrf_mismatch&provider=vercel`);
+        if (!storedState || storedState !== statePayload.csrf) {
+          return res.redirect(`${callbackUrl}?error=csrf_mismatch&provider=vercel`);
+        }
       }
     } catch {
       // State parsing failed, continue without CSRF check for backward compatibility

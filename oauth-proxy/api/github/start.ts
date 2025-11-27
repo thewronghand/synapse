@@ -1,5 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import crypto from 'crypto';
+
+// Generate random hex string without crypto module
+function generateRandomHex(length: number): string {
+  const chars = '0123456789abcdef';
+  let result = '';
+  for (let i = 0; i < length; i++) {
+    result += chars[Math.floor(Math.random() * chars.length)];
+  }
+  return result;
+}
 
 export default function handler(req: VercelRequest, res: VercelResponse) {
   const clientId = process.env.GITHUB_CLIENT_ID;
@@ -13,7 +22,7 @@ export default function handler(req: VercelRequest, res: VercelResponse) {
   const callbackUrl = (req.query.callback_url as string) || 'http://localhost:3000/oauth/callback';
 
   // Generate CSRF state token
-  const csrfToken = crypto.randomBytes(32).toString('hex');
+  const csrfToken = generateRandomHex(64);
 
   // Encode callback URL and CSRF token in state
   const statePayload = JSON.stringify({ csrf: csrfToken, callback: callbackUrl });
