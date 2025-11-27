@@ -1,37 +1,23 @@
 import { NextResponse } from 'next/server';
-import { GitHubClient } from '@/lib/github-client';
 import { VercelClient } from '@/lib/vercel-client';
 import { deleteVercelToken } from '@/lib/vercel-token';
-import { deleteGitHubToken } from '@/lib/github-token';
 import fs from 'fs/promises';
 import path from 'path';
 
 /**
  * POST /api/publish
- * Publish to Vercel via GitHub (Git-based deployment)
+ * Publish to Vercel via direct file upload (no GitHub required)
  *
  * Process:
  * 1. Run export to generate public/data/*.json files
- * 2. Create GitHub repository (or use existing)
- * 3. Push all source code to GitHub
- * 4. Create Vercel project linked to GitHub repo
- * 5. Trigger automatic deployment
+ * 2. Upload all source files to Vercel
+ * 3. Create deployment with those files
+ * 4. Wait for deployment to complete
  */
 export async function POST() {
   try {
-    // Step 1: Get clients from stored tokens
-    const githubClient = await GitHubClient.fromStoredToken();
+    // Step 1: Get Vercel client from stored token
     const vercelClient = await VercelClient.fromStoredToken();
-
-    if (!githubClient) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'GitHub not connected. Please connect your GitHub account first.',
-        },
-        { status: 401 }
-      );
-    }
 
     if (!vercelClient) {
       return NextResponse.json(
@@ -63,24 +49,11 @@ export async function POST() {
     const exportResult = await exportResponse.json();
     console.log('[Publish] Export completed:', exportResult.data);
 
-    // Step 3: Get GitHub username for unique naming
-    const githubUser = await githubClient.getCurrentUser();
-    const repoName = `synapse-published-${githubUser.login}`;
-    const projectName = `synapse-published-${githubUser.login}`;
+    // Step 3: Get Vercel user info for unique naming
+    const vercelUser = await vercelClient.getCurrentUser() as { user: { username: string } };
+    const projectName = `synapse-published-${vercelUser.user.username}`;
 
-    // Step 4: Check if GitHub repo exists, create if not
-    console.log('[Publish] Checking GitHub repository...');
-    let repo = await githubClient.getRepo(repoName);
-
-    if (repo) {
-      console.log('[Publish] Repository exists:', repo.full_name);
-    } else {
-      console.log('[Publish] Repository not found, creating...');
-      repo = await githubClient.createRepo(repoName, true); // Private repository
-      console.log('[Publish] Repository created:', repo.full_name);
-    }
-
-    // Step 5: Read all project files
+    // Step 4: Read all project files
     console.log('[Publish] Reading project files...');
     const projectRoot = process.cwd();
     const filesToPush: Array<{ path: string; content: string; encoding?: 'utf-8' | 'base64' }> = [];
@@ -122,6 +95,7 @@ export async function POST() {
           '.github-token.json',
           '.env.local',
           '.env',
+          'oauth-proxy',
         ];
 
         if (skipPatterns.some(pattern => entry.name === pattern || entry.name.startsWith('.'))) {
@@ -233,155 +207,65 @@ export async function POST() {
       encoding: 'utf-8',
     });
 
-    // Add .gitignore for published version
+    // Add .env file with NEXT_PUBLIC_IS_PUBLISHED=true
     filesToPush.push({
-      path: '.gitignore',
-      content: `# Dependencies
-node_modules
-/.pnp
-.pnp.*
-
-# Testing
-/coverage
-
-# Next.js
-/.next/
-/out/
-
-# Production
-/build
-
-# Debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Vercel
-.vercel
-
-# TypeScript
-*.tsbuildinfo
-next-env.d.ts
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Electron (not needed in published version)
-/dist
-*.dmg
-*.exe
-*.AppImage
-*.deb
-
-# Local env files
-.env*.local
-.env
-
-# OAuth tokens (not needed in published version)
-.vercel-token.json
-.github-token.json
-`,
+      path: '.env',
+      content: 'NEXT_PUBLIC_IS_PUBLISHED=true\n',
       encoding: 'utf-8',
     });
 
-    // Add README for published version
+    // Add vercel.json for configuration
     filesToPush.push({
-      path: 'README.md',
-      content: `# Synapse Published
-
-This is the published version of Synapse notes, deployed on Vercel.
-
-This repository is automatically managed by the Synapse desktop application.
-
-## Environment Variables
-
-Make sure to set the following environment variable in Vercel:
-
-\`\`\`
-NEXT_PUBLIC_IS_PUBLISHED=true
-\`\`\`
-
-This enables read-only mode for the published version.
-`,
+      path: 'vercel.json',
+      content: JSON.stringify({
+        framework: 'nextjs',
+        buildCommand: 'npm run build',
+        installCommand: 'npm install',
+      }, null, 2),
       encoding: 'utf-8',
     });
 
-    console.log(`[Publish] Found ${filesToPush.length} files to push`);
+    console.log(`[Publish] Found ${filesToPush.length} files to deploy`);
 
-    // Step 6: Push all files to GitHub
-    console.log('[Publish] Pushing files to GitHub...');
-    await githubClient.createCommit(
-      repo.owner.login,
-      repo.name,
-      'Update published notes',
-      filesToPush
-    );
-    console.log('[Publish] Files pushed successfully');
-
-    // Step 7: Check if Vercel project exists
-    console.log('[Publish] Checking Vercel project...');
-    let project = await vercelClient.getProject(projectName);
-
-    const isNewProject = !project;
-
-    if (project) {
-      console.log('[Publish] Vercel project exists:', project.name);
-    } else {
-      console.log('[Publish] Vercel project not found, creating...');
-
-      // Create Vercel project with GitHub repo linked
-      project = await vercelClient.createProject(
-        projectName,
-        'nextjs',
-        {
-          owner: repo.owner.login,
-          repo: repo.name
-        }
-      );
-      console.log('[Publish] Vercel project created with GitHub link:', project.name);
-
-      // Set environment variable
-      await vercelClient.setEnvVariable(
-        project.id,
-        'NEXT_PUBLIC_IS_PUBLISHED',
-        'true',
-        'production'
-      );
-      console.log('[Publish] Environment variable set');
-    }
-
-    // Step 8: Trigger deployment
-    if (isNewProject && project.link?.repoId) {
-      // For new projects, manually trigger first deployment
-      console.log('[Publish] Triggering initial deployment...');
-      try {
-        await vercelClient.triggerDeployment(
-          projectName,
-          {
-            type: 'github',
-            repoId: project.link.repoId,
-            ref: repo.default_branch || 'main',
-          }
-        );
-        console.log('[Publish] Initial deployment triggered successfully');
-      } catch (deployError) {
-        console.warn('[Publish] Failed to trigger deployment, but project is set up:', deployError);
-        // Don't fail the whole publish if deployment trigger fails
-        // User can manually deploy or push again
+    // Step 5: Create direct deployment to Vercel
+    console.log('[Publish] Creating Vercel deployment...');
+    const deployment = await vercelClient.createDirectDeployment(
+      projectName,
+      filesToPush,
+      {
+        target: 'production',
+        projectSettings: {
+          framework: 'nextjs',
+          buildCommand: 'npm run build',
+          installCommand: 'npm install',
+        },
       }
-    } else {
-      console.log('[Publish] Deployment will be triggered automatically by GitHub push');
+    );
+
+    console.log('[Publish] Deployment created:', deployment.id);
+
+    // Step 6: Make project public (remove all protection types)
+    console.log('[Publish] Making project public...');
+    try {
+      const project = await vercelClient.getProject(projectName);
+      if (project) {
+        await vercelClient.disableDeploymentProtection(project.id);
+        console.log('[Publish] Project is now public');
+      }
+    } catch (protectionError) {
+      // Non-fatal error - deployment still works, just might need manual protection removal
+      console.warn('[Publish] Could not remove protection (non-fatal):', protectionError);
     }
 
     return NextResponse.json({
       success: true,
       data: {
-        repoName: repo.full_name,
-        repoUrl: repo.html_url,
-        projectName: project.name,
+        deploymentId: deployment.id,
+        deploymentUrl: `https://${deployment.url}`,
+        projectName: projectName,
         projectUrl: `https://vercel.com/dashboard`,
-        message: 'Published successfully! Vercel is building your site from GitHub.',
+        message: 'Published successfully! Vercel is building your site.',
+        state: deployment.state,
       },
     });
   } catch (error) {
@@ -392,12 +276,11 @@ This enables read-only mode for the published version.
       // Automatically delete expired tokens
       console.log('[Publish] Token expired, removing stored tokens...');
       await deleteVercelToken();
-      await deleteGitHubToken();
 
       return NextResponse.json(
         {
           success: false,
-          error: 'Authentication token has expired. Please reconnect your accounts.',
+          error: 'Authentication token has expired. Please reconnect your Vercel account.',
           code: 'TOKEN_EXPIRED',
         },
         { status: 401 }
