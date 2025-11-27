@@ -134,11 +134,29 @@ function SettingsContent() {
   }
 
   function handleConnectVercel() {
-    window.location.href = '/api/auth/vercel/start';
+    // Use OAuth Proxy if configured, otherwise fall back to local OAuth
+    const proxyUrl = process.env.NEXT_PUBLIC_OAUTH_PROXY_URL;
+    const callbackUrl = encodeURIComponent(`${window.location.origin}/oauth/callback`);
+
+    if (proxyUrl) {
+      window.location.href = `${proxyUrl}/api/vercel/start?callback_url=${callbackUrl}`;
+    } else {
+      // Fallback for local development with .env.local
+      window.location.href = '/api/auth/vercel/start';
+    }
   }
 
   function handleConnectGitHub() {
-    window.location.href = '/api/auth/github/start';
+    // Use OAuth Proxy if configured, otherwise fall back to local OAuth
+    const proxyUrl = process.env.NEXT_PUBLIC_OAUTH_PROXY_URL;
+    const callbackUrl = encodeURIComponent(`${window.location.origin}/oauth/callback`);
+
+    if (proxyUrl) {
+      window.location.href = `${proxyUrl}/api/github/start?callback_url=${callbackUrl}`;
+    } else {
+      // Fallback for local development with .env.local
+      window.location.href = '/api/auth/github/start';
+    }
   }
 
   async function handleDisconnectVercel() {
