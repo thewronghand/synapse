@@ -11,10 +11,6 @@ function SettingsContent() {
   const [vercelConnected, setVercelConnected] = useState(false);
   const [vercelLoading, setVercelLoading] = useState(true);
   const [vercelConnectedAt, setVercelConnectedAt] = useState<string | null>(null);
-  const [githubConnected, setGithubConnected] = useState(false);
-  const [githubLoading, setGithubLoading] = useState(true);
-  const [githubUsername, setGithubUsername] = useState<string | null>(null);
-  const [githubConnectedAt, setGithubConnectedAt] = useState<string | null>(null);
   const [deploymentStatus, setDeploymentStatus] = useState<{
     hasDeployment: boolean;
     status?: 'BUILDING' | 'ERROR' | 'READY' | 'QUEUED' | 'CANCELED';
@@ -25,7 +21,6 @@ function SettingsContent() {
 
   useEffect(() => {
     checkVercelConnection();
-    checkGitHubConnection();
     checkDeploymentStatus();
 
     // Check for OAuth callback messages
@@ -35,11 +30,6 @@ function SettingsContent() {
     if (success === 'vercel_connected') {
       alert('Vercel 연동 완료!');
       checkVercelConnection();
-      // Clear query params
-      router.replace('/settings');
-    } else if (success === 'github_connected') {
-      alert('GitHub 연동 완료!');
-      checkGitHubConnection();
       // Clear query params
       router.replace('/settings');
     } else if (error) {
@@ -72,30 +62,6 @@ function SettingsContent() {
       setVercelConnectedAt(null);
     } finally {
       setVercelLoading(false);
-    }
-  }
-
-  async function checkGitHubConnection() {
-    try {
-      const response = await fetch('/api/auth/github/status');
-      const result = await response.json();
-
-      if (result.success && result.data.connected) {
-        setGithubConnected(true);
-        setGithubUsername(result.data.username || null);
-        setGithubConnectedAt(result.data.connectedAt || null);
-      } else {
-        setGithubConnected(false);
-        setGithubUsername(null);
-        setGithubConnectedAt(null);
-      }
-    } catch (error) {
-      console.error('Error checking GitHub connection:', error);
-      setGithubConnected(false);
-      setGithubUsername(null);
-      setGithubConnectedAt(null);
-    } finally {
-      setGithubLoading(false);
     }
   }
 
@@ -134,11 +100,16 @@ function SettingsContent() {
   }
 
   function handleConnectVercel() {
-    window.location.href = '/api/auth/vercel/start';
-  }
+    // Use OAuth Proxy if configured, otherwise fall back to local OAuth
+    const proxyUrl = process.env.NEXT_PUBLIC_OAUTH_PROXY_URL;
+    const callbackUrl = encodeURIComponent(`${window.location.origin}/oauth/callback`);
 
-  function handleConnectGitHub() {
-    window.location.href = '/api/auth/github/start';
+    if (proxyUrl) {
+      window.location.href = `${proxyUrl}/api/vercel/start?callback_url=${callbackUrl}`;
+    } else {
+      // Fallback for local development with .env.local
+      window.location.href = '/api/auth/vercel/start';
+    }
   }
 
   async function handleDisconnectVercel() {
@@ -166,38 +137,9 @@ function SettingsContent() {
     }
   }
 
-  async function handleDisconnectGitHub() {
-    if (!confirm('GitHub 연동을 해제하시겠습니까?\n\nPublish 기능을 사용하려면 다시 연동해야 합니다.')) {
-      return;
-    }
-
-    try {
-      const response = await fetch('/api/auth/github/disconnect', {
-        method: 'POST',
-      });
-
-      const result = await response.json();
-
-      if (result.success) {
-        alert('GitHub 연동이 해제되었습니다.');
-        checkGitHubConnection();
-      } else {
-        alert(`연동 해제 실패: ${result.error}`);
-      }
-    } catch (error) {
-      console.error('Error disconnecting GitHub:', error);
-      alert('연동 해제 중 오류가 발생했습니다.');
-    }
-  }
-
   async function handlePublish() {
     if (!vercelConnected) {
       alert("Vercel 연동이 필요합니다. 먼저 Vercel 계정을 연동해주세요.");
-      return;
-    }
-
-    if (!githubConnected) {
-      alert("GitHub 연동이 필요합니다. 먼저 GitHub 계정을 연동해주세요.");
       return;
     }
 
@@ -227,7 +169,6 @@ function SettingsContent() {
           alert('인증 토큰이 만료되었습니다.\n\n자동으로 연동이 해제되었습니다.\n다시 연동해주세요.');
           // Refresh connection status to update UI
           checkVercelConnection();
-          checkGitHubConnection();
         } else {
           alert(`Publish 실패: ${result.error}`);
         }
@@ -372,55 +313,6 @@ function SettingsContent() {
               )}
             </div>
 
-            {/* GitHub Connection Status */}
-            <div className="bg-gray-50 rounded-lg p-4">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">GitHub 연동 상태</h3>
-                  <p className="text-sm text-gray-600 mt-1">
-                    {githubLoading
-                      ? "확인 중..."
-                      : githubConnected
-                        ? `GitHub 계정이 연동되었습니다${githubUsername ? ` (@${githubUsername})` : ""}`
-                        : "GitHub 계정 연동이 필요합니다"}
-                  </p>
-                  {githubConnected && githubConnectedAt && (
-                    <p className="text-xs text-gray-500 mt-1">
-                      연동 날짜: {formatDate(githubConnectedAt)}
-                    </p>
-                  )}
-                </div>
-                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
-                  githubConnected
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-200 text-gray-700"
-                }`}>
-                  {githubConnected ? "연동됨" : "미연동"}
-                </div>
-              </div>
-              {!githubLoading && (
-                <div className="mt-4">
-                  {!githubConnected ? (
-                    <Button
-                      onClick={handleConnectGitHub}
-                      variant="outline"
-                      className="cursor-pointer"
-                    >
-                      GitHub 연동하기
-                    </Button>
-                  ) : (
-                    <Button
-                      onClick={handleDisconnectGitHub}
-                      variant="outline"
-                      className="cursor-pointer text-red-600 border-red-300 hover:bg-red-50"
-                    >
-                      연동 해제
-                    </Button>
-                  )}
-                </div>
-              )}
-            </div>
-
             {/* Deploy Status */}
             <div className="bg-gray-50 rounded-lg p-4">
               <div className="flex items-center justify-between">
@@ -505,7 +397,7 @@ function SettingsContent() {
             <div className="pt-4">
               <Button
                 onClick={handlePublish}
-                disabled={isPublishing || !vercelConnected || !githubConnected}
+                disabled={isPublishing || !vercelConnected}
                 className="cursor-pointer w-full sm:w-auto"
                 size="lg"
               >
@@ -514,9 +406,7 @@ function SettingsContent() {
               <p className="text-sm text-gray-500 mt-2">
                 {!vercelConnected
                   ? "Vercel 연동 후 publish할 수 있습니다"
-                  : !githubConnected
-                    ? "GitHub 연동 후 publish할 수 있습니다"
-                    : "GitHub에 코드를 push하고 Vercel에 자동 배포합니다"}
+                  : "노트를 Vercel에 직접 배포합니다"}
               </p>
             </div>
           </div>
