@@ -15,6 +15,17 @@ export interface VercelProject {
     createdAt: number;
     updatedAt: number;
   };
+  // Production domains/aliases for the project
+  alias?: Array<{
+    domain: string;
+    target?: 'production' | 'preview';
+  }>;
+  // Alternative: targets object with production info
+  targets?: {
+    production?: {
+      alias?: string[];
+    };
+  };
 }
 
 export interface VercelDeployment {
@@ -249,5 +260,162 @@ export class VercelClient {
       console.error('Error getting latest deployment:', error);
       return null;
     }
+  }
+
+  /**
+   * Update project settings to make it public
+   * Disables all protection types (password, SSO, Vercel Authentication)
+   */
+  async updateProject(
+    projectId: string,
+    settings: Record<string, unknown>
+  ): Promise<VercelProject> {
+    return this.request(`/v9/projects/${projectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(settings),
+    });
+  }
+
+  /**
+   * Disable all deployment protection for a project
+   * Based on Vercel API: https://vercel.com/docs/rest-api/reference/endpoints/projects/update-an-existing-project
+   */
+  async disableDeploymentProtection(projectId: string): Promise<void> {
+    // Set all protection types to null to disable them
+    // Note: Standard Protection may require dashboard configuration
+    const protectionSettings = {
+      passwordProtection: null,
+      ssoProtection: null,
+      trustedIps: null,
+      // Allow all paths to bypass OPTIONS preflight
+      optionsAllowlist: null,
+    };
+
+    await this.request(`/v9/projects/${projectId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(protectionSettings),
+    });
+  }
+
+  /**
+   * Upload file to Vercel and get file hash
+   * Returns the SHA1 hash of the file for use in deployment
+   */
+  async uploadFile(content: Buffer | string, contentType: string = 'application/octet-stream'): Promise<string> {
+    const url = new URL('/v2/files', 'https://api.vercel.com');
+
+    if (this.teamId) {
+      url.searchParams.set('teamId', this.teamId);
+    }
+
+    // Convert string to Buffer if needed
+    const buffer = typeof content === 'string' ? Buffer.from(content, 'utf-8') : content;
+
+    // Calculate SHA1 hash
+    const crypto = await import('crypto');
+    const sha1 = crypto.createHash('sha1').update(buffer).digest('hex');
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': contentType,
+        'x-vercel-digest': sha1,
+        'Content-Length': buffer.length.toString(),
+      },
+      body: new Uint8Array(buffer),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('TOKEN_EXPIRED');
+    }
+
+    // 200 means file uploaded, 409 means file already exists (both are OK)
+    if (!response.ok && response.status !== 409) {
+      const errorText = await response.text();
+      throw new Error(`Vercel file upload error (${response.status}): ${errorText}`);
+    }
+
+    return sha1;
+  }
+
+  /**
+   * Create a deployment with direct file upload (no Git required)
+   */
+  async createDirectDeployment(
+    projectName: string,
+    files: Array<{ path: string; content: Buffer | string; encoding?: 'utf-8' | 'base64' }>,
+    options?: {
+      target?: 'production' | 'preview';
+      projectSettings?: {
+        framework?: string;
+        buildCommand?: string;
+        installCommand?: string;
+      };
+    }
+  ): Promise<VercelDeployment> {
+    console.log(`[VercelClient] Uploading ${files.length} files...`);
+
+    // Upload all files and collect their hashes
+    const fileHashes: Array<{ file: string; sha: string; size: number }> = [];
+
+    for (const file of files) {
+      let buffer: Buffer;
+
+      if (file.encoding === 'base64' && typeof file.content === 'string') {
+        buffer = Buffer.from(file.content, 'base64');
+      } else if (typeof file.content === 'string') {
+        buffer = Buffer.from(file.content, 'utf-8');
+      } else {
+        buffer = file.content;
+      }
+
+      const sha = await this.uploadFile(buffer);
+      fileHashes.push({
+        file: file.path,
+        sha,
+        size: buffer.length,
+      });
+    }
+
+    console.log(`[VercelClient] All files uploaded, creating deployment...`);
+
+    // Create deployment with file references
+    const url = new URL('/v13/deployments', 'https://api.vercel.com');
+
+    if (this.teamId) {
+      url.searchParams.set('teamId', this.teamId);
+    }
+
+    const deploymentBody = {
+      name: projectName,
+      files: fileHashes,
+      target: options?.target || 'production',
+      projectSettings: options?.projectSettings || {
+        framework: 'nextjs',
+        buildCommand: 'npm run build',
+        installCommand: 'npm install',
+      },
+    };
+
+    const response = await fetch(url.toString(), {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(deploymentBody),
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('TOKEN_EXPIRED');
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Vercel deployment error (${response.status}): ${errorText}`);
+    }
+
+    return response.json();
   }
 }
