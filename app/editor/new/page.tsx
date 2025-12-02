@@ -7,6 +7,7 @@ import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
 export default function NewNotePage() {
   const router = useRouter();
@@ -156,7 +157,7 @@ ${bodyContent}`;
   return (
     <div className="flex flex-col h-screen">
       {/* Header */}
-      <header className="border-b bg-white p-4">
+      <header className="border-b bg-card p-4">
         <div className="container mx-auto">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center gap-4 flex-1">
@@ -180,7 +181,8 @@ ${bodyContent}`;
                 )}
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
               <Button
                 onClick={saveDocument}
                 disabled={isSaving || !title.trim()}
@@ -193,7 +195,7 @@ ${bodyContent}`;
 
           {/* Tags Section */}
           <div className="max-w-2xl">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
               태그
             </label>
             <TagInput
@@ -208,11 +210,11 @@ ${bodyContent}`;
       </header>
 
       {/* Editor + Preview */}
-      <div className="flex-1 grid grid-cols-2 gap-4 p-4 overflow-hidden">
+      <div className="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden">
         {/* Editor */}
-        <div className="flex flex-col h-full overflow-hidden">
-          <h2 className="text-lg font-semibold mb-2">Editor</h2>
-          <div className="flex-1 overflow-y-auto border rounded-lg">
+        <div className="w-1/2 flex flex-col min-h-0">
+          <h2 className="text-lg font-semibold mb-2 shrink-0">Editor</h2>
+          <div className="flex-1 border rounded-lg min-h-0 overflow-hidden">
             <MarkdownEditor
               value={(() => {
                 // Extract body content without frontmatter
@@ -235,13 +237,15 @@ ${bodyContent}`;
         </div>
 
         {/* Preview */}
-        <div className="flex flex-col h-full overflow-hidden">
-          <h2 className="text-lg font-semibold mb-2">Preview</h2>
-          <div className="flex-1 border rounded-lg overflow-y-auto">
-            <MarkdownViewer
-              content={content}
-              onWikiLinkClick={handleWikiLinkClick}
-            />
+        <div className="w-1/2 flex flex-col min-h-0">
+          <h2 className="text-lg font-semibold mb-2 shrink-0">Preview</h2>
+          <div className="flex-1 border rounded-lg relative min-h-0">
+            <div className="absolute inset-0 overflow-y-auto">
+              <MarkdownViewer
+                content={content}
+                onWikiLinkClick={handleWikiLinkClick}
+              />
+            </div>
           </div>
         </div>
       </div>

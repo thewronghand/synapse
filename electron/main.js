@@ -2,12 +2,37 @@ const { app, BrowserWindow } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
+const net = require('net');
 
 let mainWindow;
 let nextServer;
 // Use app.isPackaged to reliably detect if app is packaged or in development
 const isDev = !app.isPackaged;
-const PORT = process.env.PORT || 3000;
+let PORT = 3000;
+
+// Find an available port starting from the preferred port
+async function findAvailablePort(startPort = 3000, endPort = 3100) {
+  for (let port = startPort; port <= endPort; port++) {
+    const available = await checkPortAvailable(port);
+    if (available) {
+      return port;
+    }
+  }
+  throw new Error(`No available port found between ${startPort} and ${endPort}`);
+}
+
+function checkPortAvailable(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close();
+      resolve(true);
+    });
+    // Listen on all interfaces to properly detect port conflicts
+    server.listen(port);
+  });
+}
 
 // Setup notes directory in user's Documents folder
 function setupNotesDirectory() {
@@ -203,6 +228,16 @@ function startNextServer() {
 
 app.whenReady().then(async () => {
   try {
+    // In development, use fixed port (dev server already running)
+    // In production, find available port dynamically
+    if (isDev) {
+      PORT = 3000;
+      console.log(`Development mode: using fixed port ${PORT}`);
+    } else {
+      PORT = await findAvailablePort(3000, 3100);
+      console.log(`Production mode: using dynamic port ${PORT}`);
+    }
+
     await startNextServer();
     createWindow();
 

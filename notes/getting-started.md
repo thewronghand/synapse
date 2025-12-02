@@ -44,7 +44,7 @@ Create connections between notes using [[wiki-links]]:
 ## Next Steps
 
 - Learn about [[How to Use Wiki Links]]
-- Explore the [[Graph View]]
-- Read the [[Publishing Guide]]
+- Check out [[마크다운 문법 가이드]]
+- Explore the graph view to visualize connections
 
 Back to [[Welcome to Synapse]]
