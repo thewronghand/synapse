@@ -1,10 +1,56 @@
 "use client";
 
+import { useState, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkWikiLink from "remark-wiki-link";
+import remarkMath from "remark-math";
+import remarkEmoji from "remark-emoji";
 import rehypeRaw from "rehype-raw";
+import rehypeKatex from "rehype-katex";
+import rehypeHighlight from "rehype-highlight";
+import * as Tooltip from "@radix-ui/react-tooltip";
+import { ImageOff } from "lucide-react";
+import "katex/dist/katex.min.css";
+import "highlight.js/styles/github.css";
+
+// 이미지 로딩 실패 캐시 - 컴포넌트 외부에서 관리하여 리렌더링 시 재시도 방지
+const failedImageCache = new Set<string>();
+
+// 이미지 로딩 실패 시 대체 UI를 표시하는 컴포넌트
+function ImageWithFallback({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLImageElement>) {
+  // 캐시에서 이미 실패한 이미지인지 확인
+  const srcString = typeof src === 'string' ? src : '';
+  const [hasError, setHasError] = useState(() => {
+    return srcString ? failedImageCache.has(srcString) : false;
+  });
+
+  if (hasError) {
+    return (
+      <span className="inline-flex items-center gap-2 px-3 py-2 bg-muted border border-border rounded-lg">
+        <span className="flex items-center justify-center w-10 h-10 bg-muted-foreground/10 rounded">
+          <ImageOff className="w-5 h-5 text-muted-foreground" />
+        </span>
+        <code className="text-sm bg-muted-foreground/10 px-2 py-0.5 rounded font-mono">
+          {alt || "이미지를 불러올 수 없습니다"}
+        </code>
+      </span>
+    );
+  }
+
+  return (
+    <img
+      src={src}
+      alt={alt}
+      {...props}
+      onError={() => {
+        if (srcString) failedImageCache.add(srcString);
+        setHasError(true);
+      }}
+    />
+  );
+}
 
 interface MarkdownViewerProps {
   content: string;
@@ -44,11 +90,39 @@ function parseFrontmatter(content: string): {
   return { frontmatter, contentWithoutFrontmatter };
 }
 
-export default function MarkdownViewer({
+function MarkdownViewer({
   content,
   onWikiLinkClick
 }: MarkdownViewerProps) {
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+
+  // 링크에 커스텀 툴팁을 적용하는 헬퍼 함수
+  const renderLinkWithTooltip = (
+    linkElement: React.ReactElement,
+    title: string | undefined
+  ) => {
+    if (!title) {
+      return linkElement;
+    }
+    return (
+      <Tooltip.Provider delayDuration={300}>
+        <Tooltip.Root>
+          <Tooltip.Trigger asChild>
+            {linkElement}
+          </Tooltip.Trigger>
+          <Tooltip.Portal>
+            <Tooltip.Content
+              className="z-50 px-3 py-1.5 text-sm bg-card text-card-foreground border border-border rounded-md shadow-md"
+              sideOffset={5}
+            >
+              {title}
+              <Tooltip.Arrow className="fill-card" />
+            </Tooltip.Content>
+          </Tooltip.Portal>
+        </Tooltip.Root>
+      </Tooltip.Provider>
+    );
+  };
 
   return (
     <div className="p-4">
@@ -59,11 +133,11 @@ export default function MarkdownViewer({
             <h1 className="text-xl font-bold">{frontmatter.title}</h1>
           )}
           {frontmatter.tags && frontmatter.tags.length > 0 && (
-            <div className="flex gap-1 mt-1">
+            <div className="flex flex-wrap gap-1 mt-1">
               {frontmatter.tags.map((tag, index) => (
                 <span
                   key={index}
-                  className="text-xs px-2 py-0.5 bg-gray-100 rounded"
+                  className="text-xs px-2 py-0.5 bg-primary/10 text-primary rounded"
                 >
                   {tag}
                 </span>
@@ -79,18 +153,23 @@ export default function MarkdownViewer({
         remarkPlugins={[
           remarkGfm,
           remarkBreaks,
+          remarkMath,
+          remarkEmoji,
           [
             remarkWikiLink,
             {
               pageResolver: (name: string) => [name.replace(/ /g, "-").toLowerCase()],
               hrefTemplate: (permalink: string) => `/doc/${permalink}`,
-              wikiLinkClassName: "wiki-link text-blue-600 hover:underline cursor-pointer",
+              wikiLinkClassName: "wiki-link text-primary hover:text-primary/80 cursor-pointer no-underline",
             },
           ],
         ]}
-        rehypePlugins={[rehypeRaw]}
+        rehypePlugins={[rehypeRaw, rehypeKatex, rehypeHighlight]}
         components={{
-          a: ({ node, href, children, ...props }) => {
+          img: ({ src, alt, ...props }) => (
+            <ImageWithFallback src={src} alt={alt} {...props} />
+          ),
+          a: ({ node, href, children, title, ...props }) => {
             // Wiki link 처리
             if (props.className?.includes("wiki-link")) {
               return (
@@ -107,12 +186,30 @@ export default function MarkdownViewer({
                 </a>
               );
             }
-            // 일반 링크
-            return (
+            // 페이지 내 앵커 링크 (각주 등) - 히스토리 없이 스크롤
+            if (href?.startsWith("#")) {
+              return (
+                <a
+                  href={href}
+                  {...props}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    const targetId = href.slice(1);
+                    const targetElement = document.getElementById(targetId);
+                    targetElement?.scrollIntoView({ behavior: "smooth" });
+                  }}
+                >
+                  {children}
+                </a>
+              );
+            }
+            // 외부 링크 - 새 탭에서 열기 (title이 있으면 커스텀 툴팁 적용)
+            const linkElement = (
               <a href={href} {...props} target="_blank" rel="noopener noreferrer">
                 {children}
               </a>
             );
+            return renderLinkWithTooltip(linkElement, title);
           },
         }}
       >
@@ -122,3 +219,6 @@ export default function MarkdownViewer({
     </div>
   );
 }
+
+// memo로 감싸서 props가 같을 때 리렌더링 방지
+export default memo(MarkdownViewer);

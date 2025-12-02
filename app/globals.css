@@ -2,26 +2,71 @@
 @plugin "@tailwindcss/typography";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
+  --background: #F9FAFB;
+  --foreground: #1F2937;
+  --primary: #008080;
+  --primary-foreground: #ffffff;
+  --secondary: #6C5B7B;
+  --secondary-foreground: #ffffff;
+  --muted: #F9FAFB;
+  --muted-foreground: #6B7280;
+  --card: #FFFFFF;
+  --card-foreground: #1F2937;
+  --border: #E5E7EB;
+  --input: #E5E7EB;
+  --accent: #E5E7EB;
+  --accent-foreground: #1F2937;
+  --success: #2E9E6B;
+  --warning: #E6A23C;
+  --destructive: #D94652;
+  --destructive-foreground: #ffffff;
+  --destructive-muted: #FEE2E2;
+}
+
+.dark {
+  --background: #2D3748;
+  --foreground: #F3F4F6;
+  --primary: #5FC9C3;
+  --primary-foreground: #134E4A;
+  --secondary: #9F8AB8;
+  --secondary-foreground: #F3F4F6;
+  --muted: #3D4A5C;
+  --muted-foreground: #9CA3AF;
+  --card: #3D4A5C;
+  --card-foreground: #F3F4F6;
+  --border: #6B7280;
+  --input: #6B7280;
+  --accent: #4A5568;
+  --accent-foreground: #F3F4F6;
+  --success: #4ABA87;
+  --warning: #F0B856;
+  --destructive: #D94652;
+  --destructive-foreground: #1F2937;
+  --destructive-muted: #FEE2E2;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --color-destructive: hsl(var(--destructive));
-  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-destructive-muted: var(--destructive-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
@@ -33,3 +78,240 @@ body {
 html {
   scrollbar-gutter: stable;
 }
+
+/* Dark mode prose typography */
+.dark .prose {
+  --tw-prose-body: #E5E7EB;
+  --tw-prose-headings: #FFFFFF;
+  --tw-prose-bold: #FFFFFF;
+  --tw-prose-code: #F3F4F6;
+  --tw-prose-quotes: #E5E7EB;
+  --tw-prose-quote-borders: #5FC9C3;
+  --tw-prose-counters: #9CA3AF;
+}
+
+.dark .prose h1 {
+  color: #FFFFFF;
+}
+
+.dark .prose h2 {
+  color: #F3F4F6;
+}
+
+.dark .prose h3,
+.dark .prose h4,
+.dark .prose h5,
+.dark .prose h6 {
+  color: #E5E7EB;
+}
+
+/* Inline code styling */
+.prose code:not(pre code) {
+  background-color: #E5E7EB;
+  padding: 0.2em 0.4em;
+  border-radius: 0.25rem;
+  font-size: 0.875em;
+  font-weight: 500;
+}
+
+.prose code:not(pre code)::before,
+.prose code:not(pre code)::after {
+  content: none;
+}
+
+.dark .prose code:not(pre code) {
+  background-color: #4A5568;
+  color: #F3F4F6;
+}
+
+.dark .prose pre code {
+  background-color: transparent;
+  color: #FFFFFF;
+}
+
+/* CodeMirror height fix - absolute positioning for scroller in flex containers */
+.cm-editor {
+  height: 100% !important;
+  position: relative !important;
+}
+
+.cm-editor .cm-scroller {
+  position: absolute !important;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  overflow-y: auto !important;
+}
+
+/* Links in prose - secondary color for external links */
+.prose a:not(.wiki-link):not([href^="#"]) {
+  color: #8B6FC0;
+  text-decoration: none;
+}
+
+.dark .prose a:not(.wiki-link):not([href^="#"]) {
+  color: #9F8AB8;
+}
+
+/* Wiki links - higher saturation primary color */
+.prose a.wiki-link {
+  color: #00A3A3;
+}
+
+.dark .prose a.wiki-link {
+  color: #6EE7E7;
+}
+
+/* Anchor links (footnotes) - primary color */
+.prose a[href^="#"] {
+  color: #008080;
+}
+
+.dark .prose a[href^="#"] {
+  color: #5FC9C3;
+}
+
+/* Dark mode blockquote text */
+.dark .prose blockquote {
+  color: #E5E7EB;
+  border-left-color: #5FC9C3;
+}
+
+.dark .prose blockquote p {
+  color: #E5E7EB;
+}
+
+/* Dark mode image alt text (figcaption) */
+.dark .prose figcaption {
+  color: #9CA3AF;
+}
+
+/* Keyboard tag styling */
+.prose kbd {
+  background-color: #E5E7EB;
+  border: 1px solid #D1D5DB;
+  border-radius: 0.25rem;
+  padding: 0.125rem 0.375rem;
+  font-size: 0.875em;
+  font-family: ui-monospace, monospace;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.dark .prose kbd {
+  background-color: #4A5568;
+  border-color: #6B7280;
+  color: #F3F4F6;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* Highlight/mark styling - unified teal color */
+.prose mark {
+  background-color: #B2E4E1;
+  color: #134E4A;
+  padding: 0.125rem 0.25rem;
+  border-radius: 0.125rem;
+}
+
+
+/* Footnote section text */
+.dark .prose .footnotes {
+  color: #E5E7EB;
+}
+
+/* Details/summary (collapsible sections) */
+.prose summary {
+  cursor: pointer;
+}
+
+/* Code block styling - light mode */
+.prose pre {
+  background-color: #F3F4F6;
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+}
+
+.prose pre code {
+  background-color: transparent;
+  color: #6a737d;
+}
+
+/* Code block styling - dark mode (github-dark theme override) */
+.dark .prose pre {
+  background-color: #1E293B;
+  border-color: #334155;
+}
+
+.dark .prose pre code {
+  color: #E2E8F0;
+}
+
+/* Dark mode syntax highlighting colors */
+.dark .hljs-comment,
+.dark .hljs-quote {
+  color: #8B949E;
+}
+
+.dark .hljs-keyword,
+.dark .hljs-selector-tag,
+.dark .hljs-type {
+  color: #FF7B72;
+}
+
+.dark .hljs-string,
+.dark .hljs-attr,
+.dark .hljs-addition {
+  color: #A5D6FF;
+}
+
+.dark .hljs-number,
+.dark .hljs-literal {
+  color: #79C0FF;
+}
+
+.dark .hljs-title,
+.dark .hljs-section,
+.dark .hljs-name {
+  color: #D2A8FF;
+}
+
+.dark .hljs-function,
+.dark .hljs-title.function_ {
+  color: #D2A8FF;
+}
+
+.dark .hljs-variable,
+.dark .hljs-template-variable {
+  color: #FFA657;
+}
+
+.dark .hljs-built_in {
+  color: #FFA657;
+}
+
+.dark .hljs-deletion {
+  color: #FFDCD7;
+  background-color: #67060C;
+}
+
+.dark .hljs-meta {
+  color: #79C0FF;
+}
+
+.dark .hljs-selector-class,
+.dark .hljs-class {
+  color: #7EE787;
+}
+
+.dark .hljs-property {
+  color: #79C0FF;
+}
+
+.dark .hljs-params {
+  color: #E2E8F0;
+}
+
+.dark .hljs-punctuation {
+  color: #C9D1D9;
+}
+

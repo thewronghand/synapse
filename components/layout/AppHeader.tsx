@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
+import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Settings } from "lucide-react";
 import { ReactNode } from "react";
 import { isPublishedMode } from "@/lib/env";
@@ -22,7 +23,7 @@ export default function AppHeader({
   const router = useRouter();
 
   return (
-    <header className="border-b bg-white p-4">
+    <header className="border-b bg-background p-4">
       <div className="container mx-auto flex items-start justify-between">
         {/* Left side: Title and subtitle */}
         <div>
@@ -35,7 +36,7 @@ export default function AppHeader({
           )}
           {subtitle && (
             typeof subtitle === 'string' ? (
-              <p className="text-gray-600">{subtitle}</p>
+              <p className="text-foreground/60">{subtitle}</p>
             ) : (
               subtitle
             )
@@ -45,6 +46,7 @@ export default function AppHeader({
         {/* Right side: Actions and Settings */}
         <div className="flex gap-2">
           {actions}
+          <ThemeToggle />
           {showSettings && !isPublishedMode() && (
             <Button
               variant="outline"

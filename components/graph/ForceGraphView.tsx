@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
+import { useTheme } from "next-themes";
 import { DigitalGardenNode, GraphEdge } from "@/types";
 
 // ForceGraph instance type definition
@@ -55,6 +56,8 @@ export default function ForceGraphView({
   showSearchFilter = false,
 }: ForceGraphViewProps) {
   const router = useRouter();
+  const { resolvedTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const graphRef = useRef<ForceGraphInstance | null>(null);
   const [filteredData, setFilteredData] = useState<FilteredGraphData | null>(null);
@@ -62,6 +65,23 @@ export default function ForceGraphView({
   const highlightNodesRef = useRef<Set<DigitalGardenNode>>(new Set());
   const highlightLinksRef = useRef<Set<GraphEdge>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+
+  // Handle hydration mismatch
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  const isDark = mounted && resolvedTheme === "dark";
+
+  // Theme colors for nodes
+  const nodeColors = {
+    // Teal gradient based on connection count
+    highConnections: isDark ? "#5FC9C3" : "#008080",    // Primary - 5+ connections
+    mediumConnections: isDark ? "#7DD4D0" : "#2A9D9D",  // Lighter teal - 3-4 connections
+    lowConnections: isDark ? "#A5E0DC" : "#5FBFBF",     // Light teal - 1-2 connections
+    noConnections: isDark ? "#6B7280" : "#9CA3AF",      // Gray - 0 connections
+    currentNode: isDark ? "#9F8AB8" : "#6C5B7B",        // Secondary - current node in local graph
+  };
 
   // Search and filter states
   const [searchInput, setSearchInput] = useState(""); // User input (immediate)
@@ -274,13 +294,76 @@ export default function ForceGraphView({
       .nodeId("id")
       .nodeLabel("title")
       .nodeVal((node: DigitalGardenNode) => node.size)
-      .nodeColor((node: DigitalGardenNode) => node.color || "#9f4ff3")
+      .nodeColor((node: DigitalGardenNode) => {
+        // Calculate connection count
+        const connectionCount = node.neighbors?.length || 0;
+
+        // Current node in local graph (compare with URL decoding)
+        const decodedCurrentUrl = currentNodeUrl ? decodeURIComponent(currentNodeUrl) : null;
+        const isCurrent = currentNodeUrl && (
+          node.url === currentNodeUrl ||
+          node.url === decodedCurrentUrl ||
+          decodeURIComponent(node.url) === decodedCurrentUrl
+        );
+        if (isCurrent) {
+          return nodeColors.currentNode;
+        }
+
+        // Color based on connection count
+        if (connectionCount >= 5) return nodeColors.highConnections;
+        if (connectionCount >= 3) return nodeColors.mediumConnections;
+        if (connectionCount >= 1) return nodeColors.lowConnections;
+        return nodeColors.noConnections;
+      })
       .nodeCanvasObject((node: DigitalGardenNode, ctx: CanvasRenderingContext2D) => {
         const nodeWithPos = node as any;
         const { x, y, title, size, url } = nodeWithPos;
         const radius = size || 2;
-        const isCurrent = url === currentNodeUrl;
+        // Compare with URL decoding for Korean slugs
+        const decodedCurrentUrl = currentNodeUrl ? decodeURIComponent(currentNodeUrl) : null;
+        let decodedNodeUrl = url;
+        try {
+          decodedNodeUrl = decodeURIComponent(url || '');
+        } catch (e) {
+          // URL may already be decoded
+        }
+        const isCurrent = !!(currentNodeUrl && (
+          url === currentNodeUrl ||
+          url === decodedCurrentUrl ||
+          decodedNodeUrl === currentNodeUrl ||
+          decodedNodeUrl === decodedCurrentUrl
+        ));
+
+        // Debug log for first node only
+        if (title && !nodeWithPos._logged) {
+          console.log('[ForceGraphView] Node URL comparison:', {
+            nodeUrl: url,
+            decodedNodeUrl,
+            currentNodeUrl,
+            decodedCurrentUrl,
+            isCurrent
+          });
+          nodeWithPos._logged = true;
+        }
+
         const isHighlighted = !hoveredNodeRef.current || highlightNodesRef.current.has(node);
+
+        // Calculate connection count for color
+        const connectionCount = node.neighbors?.length || 0;
+
+        // Determine node color based on connection count
+        let nodeColor: string;
+        if (isCurrent) {
+          nodeColor = nodeColors.currentNode;
+        } else if (connectionCount >= 5) {
+          nodeColor = nodeColors.highConnections;
+        } else if (connectionCount >= 3) {
+          nodeColor = nodeColors.mediumConnections;
+        } else if (connectionCount >= 1) {
+          nodeColor = nodeColors.lowConnections;
+        } else {
+          nodeColor = nodeColors.noConnections;
+        }
 
         // Draw node circle
         ctx.beginPath();
@@ -288,18 +371,18 @@ export default function ForceGraphView({
 
         // Apply color based on highlight state
         if (isHighlighted) {
-          ctx.fillStyle = node.color || "#9f4ff3";
+          ctx.fillStyle = nodeColor;
         } else {
-          ctx.fillStyle = "#d1d5db"; // gray-300
+          ctx.fillStyle = isDark ? "#4B5563" : "#d1d5db"; // gray-600 : gray-300
         }
         ctx.fill();
 
         // Draw outer ring for current node
         if (isCurrent) {
           ctx.beginPath();
-          ctx.arc(x, y, radius + 2, 0, 2 * Math.PI);
-          ctx.strokeStyle = "#fff";
-          ctx.lineWidth = 2;
+          ctx.arc(x, y, radius + 1.5, 0, 2 * Math.PI);
+          ctx.strokeStyle = isDark ? "#F3F4F6" : "#9CA3AF"; // Light gray in dark mode, medium gray in light mode
+          ctx.lineWidth = 1;
           ctx.stroke();
         }
 
@@ -308,8 +391,10 @@ export default function ForceGraphView({
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
 
-        // Dim label if not highlighted
-        ctx.fillStyle = isHighlighted ? "#1f2937" : "#9ca3af"; // gray-400
+        // Dim label if not highlighted - use theme-aware colors
+        ctx.fillStyle = isHighlighted
+          ? (isDark ? "#F3F4F6" : "#1f2937") // foreground
+          : (isDark ? "#6B7280" : "#9ca3af"); // muted-foreground
 
         // Truncate long labels
         const maxLength = 20;
@@ -321,9 +406,11 @@ export default function ForceGraphView({
       })
       .nodeCanvasObjectMode(() => "replace")
       .linkColor((link: GraphEdge) => {
-        // Highlight links connected to hovered node
-        if (!hoveredNodeRef.current) return "#d3d3d3";
-        return highlightLinksRef.current.has(link) ? "#6b7280" : "#e5e7eb"; // gray-500 : gray-200
+        // Highlight links connected to hovered node - theme aware
+        if (!hoveredNodeRef.current) return isDark ? "#9CA3AF" : "#d3d3d3"; // gray-400 : lightgray
+        return highlightLinksRef.current.has(link)
+          ? (isDark ? "#D1D5DB" : "#6b7280") // gray-300 : gray-500
+          : (isDark ? "#6B7280" : "#e5e7eb"); // gray-500 : gray-200
       })
       .linkWidth((link: GraphEdge) => {
         // Make highlighted links slightly thicker
@@ -402,22 +489,35 @@ export default function ForceGraphView({
       const density = linkCount / Math.max(nodeCount, 1);
 
       // Calculate optimal force parameters based on node count
-      // More nodes = stronger repulsion to prevent clustering
-      const chargeStrength = Math.min(-30, -30 - (nodeCount / 10));
+      // Reduced repulsion to keep disconnected components closer
+      const chargeStrength = Math.min(-20, -15 - (nodeCount / 20));
 
       // Calculate link distance based on density
       // Higher density = longer links to spread out
-      const linkDistance = density > 2 ? 40 : 30;
+      const linkDistance = density > 2 ? 35 : 25;
 
       const chargeForce = graph.d3Force('charge');
-      if (chargeForce) chargeForce.strength(chargeStrength);
+      if (chargeForce) {
+        chargeForce.strength(chargeStrength);
+        // Limit the distance at which charge force applies
+        chargeForce.distanceMax(150);
+      }
 
       const linkForce = graph.d3Force('link');
       if (linkForce) linkForce.distance(linkDistance);
 
+      // Auto zoom to fit all nodes after simulation stabilizes
+      graph.onEngineStop(() => {
+        // Only run once
+        if (!graphRef.current?._zoomFitted) {
+          graph.zoomToFit(400, 20); // 400ms duration, 20px padding
+          graph._zoomFitted = true;
+        }
+      });
+
       graphRef.current = graph;
     });
-  }, [filteredData, currentNodeUrl, height, onNodeClick, router]);
+  }, [filteredData, currentNodeUrl, height, onNodeClick, router, isDark]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -464,9 +564,45 @@ export default function ForceGraphView({
     }
   };
 
+  // Check graph state for empty messages
+  // 1. Error state: filteredData itself is null/undefined (data loading failed)
+  const hasError = !filteredData;
+
+  // 2. Local graph with no connections: only current node exists with no edges
+  //    Only show message when viewing local graph (currentNodeUrl is set)
+  const isLocalGraphWithNoConnections = currentNodeUrl &&
+    filteredData &&
+    Object.keys(filteredData.nodes).length === 1 &&
+    filteredData.links.length === 0;
+
   return (
     <div className="relative w-full overflow-hidden" style={{ height: `${height}px` }}>
       <div ref={containerRef} className="w-full h-full overflow-hidden" />
+
+      {/* Error state: failed to load graph data */}
+      {hasError && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="text-center">
+            <p className="text-sm text-muted-foreground">
+              그래프 데이터를 불러올 수 없습니다
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Local graph with no connections: show message below center */}
+      {isLocalGraphWithNoConnections && (
+        <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none">
+          <div className="text-center bg-card/80 backdrop-blur-sm px-4 py-2 rounded-lg">
+            <p className="text-sm text-muted-foreground">
+              연결된 문서가 없습니다
+            </p>
+            <p className="text-xs text-muted-foreground/70 mt-1">
+              [[위키링크]]로 다른 문서를 연결해보세요
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Search and Filter Controls - Only show on full graph */}
       {showSearchFilter && (
@@ -474,7 +610,7 @@ export default function ForceGraphView({
           <div className="flex flex-col gap-2">
             {/* Search Bar */}
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-500 z-10 pointer-events-none" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground z-10 pointer-events-none" />
               <input
                 type="text"
                 placeholder="노트 검색..."
@@ -504,12 +640,12 @@ export default function ForceGraphView({
                     setShowSearchSuggestions(false);
                   }
                 }}
-                className="w-full pl-10 pr-3 py-1.5 text-sm bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full pl-10 pr-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
 
               {/* Search Suggestions Dropdown */}
               {showSearchSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg max-h-40 overflow-y-auto z-10">
                   {searchSuggestions.map((title, index) => (
                     <button
                       key={title}
@@ -517,10 +653,10 @@ export default function ForceGraphView({
                         setSearchInput(title);
                         setShowSearchSuggestions(false);
                       }}
-                      className={`w-full px-3 py-1.5 text-sm text-left transition-colors ${
+                      className={`w-full px-3 py-1.5 text-sm text-left transition-colors hover:bg-primary/10 ${
                         index === selectedSearchIndex
-                          ? "bg-blue-50 text-blue-700"
-                          : "hover:bg-gray-100"
+                          ? "bg-primary/20 text-primary"
+                          : ""
                       }`}
                     >
                       {title}
@@ -561,20 +697,20 @@ export default function ForceGraphView({
                     setShowTagSuggestions(false);
                   }
                 }}
-                className="w-full px-3 py-1.5 text-sm bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
               />
 
               {/* Tag Suggestions Dropdown */}
               {showTagSuggestions && tagSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg max-h-40 overflow-y-auto z-10">
                   {tagSuggestions.map((tag, index) => (
                     <button
                       key={tag}
                       onClick={() => handleAddTag(tag)}
-                      className={`w-full px-3 py-1.5 text-sm text-left transition-colors ${
+                      className={`w-full px-3 py-1.5 text-sm text-left transition-colors hover:bg-primary/10 ${
                         index === selectedTagIndex
-                          ? "bg-blue-50 text-blue-700"
-                          : "hover:bg-gray-100"
+                          ? "bg-primary/20 text-primary"
+                          : ""
                       }`}
                     >
                       {tag}
@@ -590,7 +726,7 @@ export default function ForceGraphView({
                 {selectedTags.map((tag) => (
                   <span
                     key={tag}
-                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded cursor-pointer hover:bg-blue-200 transition-colors"
+                    className="inline-flex items-center gap-1 px-2 py-1 text-xs bg-secondary text-secondary-foreground rounded cursor-pointer hover:bg-secondary/80 transition-colors"
                     onClick={() => handleRemoveTag(tag)}
                   >
                     {tag}
@@ -609,7 +745,7 @@ export default function ForceGraphView({
       <div className="absolute top-2 right-2 flex flex-col gap-1">
         <button
           onClick={handleZoomIn}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Zoom In"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -618,7 +754,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomOut}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Zoom Out"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -627,7 +763,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomReset}
-          className="w-8 h-8 bg-white/90 backdrop-blur-sm border border-gray-200 rounded shadow-sm hover:bg-gray-50 transition-colors flex items-center justify-center cursor-pointer"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Reset View"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -637,14 +773,14 @@ export default function ForceGraphView({
       </div>
 
       {/* Collapsible Legend */}
-      <div className="absolute bottom-2 right-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg shadow-sm text-xs">
+      <div className="absolute bottom-2 right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg shadow-sm text-xs">
         <button
           onClick={() => setIsLegendExpanded(!isLegendExpanded)}
-          className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-gray-50 rounded-lg transition-colors cursor-pointer"
+          className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-accent rounded-lg transition-colors cursor-pointer"
         >
-          <div className="font-semibold text-gray-700">범례</div>
+          <div className="font-semibold text-foreground">범례</div>
           <svg
-            className={`w-3 h-3 text-gray-500 transition-transform ${isLegendExpanded ? 'rotate-180' : ''}`}
+            className={`w-3 h-3 text-muted-foreground transition-transform ${isLegendExpanded ? 'rotate-180' : ''}`}
             fill="none"
             stroke="currentColor"
             viewBox="0 0 24 24"
@@ -654,37 +790,35 @@ export default function ForceGraphView({
         </button>
 
         {isLegendExpanded && (
-          <div className="px-2 pb-2 pt-1 space-y-1 border-t border-gray-100">
-            {/* Tag-based colors */}
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#3b82f6] flex-shrink-0"></div>
-              <span className="text-gray-600">가이드/튜토리얼</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#10b981] flex-shrink-0"></div>
-              <span className="text-gray-600">시작하기</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#8b5cf6] flex-shrink-0"></div>
-              <span className="text-gray-600">기능</span>
-            </div>
-
-            {/* Divider */}
-            <div className="border-t border-gray-200 my-1"></div>
-
+          <div className="px-2 pb-2 pt-1 space-y-1 border-t border-border">
             {/* Connection-based colors */}
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#ef4444] flex-shrink-0"></div>
-              <span className="text-gray-600">많은 연결 (3+)</span>
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: nodeColors.highConnections }}></div>
+              <span className="text-muted-foreground">5+ 연결</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#f59e0b] flex-shrink-0"></div>
-              <span className="text-gray-600">연결됨 (1-2)</span>
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: nodeColors.mediumConnections }}></div>
+              <span className="text-muted-foreground">3-4 연결</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <div className="w-2.5 h-2.5 rounded-full bg-[#6b7280] flex-shrink-0"></div>
-              <span className="text-gray-600">기본</span>
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: nodeColors.lowConnections }}></div>
+              <span className="text-muted-foreground">1-2 연결</span>
             </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ backgroundColor: nodeColors.noConnections }}></div>
+              <span className="text-muted-foreground">연결 없음</span>
+            </div>
+
+            {/* Current node indicator (only in local graph) */}
+            {currentNodeUrl && (
+              <>
+                <div className="border-t border-border my-1"></div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2.5 h-2.5 rounded-full flex-shrink-0 ring-1 ring-muted-foreground ring-offset-1 ring-offset-card" style={{ backgroundColor: nodeColors.currentNode }}></div>
+                  <span className="text-muted-foreground">현재 문서</span>
+                </div>
+              </>
+            )}
           </div>
         )}
       </div>
@@ -707,14 +841,36 @@ function filterLocalGraphData(
   // Start with current node
   let existing: { [url: string]: DigitalGardenNode } = {};
 
-  const currentNode = remaining[currentUrl];
+  // Decode URL-encoded currentUrl for comparison
+  const decodedCurrentUrl = decodeURIComponent(currentUrl);
+
+  // Try to find current node by URL key (both encoded and decoded)
+  let currentNode = remaining[currentUrl] || remaining[decodedCurrentUrl];
+  let currentNodeKey = remaining[currentUrl] ? currentUrl : decodedCurrentUrl;
+
+  if (!currentNode) {
+    // Try to find by url property (in case key format differs)
+    const entry = Object.entries(remaining).find(
+      ([key, node]) => {
+        const nodeUrl = (node as DigitalGardenNode).url;
+        return nodeUrl === currentUrl ||
+               nodeUrl === decodedCurrentUrl ||
+               decodeURIComponent(key) === decodedCurrentUrl;
+      }
+    );
+    if (entry) {
+      currentNodeKey = entry[0];
+      currentNode = entry[1] as DigitalGardenNode;
+    }
+  }
+
   if (!currentNode) {
     // If current node not found, return empty graph
     return { nodes: {}, links: [] };
   }
 
-  existing[currentUrl] = currentNode;
-  delete remaining[currentUrl];
+  existing[currentNodeKey] = currentNode;
+  delete remaining[currentNodeKey];
 
   // Expand by depth levels
   for (let i = 0; i < depth; i++) {
@@ -729,6 +885,7 @@ function filterLocalGraphData(
 
   // Filter links to only include visible nodes
   const visibleUrls = Object.keys(existing);
+  const visibleUrlsDecoded = visibleUrls.map(u => decodeURIComponent(u));
 
   const filteredLinks = graphData.links.filter((link) => {
     const sourceId = link.source;
@@ -737,9 +894,19 @@ function filterLocalGraphData(
     const sourceNode = (Object.values(graphData.nodes) as DigitalGardenNode[]).find(n => n.id === sourceId);
     const targetNode = (Object.values(graphData.nodes) as DigitalGardenNode[]).find(n => n.id === targetId);
 
-    return sourceNode && targetNode &&
-           visibleUrls.includes(sourceNode.url) &&
-           visibleUrls.includes(targetNode.url);
+    if (!sourceNode || !targetNode) return false;
+
+    // Check visibility with both encoded and decoded URLs
+    const sourceVisible = visibleUrls.includes(sourceNode.url) ||
+                          visibleUrlsDecoded.includes(sourceNode.url) ||
+                          visibleUrls.includes(decodeURIComponent(sourceNode.url)) ||
+                          visibleUrlsDecoded.includes(decodeURIComponent(sourceNode.url));
+    const targetVisible = visibleUrls.includes(targetNode.url) ||
+                          visibleUrlsDecoded.includes(targetNode.url) ||
+                          visibleUrls.includes(decodeURIComponent(targetNode.url)) ||
+                          visibleUrlsDecoded.includes(decodeURIComponent(targetNode.url));
+
+    return sourceVisible && targetVisible;
   });
 
   return {
@@ -756,15 +923,22 @@ function getNextLevelNeighbours(
   remaining: { [url: string]: DigitalGardenNode }
 ): { [url: string]: DigitalGardenNode } {
   const existingKeys = Object.keys(existing);
+  // Also include decoded versions for URL-encoded key comparison
+  const existingKeysDecoded = existingKeys.map(k => decodeURIComponent(k));
   const neighbours: { [url: string]: DigitalGardenNode } = {};
 
   Object.entries(remaining).forEach(([url, node]) => {
     if (node.hide) return;
 
     // Check if this node is a neighbor of any existing node
-    const isNeighbor = node.neighbors.some(neighborUrl =>
-      existingKeys.includes(neighborUrl)
-    );
+    // Compare both encoded and decoded versions
+    const isNeighbor = node.neighbors.some(neighborUrl => {
+      const decodedNeighborUrl = decodeURIComponent(neighborUrl);
+      return existingKeys.includes(neighborUrl) ||
+             existingKeys.includes(decodedNeighborUrl) ||
+             existingKeysDecoded.includes(neighborUrl) ||
+             existingKeysDecoded.includes(decodedNeighborUrl);
+    });
 
     if (isNeighbor) {
       neighbours[url] = node;

@@ -23,8 +23,8 @@ export function TagInput({
   showHelper = false,
 }: TagInputProps) {
   const colorClasses = variant === "include"
-    ? "bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200 hover:bg-blue-300"
-    : "bg-red-50 text-red-700 hover:bg-red-100 border-red-200 hover:bg-red-200";
+    ? "bg-primary/10 text-primary border border-primary hover:bg-primary/20"
+    : "bg-destructive/10 text-destructive border border-destructive hover:bg-destructive/20";
   const [inputValue, setInputValue] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -124,7 +124,7 @@ export function TagInput({
 
   return (
     <div className="relative">
-      <div className="flex flex-wrap gap-2 p-2 border rounded-lg min-h-[42px] focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-gray-400">
+      <div className="flex flex-wrap gap-2 p-2 border border-border rounded-lg min-h-[42px] bg-card focus-within:ring-2 focus-within:ring-offset-2 focus-within:ring-primary">
         {tags.map((tag) => (
           <Badge
             key={tag}
@@ -157,7 +157,7 @@ export function TagInput({
 
       {/* Suggestions dropdown */}
       {showSuggestions && displaySuggestions.length > 0 && (
-        <div className="absolute z-10 w-full mt-1 bg-white border rounded-lg shadow-lg max-h-[200px] overflow-y-auto">
+        <div className="absolute z-10 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-[200px] overflow-y-auto">
           {displaySuggestions.map((suggestion, index) => (
             <button
               key={suggestion}
@@ -166,8 +166,8 @@ export function TagInput({
                 e.preventDefault();
                 addTag(suggestion);
               }}
-              className={`w-full text-left px-3 py-2 text-sm hover:bg-gray-100 ${
-                index === selectedIndex ? "bg-gray-100" : ""
+              className={`w-full text-left px-3 py-2 text-sm hover:bg-primary/10 ${
+                index === selectedIndex ? "bg-primary/20 text-primary" : ""
               }`}
             >
               {suggestion}
@@ -177,7 +177,7 @@ export function TagInput({
       )}
 
       {showHelper && (
-        <p className="text-xs text-gray-500 mt-1">
+        <p className="text-xs text-muted-foreground mt-1">
           Enter, 쉼표, 스페이스로 태그 추가
         </p>
       )}

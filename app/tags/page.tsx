@@ -63,7 +63,7 @@ export default function TagsPage() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading...</p>
+        <p className="text-lg text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -113,11 +113,11 @@ export default function TagsPage() {
         {sortedTags.map(({ tag, count }) => (
           <Badge
             key={tag}
-            className="cursor-pointer bg-blue-100 text-blue-800 hover:bg-blue-200 border-blue-200 px-3 py-2 text-sm transition-colors"
+            className="cursor-pointer bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 px-3 py-2 text-sm transition-colors"
             onClick={() => router.push(`/documents?tags=${encodeURIComponent(tag)}`)}
           >
             <span className="font-medium">{tag}</span>
-            <span className="ml-2 text-blue-600">{count}</span>
+            <span className="ml-2 opacity-70">{count}</span>
           </Badge>
         ))}
       </div>
@@ -125,8 +125,8 @@ export default function TagsPage() {
       {/* Empty State */}
       {sortedTags.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">아직 태그가 없습니다.</p>
-          <p className="text-sm text-gray-500">문서에 태그를 추가해보세요!</p>
+          <p className="text-muted-foreground mb-4">아직 태그가 없습니다.</p>
+          <p className="text-sm text-muted-foreground">문서에 태그를 추가해보세요!</p>
         </div>
       )}
     </div>

@@ -249,27 +249,27 @@ function SettingsContent() {
           </Button>
           <h1 className="text-4xl font-bold">설정</h1>
         </div>
-        <p className="text-gray-600">
+        <p className="text-muted-foreground">
           Synapse 앱 설정 및 publish 관리
         </p>
       </div>
 
       {/* Settings Sections */}
-      <div className="max-w-3xl space-y-8">
+      <div className="max-w-3xl mx-auto space-y-8">
         {/* Publish Section */}
-        <section className="border rounded-lg p-6 bg-white shadow-sm">
+        <section className="border rounded-lg p-6 bg-card shadow-sm">
           <h2 className="text-2xl font-semibold mb-4">Publish</h2>
-          <p className="text-gray-600 mb-6">
+          <p className="text-muted-foreground mb-6">
             로컬 노트를 읽기 전용 웹사이트로 배포하세요. Vercel을 통해 무료로 publish할 수 있습니다.
           </p>
 
           <div className="space-y-4">
             {/* Vercel Connection Status */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">Vercel 연동 상태</h3>
-                  <p className="text-sm text-gray-600 mt-1">
+                  <h3 className="font-semibold">Vercel 연동 상태</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
                     {vercelLoading
                       ? "확인 중..."
                       : vercelConnected
@@ -277,15 +277,15 @@ function SettingsContent() {
                         : "Vercel 계정 연동이 필요합니다"}
                   </p>
                   {vercelConnected && vercelConnectedAt && (
-                    <p className="text-xs text-gray-500 mt-1">
+                    <p className="text-xs text-muted-foreground mt-1">
                       연동 날짜: {formatDate(vercelConnectedAt)}
                     </p>
                   )}
                 </div>
                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                   vercelConnected
-                    ? "bg-green-100 text-green-700"
-                    : "bg-gray-200 text-gray-700"
+                    ? "bg-success/10 text-success"
+                    : "bg-muted text-muted-foreground"
                 }`}>
                   {vercelConnected ? "연동됨" : "미연동"}
                 </div>
@@ -314,69 +314,69 @@ function SettingsContent() {
             </div>
 
             {/* Deploy Status */}
-            <div className="bg-gray-50 rounded-lg p-4">
+            <div className="bg-muted rounded-lg p-4">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
-                  <h3 className="font-semibold text-gray-900">배포 상태</h3>
+                  <h3 className="font-semibold">배포 상태</h3>
                   {deploymentLoading ? (
-                    <p className="text-sm text-gray-600 mt-1">확인 중...</p>
+                    <p className="text-sm text-muted-foreground mt-1">확인 중...</p>
                   ) : !deploymentStatus?.hasDeployment ? (
-                    <p className="text-sm text-gray-600 mt-1">아직 배포되지 않았습니다</p>
+                    <p className="text-sm text-muted-foreground mt-1">아직 배포되지 않았습니다</p>
                   ) : deploymentStatus.status === 'READY' ? (
                     <>
-                      <p className="text-sm text-green-600 mt-1">배포 완료</p>
+                      <p className="text-sm text-success mt-1">배포 완료</p>
                       {deploymentStatus.url && (
                         <a
                           href={deploymentStatus.url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-sm text-blue-600 hover:underline mt-1 block"
+                          className="text-sm text-primary hover:underline mt-1 block"
                         >
                           {deploymentStatus.url}
                         </a>
                       )}
                       {deploymentStatus.createdAt && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           마지막 배포: {formatDate(new Date(deploymentStatus.createdAt).toISOString())}
                         </p>
                       )}
                     </>
                   ) : deploymentStatus.status === 'BUILDING' ? (
                     <>
-                      <p className="text-sm text-blue-600 mt-1">빌드 중...</p>
+                      <p className="text-sm text-primary mt-1">빌드 중...</p>
                       {deploymentStatus.createdAt && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           시작 시간: {formatDate(new Date(deploymentStatus.createdAt).toISOString())}
                         </p>
                       )}
                     </>
                   ) : deploymentStatus.status === 'QUEUED' ? (
-                    <p className="text-sm text-yellow-600 mt-1">대기 중...</p>
+                    <p className="text-sm text-warning mt-1">대기 중...</p>
                   ) : deploymentStatus.status === 'ERROR' ? (
                     <>
-                      <p className="text-sm text-red-600 mt-1">배포 실패</p>
+                      <p className="text-sm text-destructive mt-1">배포 실패</p>
                       {deploymentStatus.createdAt && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           실패 시간: {formatDate(new Date(deploymentStatus.createdAt).toISOString())}
                         </p>
                       )}
                     </>
                   ) : (
-                    <p className="text-sm text-gray-600 mt-1">상태 확인 불가</p>
+                    <p className="text-sm text-muted-foreground mt-1">상태 확인 불가</p>
                   )}
                 </div>
                 <div className={`px-3 py-1 rounded-full text-sm font-medium ${
                   !deploymentStatus?.hasDeployment
-                    ? "bg-gray-200 text-gray-700"
+                    ? "bg-muted text-muted-foreground"
                     : deploymentStatus.status === 'READY'
-                      ? "bg-green-100 text-green-700"
+                      ? "bg-success/10 text-success"
                       : deploymentStatus.status === 'BUILDING'
-                        ? "bg-blue-100 text-blue-700"
+                        ? "bg-primary/10 text-primary"
                         : deploymentStatus.status === 'QUEUED'
-                          ? "bg-yellow-100 text-yellow-700"
+                          ? "bg-warning/10 text-warning"
                           : deploymentStatus.status === 'ERROR'
-                            ? "bg-red-100 text-red-700"
-                            : "bg-gray-200 text-gray-700"
+                            ? "bg-destructive/10 text-destructive"
+                            : "bg-muted text-muted-foreground"
                 }`}>
                   {!deploymentStatus?.hasDeployment
                     ? "미배포"
@@ -403,7 +403,7 @@ function SettingsContent() {
               >
                 {isPublishing ? "Publishing..." : "Publish to Vercel"}
               </Button>
-              <p className="text-sm text-gray-500 mt-2">
+              <p className="text-sm text-muted-foreground mt-2">
                 {!vercelConnected
                   ? "Vercel 연동 후 publish할 수 있습니다"
                   : "노트를 Vercel에 직접 배포합니다"}
@@ -413,9 +413,9 @@ function SettingsContent() {
         </section>
 
         {/* General Settings Section (Placeholder) */}
-        <section className="border rounded-lg p-6 bg-white shadow-sm">
+        <section className="border rounded-lg p-6 bg-card shadow-sm">
           <h2 className="text-2xl font-semibold mb-4">일반 설정</h2>
-          <p className="text-gray-600">
+          <p className="text-muted-foreground">
             추가 설정 항목은 곧 추가될 예정입니다.
           </p>
         </section>

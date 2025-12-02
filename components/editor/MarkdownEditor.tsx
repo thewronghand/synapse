@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { useTheme } from 'next-themes';
 import CodeMirror from '@uiw/react-codemirror';
 import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
 import { languages } from '@codemirror/language-data';
@@ -28,6 +29,14 @@ import {
   Quote,
   Minus,
   ChevronDown,
+  Table,
+  Sigma,
+  Highlighter,
+  Footprints,
+  MoreHorizontal,
+  Smile,
+  ChevronsUpDown,
+  Keyboard,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -42,15 +51,51 @@ interface MarkdownEditorProps {
   placeholder?: string;
 }
 
+// Dark theme for CodeMirror
+const darkTheme = EditorView.theme({
+  '&': {
+    backgroundColor: '#3D4A5C',
+    color: '#F3F4F6',
+  },
+  '.cm-content': {
+    caretColor: '#F3F4F6',
+  },
+  '.cm-cursor': {
+    borderLeftColor: '#F3F4F6',
+  },
+  '.cm-gutters': {
+    backgroundColor: '#2D3748',
+    color: '#9CA3AF',
+    borderRight: '1px solid #6B7280',
+  },
+  '.cm-activeLineGutter': {
+    backgroundColor: '#4A5568',
+  },
+  '.cm-activeLine': {
+    backgroundColor: '#4A556820',
+  },
+  '.cm-placeholder': {
+    color: '#9CA3AF',
+  },
+}, { dark: true });
+
+
 export default function MarkdownEditor({
   value,
   onChange,
   placeholder = 'Start writing...',
 }: MarkdownEditorProps) {
+  const { resolvedTheme } = useTheme();
   const [isUploading, setIsUploading] = useState(false);
   const [documentTitles, setDocumentTitles] = useState<string[]>([]);
   const editorViewRef = useRef<EditorView | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [mounted, setMounted] = useState(false);
+
+  // Wait for theme to be resolved (avoid hydration mismatch)
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Fetch document titles for wiki link autocomplete
   useEffect(() => {
@@ -336,9 +381,9 @@ export default function MarkdownEditor({
 
   return (
     <TooltipProvider>
-      <div className="h-full flex flex-col">
+      <div className="h-full flex flex-col min-h-0">
         {/* Toolbar */}
-        <div className="flex items-center gap-1 p-2 border-b bg-gray-50 flex-wrap">
+        <div className="flex items-center gap-1 p-2 border-b bg-muted flex-wrap">
           {/* Bold */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -347,13 +392,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('**', '**')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Bold className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Bold (⌘B / Ctrl+B)</p>
+              <p>볼드 (⌘B / Ctrl+B)</p>
             </TooltipContent>
           </Tooltip>
 
@@ -365,13 +410,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('*', '*')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Italic className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Italic (⌘I / Ctrl+I)</p>
+              <p>이탤릭 (⌘I / Ctrl+I)</p>
             </TooltipContent>
           </Tooltip>
 
@@ -383,13 +428,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('~~', '~~')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Strikethrough className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Strikethrough (⌘⇧X / Ctrl+Shift+X)</p>
+              <p>취소선 (⌘⇧X / Ctrl+Shift+X)</p>
             </TooltipContent>
           </Tooltip>
 
@@ -401,50 +446,50 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('`', '`')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Code className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Inline Code (⌘E / Ctrl+E)</p>
+              <p>인라인 코드 (⌘E / Ctrl+E)</p>
             </TooltipContent>
           </Tooltip>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-border mx-1" />
 
           {/* Heading Dropdown */}
           <DropdownMenu>
             <Tooltip>
               <TooltipTrigger asChild>
                 <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="ghost" size="sm" className="cursor-pointer hover:bg-gray-200">
+                  <Button type="button" variant="ghost" size="sm" className="cursor-pointer hover:bg-accent">
                     <Heading className="h-4 w-4" />
                     <ChevronDown className="h-3 w-3 ml-1" />
                   </Button>
                 </DropdownMenuTrigger>
               </TooltipTrigger>
               <TooltipContent className="bg-black/80 text-white border-none">
-                <p>Heading</p>
+                <p>제목</p>
               </TooltipContent>
             </Tooltip>
-            <DropdownMenuContent className="bg-white">
-              <DropdownMenuItem onClick={() => insertHeading(1)} className="cursor-pointer hover:bg-gray-100">
-                <span className="font-bold text-lg"># Heading 1</span>
+            <DropdownMenuContent className="bg-card">
+              <DropdownMenuItem onClick={() => insertHeading(1)} className="cursor-pointer hover:bg-accent">
+                <span className="font-bold text-lg"># 제목 1</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => insertHeading(2)} className="cursor-pointer hover:bg-gray-100">
-                <span className="font-bold text-base">## Heading 2</span>
+              <DropdownMenuItem onClick={() => insertHeading(2)} className="cursor-pointer hover:bg-accent">
+                <span className="font-bold text-base">## 제목 2</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => insertHeading(3)} className="cursor-pointer hover:bg-gray-100">
-                <span className="font-semibold text-sm">### Heading 3</span>
+              <DropdownMenuItem onClick={() => insertHeading(3)} className="cursor-pointer hover:bg-accent">
+                <span className="font-semibold text-sm">### 제목 3</span>
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => insertHeading(4)} className="cursor-pointer hover:bg-gray-100">
-                <span className="font-medium text-sm">#### Heading 4</span>
+              <DropdownMenuItem onClick={() => insertHeading(4)} className="cursor-pointer hover:bg-accent">
+                <span className="font-medium text-sm">#### 제목 4</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-border mx-1" />
 
           {/* Unordered List */}
           <Tooltip>
@@ -454,13 +499,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertList('-')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <List className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Bullet List</p>
+              <p>글머리 기호</p>
             </TooltipContent>
           </Tooltip>
 
@@ -472,13 +517,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertList('1.')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <ListOrdered className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Numbered List</p>
+              <p>번호 목록</p>
             </TooltipContent>
           </Tooltip>
 
@@ -490,17 +535,17 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertList('- [ ]')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <CheckSquare className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Checkbox</p>
+              <p>체크박스</p>
             </TooltipContent>
           </Tooltip>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-border mx-1" />
 
           {/* Link */}
           <Tooltip>
@@ -510,13 +555,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('[', '](url)')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Link className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Link (⌘K / Ctrl+K)</p>
+              <p>링크 (⌘K / Ctrl+K)</p>
             </TooltipContent>
           </Tooltip>
 
@@ -528,14 +573,14 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('```\n', '\n```')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Code className="h-4 w-4" />
                 <Code className="h-4 w-4 -ml-2" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Code Block (⌘⇧C / Ctrl+Shift+C)</p>
+              <p>코드 블록 (⌘⇧C / Ctrl+Shift+C)</p>
             </TooltipContent>
           </Tooltip>
 
@@ -547,13 +592,13 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertList('>')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Quote className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Quote</p>
+              <p>인용</p>
             </TooltipContent>
           </Tooltip>
 
@@ -565,17 +610,17 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('\n---\n')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <Minus className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Horizontal Rule</p>
+              <p>구분선</p>
             </TooltipContent>
           </Tooltip>
 
-          <div className="w-px h-6 bg-gray-300 mx-1" />
+          <div className="w-px h-6 bg-border mx-1" />
 
           {/* Image */}
           <Tooltip>
@@ -586,13 +631,14 @@ export default function MarkdownEditor({
                 size="sm"
                 onClick={handleImageButtonClick}
                 disabled={isUploading}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <ImagePlus className="h-4 w-4" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent className="bg-black/80 text-white border-none">
-              <p>💡 드래그&드롭이나 붙여넣기로도 이미지를 넣을 수 있어요!</p>
+            <TooltipContent className="bg-black/80 text-white border-none text-center">
+              <p className="font-medium">이미지 첨부</p>
+              <p className="text-xs opacity-80">💡 드래그&드롭이나 붙여넣기로도 이미지를 넣을 수 있어요!</p>
             </TooltipContent>
           </Tooltip>
 
@@ -604,18 +650,129 @@ export default function MarkdownEditor({
                 variant="ghost"
                 size="sm"
                 onClick={() => insertMarkdown('[[', ']]')}
-                className="cursor-pointer hover:bg-gray-200"
+                className="cursor-pointer hover:bg-accent"
               >
                 <span className="text-xs font-bold">[[]]</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent className="bg-black/80 text-white border-none">
-              <p>Wiki Link</p>
+              <p>위키 링크</p>
             </TooltipContent>
           </Tooltip>
 
+          <div className="w-px h-6 bg-border mx-1" />
+
+          {/* Table */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertMarkdown('\n| 헤더 1 | 헤더 2 | 헤더 3 |\n|--------|--------|--------|\n| 셀 1 | 셀 2 | 셀 3 |\n')}
+                className="cursor-pointer hover:bg-accent"
+              >
+                <Table className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="bg-black/80 text-white border-none">
+              <p>테이블</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Math */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="cursor-pointer hover:bg-accent">
+                    <Sigma className="h-4 w-4" />
+                    <ChevronDown className="h-3 w-3 ml-1" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent className="bg-black/80 text-white border-none">
+                <p>수학 수식</p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent className="bg-card">
+              <DropdownMenuItem onClick={() => insertMarkdown('$', '$')} className="cursor-pointer hover:bg-accent">
+                <span>인라인 수식 $...$</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => insertMarkdown('\n$$\n', '\n$$\n')} className="cursor-pointer hover:bg-accent">
+                <span>블록 수식 $$...$$</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          {/* Highlight */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertMarkdown('<mark>', '</mark>')}
+                className="cursor-pointer hover:bg-accent"
+              >
+                <Highlighter className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="bg-black/80 text-white border-none">
+              <p>하이라이트</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* Footnote */}
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => insertMarkdown('[^1]\n\n[^1]: ', '\n')}
+                className="cursor-pointer hover:bg-accent"
+              >
+                <Footprints className="h-4 w-4" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent className="bg-black/80 text-white border-none">
+              <p>각주</p>
+            </TooltipContent>
+          </Tooltip>
+
+          {/* More Options */}
+          <DropdownMenu>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="ghost" size="sm" className="cursor-pointer hover:bg-accent">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+              </TooltipTrigger>
+              <TooltipContent className="bg-black/80 text-white border-none">
+                <p>더보기</p>
+              </TooltipContent>
+            </Tooltip>
+            <DropdownMenuContent className="bg-card">
+              <DropdownMenuItem onClick={() => insertMarkdown(':smile: ')} className="cursor-pointer hover:bg-accent">
+                <Smile className="h-4 w-4 mr-2" />
+                <span>이모지 :emoji:</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => insertMarkdown('<details>\n<summary>제목</summary>\n\n', '\n\n</details>')} className="cursor-pointer hover:bg-accent">
+                <ChevronsUpDown className="h-4 w-4 mr-2" />
+                <span>접는 섹션</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => insertMarkdown('<kbd>', '</kbd>')} className="cursor-pointer hover:bg-accent">
+                <Keyboard className="h-4 w-4 mr-2" />
+                <span>키보드 단축키</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+
           {isUploading && (
-            <span className="text-sm text-blue-600 ml-2">업로드 중...</span>
+            <span className="text-sm text-primary ml-2">업로드 중...</span>
           )}
         </div>
 
@@ -634,7 +791,7 @@ export default function MarkdownEditor({
           onPaste={handlePaste}
           onDrop={handleDrop}
           onDragOver={handleDragOver}
-          className="flex-1 relative"
+          className="flex-1 relative overflow-hidden min-h-0"
         >
           <CodeMirror
             value={value}
@@ -652,6 +809,7 @@ export default function MarkdownEditor({
                 activateOnTyping: true,
               }),
               markdownKeymap,
+              ...(mounted && resolvedTheme === 'dark' ? [darkTheme] : []),
             ]}
             placeholder={placeholder}
             className="h-full"
@@ -661,6 +819,7 @@ export default function MarkdownEditor({
               highlightActiveLine: true,
               foldGutter: true,
             }}
+            theme={mounted && resolvedTheme === 'dark' ? 'dark' : 'light'}
             style={{
               fontSize: '14px',
               height: '100%',
