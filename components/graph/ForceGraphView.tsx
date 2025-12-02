@@ -25,9 +25,12 @@ interface ForceGraphInstance {
   width: (width: number) => ForceGraphInstance;
   height: (height: number) => ForceGraphInstance;
   zoom: (scale?: number, duration?: number) => number | ForceGraphInstance;
+  zoomToFit: (duration?: number, padding?: number) => ForceGraphInstance;
   centerAt: (x: number, y: number, duration?: number) => ForceGraphInstance;
+  onEngineStop: (callback: () => void) => ForceGraphInstance;
   d3Force: (forceName: string) => any;
   _destructor: () => void;
+  _zoomFitted?: boolean;
 }
 
 interface FilteredGraphData {
