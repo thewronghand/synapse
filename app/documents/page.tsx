@@ -248,7 +248,7 @@ function DocumentsContent() {
         onClick={() => handlePageChange(1)}
         disabled={currentPage === 1}
         title="First page"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
+        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
       >
         «
       </Button>
@@ -260,7 +260,7 @@ function DocumentsContent() {
         onClick={() => handlePageChange(Math.max(1, currentPage - 5))}
         disabled={currentPage === 1}
         title="Previous 5 pages"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
+        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
       >
         ‹
       </Button>
@@ -275,8 +275,8 @@ function DocumentsContent() {
             onClick={() => handlePageChange(page)}
             className={`min-w-[32px] font-mono cursor-pointer transition-colors ${
               currentPage === page
-                ? "bg-blue-100 text-blue-800 border-blue-200 font-bold hover:bg-blue-200"
-                : "hover:bg-gray-100 hover:border-gray-400"
+                ? "bg-primary/10 text-primary border-primary/20 font-bold hover:bg-primary/15"
+                : "hover:bg-accent hover:border-border"
             }`}
           >
             {page}
@@ -291,7 +291,7 @@ function DocumentsContent() {
         onClick={() => handlePageChange(Math.min(totalPages, currentPage + 5))}
         disabled={currentPage === totalPages}
         title="Next 5 pages"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
+        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
       >
         ›
       </Button>
@@ -303,7 +303,7 @@ function DocumentsContent() {
         onClick={() => handlePageChange(totalPages)}
         disabled={currentPage === totalPages}
         title="Last page"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-gray-100 hover:border-gray-400 transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
+        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
       >
         »
       </Button>
@@ -313,7 +313,7 @@ function DocumentsContent() {
   if (isLoading) {
     return (
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading...</p>
+        <p className="text-lg text-muted-foreground">Loading...</p>
       </div>
     );
   }
@@ -371,12 +371,12 @@ function DocumentsContent() {
                 setShowSearchSuggestions(false);
               }
             }}
-            className="pl-10"
+            className="pl-10 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           />
 
           {/* Search Suggestions Dropdown */}
           {showSearchSuggestions && searchSuggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-white border border-gray-200 rounded shadow-lg max-h-40 overflow-y-auto z-10">
+            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-[200px] overflow-y-auto z-10">
               {searchSuggestions.map((title, index) => (
                 <button
                   key={title}
@@ -384,10 +384,10 @@ function DocumentsContent() {
                     setSearchInput(title);
                     setShowSearchSuggestions(false);
                   }}
-                  className={`w-full px-3 py-2 text-sm text-left transition-colors ${
+                  className={`w-full px-3 py-2 text-sm text-left transition-colors hover:bg-primary/10 ${
                     index === selectedSearchIndex
-                      ? "bg-blue-50 text-blue-700"
-                      : "hover:bg-gray-100"
+                      ? "bg-primary/20 text-primary"
+                      : ""
                   }`}
                 >
                   {title}
@@ -397,7 +397,7 @@ function DocumentsContent() {
           )}
         </div>
         {!isPublishedMode() && (
-          <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">
+          <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">
             + 새 노트
           </Button>
         )}
@@ -408,7 +408,7 @@ function DocumentsContent() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {/* Include Tags */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
               포함 태그 (AND)
             </label>
             <TagInput
@@ -421,7 +421,7 @@ function DocumentsContent() {
 
           {/* Exclude Tags */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-muted-foreground mb-2">
               제외 태그 (NOT)
             </label>
             <TagInput
@@ -433,13 +433,13 @@ function DocumentsContent() {
             />
           </div>
         </div>
-        <p className="text-xs text-gray-500 mt-2">
+        <p className="text-xs text-muted-foreground mt-2">
           💡 Enter, 쉼표, 스페이스로 태그 추가
         </p>
       </div>
 
       {/* Stats */}
-      <div className="mb-6 text-sm text-gray-600">
+      <div className="mb-6 text-sm text-muted-foreground">
         {filteredDocuments.length > 0 ? (
           <>
             Showing {startIndex + 1}-{Math.min(endIndex, filteredDocuments.length)} of {filteredDocuments.length} {filteredDocuments.length === 1 ? "note" : "notes"}
@@ -483,10 +483,10 @@ function DocumentsContent() {
                       {doc.frontmatter.tags.map((tag) => (
                         <Badge
                           key={tag}
-                          className={`cursor-pointer hover:opacity-80 text-xs ${
+                          className={`cursor-pointer text-xs transition-colors ${
                             selectedTags.includes(tag)
-                              ? "bg-blue-100 text-blue-800 border-blue-200"
-                              : "bg-gray-100 text-gray-700 border-gray-200"
+                              ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                              : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
                           }`}
                           onClick={(e) => handleTagClick(tag, e)}
                         >
@@ -512,13 +512,13 @@ function DocumentsContent() {
       {/* Empty State - No documents at all */}
       {documents.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-600 mb-4">
+          <p className="text-muted-foreground mb-4">
             {isPublishedMode()
               ? "아직 노트가 없습니다."
               : "아직 노트가 없습니다. 첫 노트를 만들어보세요!"}
           </p>
           {!isPublishedMode() && (
-            <Button variant="outline" onClick={() => router.push("/editor/new")} className="cursor-pointer bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100">+ 새 노트</Button>
+            <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">+ 새 노트</Button>
           )}
         </div>
       )}
@@ -526,8 +526,8 @@ function DocumentsContent() {
       {/* No Filter Results */}
       {documents.length > 0 && filteredDocuments.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-700 font-medium mb-2">현재 조건에 해당하는 문서가 없습니다</p>
-          <p className="text-sm text-gray-500">필터를 변경하거나 새 문서를 작성해보세요</p>
+          <p className="font-medium mb-2">현재 조건에 해당하는 문서가 없습니다</p>
+          <p className="text-sm text-muted-foreground">필터를 변경하거나 새 문서를 작성해보세요</p>
         </div>
       )}
     </div>
@@ -538,7 +538,7 @@ export default function DocumentsPage() {
   return (
     <Suspense fallback={
       <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading...</p>
+        <p className="text-lg text-muted-foreground">Loading...</p>
       </div>
     }>
       <DocumentsContent />
