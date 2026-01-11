@@ -10,6 +10,7 @@ import {
 import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
 import { documentCache } from '@/lib/document-cache';
+import { graphCache } from '@/lib/graph-cache';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
 
@@ -96,6 +97,10 @@ export async function PUT(
     documentCache.updateDocument(slug, title);
     console.log(`[DocumentCache] Updated document: ${slug} - ${title}`);
 
+    // Update graph cache
+    await graphCache.updateDocument(slug, content);
+    console.log(`[GraphCache] Updated document: ${slug}`);
+
     // Get updated document
     const document = await getDocumentBySlug(slug);
 
@@ -146,6 +151,10 @@ export async function DELETE(
     // Remove document from cache
     documentCache.removeDocument(slug);
     console.log(`[DocumentCache] Removed document: ${slug}`);
+
+    // Update graph cache
+    graphCache.removeDocument(slug);
+    console.log(`[GraphCache] Removed document: ${slug}`);
 
     // Refresh tag cache since we don't know which tags are no longer used
     await tagCache.refreshTags();
