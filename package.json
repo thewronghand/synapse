@@ -9,7 +9,7 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "concurrently \"npm run dev\" \"wait-on http://localhost:3000 && cross-env NODE_ENV=development electron .\"",
-    "electron:build": "rm -rf dist && next build && npm run copy-assets && electron-builder",
+    "electron:build": "rm -rf dist && next build && npm run copy-assets && node scripts/set-build-version.js && electron-builder; node scripts/restore-version.js",
     "copy-assets": "node scripts/copy-assets.js"
   },
   "dependencies": {

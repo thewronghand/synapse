@@ -6,6 +6,9 @@ import {
   extractTitle,
   extractWikiLinks,
   calculateBacklinks,
+  buildSlugToFilenameMap,
+  getSlugFromFilePath,
+  normalizeSlug,
 } from '@/lib/document-parser';
 import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
@@ -67,12 +70,15 @@ export async function PUT(
       );
     }
 
-    const filePath = path.join(NOTES_DIR, `${slug}.md`);
+    // Find the file by normalized slug
+    const files = await fs.readdir(NOTES_DIR);
+    const markdownFiles = files.filter((file) => file.endsWith('.md'));
+    const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
 
-    // Check if file exists
-    try {
-      await fs.access(filePath);
-    } catch {
+    const normalizedSlug = normalizeSlug(slug);
+    const filename = slugToFilenameMap.get(normalizedSlug);
+
+    if (!filename) {
       return NextResponse.json(
         {
           success: false,
@@ -81,6 +87,8 @@ export async function PUT(
         { status: 404 }
       );
     }
+
+    const filePath = path.join(NOTES_DIR, filename);
 
     // Write updated content
     await fs.writeFile(filePath, content, 'utf-8');
@@ -94,12 +102,12 @@ export async function PUT(
 
     // Update document cache with new title
     const title = extractTitle(contentWithoutFrontmatter, frontmatter);
-    documentCache.updateDocument(slug, title);
-    console.log(`[DocumentCache] Updated document: ${slug} - ${title}`);
+    documentCache.updateDocument(normalizedSlug, title);
+    console.log(`[DocumentCache] Updated document: ${normalizedSlug} - ${title}`);
 
     // Update graph cache
-    await graphCache.updateDocument(slug, content);
-    console.log(`[GraphCache] Updated document: ${slug}`);
+    await graphCache.updateDocument(normalizedSlug, content);
+    console.log(`[GraphCache] Updated document: ${normalizedSlug}`);
 
     // Get updated document
     const document = await getDocumentBySlug(slug);
@@ -130,12 +138,16 @@ export async function DELETE(
 ) {
   try {
     const { slug } = await params;
-    const filePath = path.join(NOTES_DIR, `${slug}.md`);
 
-    // Check if file exists
-    try {
-      await fs.access(filePath);
-    } catch {
+    // Find the file by normalized slug
+    const files = await fs.readdir(NOTES_DIR);
+    const markdownFiles = files.filter((file) => file.endsWith('.md'));
+    const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
+
+    const normalizedSlug = normalizeSlug(slug);
+    const filename = slugToFilenameMap.get(normalizedSlug);
+
+    if (!filename) {
       return NextResponse.json(
         {
           success: false,
@@ -145,16 +157,18 @@ export async function DELETE(
       );
     }
 
+    const filePath = path.join(NOTES_DIR, filename);
+
     // Delete file
     await fs.unlink(filePath);
 
     // Remove document from cache
-    documentCache.removeDocument(slug);
-    console.log(`[DocumentCache] Removed document: ${slug}`);
+    documentCache.removeDocument(normalizedSlug);
+    console.log(`[DocumentCache] Removed document: ${normalizedSlug}`);
 
     // Update graph cache
-    graphCache.removeDocument(slug);
-    console.log(`[GraphCache] Removed document: ${slug}`);
+    graphCache.removeDocument(normalizedSlug);
+    console.log(`[GraphCache] Removed document: ${normalizedSlug}`);
 
     // Refresh tag cache since we don't know which tags are no longer used
     await tagCache.refreshTags();
@@ -187,8 +201,20 @@ async function getDocumentBySlug(slug: string): Promise<Document> {
     return JSON.parse(jsonData);
   }
 
-  // In normal mode, read from markdown file
-  const filePath = path.join(NOTES_DIR, `${slug}.md`);
+  // In normal mode, find the file by normalized slug
+  const files = await fs.readdir(NOTES_DIR);
+  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+  const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
+
+  // Normalize the requested slug and find the matching file
+  const normalizedSlug = normalizeSlug(slug);
+  const filename = slugToFilenameMap.get(normalizedSlug);
+
+  if (!filename) {
+    throw new Error(`Document not found: ${slug}`);
+  }
+
+  const filePath = path.join(NOTES_DIR, filename);
   const content = await fs.readFile(filePath, 'utf-8');
   const stats = await fs.stat(filePath);
 
@@ -197,11 +223,11 @@ async function getDocumentBySlug(slug: string): Promise<Document> {
   const links = extractWikiLinks(content);
 
   // Calculate backlinks by checking all other documents
-  const backlinks = await calculateBacklinksForDocument(slug);
+  const backlinks = await calculateBacklinksForDocument(normalizedSlug, slugToFilenameMap);
 
   return {
-    slug,
-    filePath: `notes/${slug}.md`,
+    slug: normalizedSlug,
+    filePath: `notes/${filename}`,
     title,
     content,
     contentWithoutFrontmatter,
@@ -216,22 +242,22 @@ async function getDocumentBySlug(slug: string): Promise<Document> {
 /**
  * Helper: Calculate backlinks for a specific document
  */
-async function calculateBacklinksForDocument(targetSlug: string): Promise<string[]> {
-  const files = await fs.readdir(NOTES_DIR);
-  const markdownFiles = files.filter((file) => file.endsWith('.md'));
-
+async function calculateBacklinksForDocument(
+  targetSlug: string,
+  slugToFilenameMap: Map<string, string>
+): Promise<string[]> {
   const backlinks: string[] = [];
 
-  for (const file of markdownFiles) {
-    const slug = file.replace('.md', '');
-    if (slug === targetSlug) continue; // Skip self
+  for (const [normalizedSlug, filename] of slugToFilenameMap) {
+    if (normalizedSlug === targetSlug) continue; // Skip self
 
-    const filePath = path.join(NOTES_DIR, file);
+    const filePath = path.join(NOTES_DIR, filename);
     const content = await fs.readFile(filePath, 'utf-8');
     const links = extractWikiLinks(content);
 
+    // links are already normalized by extractWikiLinks
     if (links.includes(targetSlug)) {
-      backlinks.push(slug);
+      backlinks.push(normalizedSlug);
     }
   }
 

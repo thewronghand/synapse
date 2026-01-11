@@ -1,5 +1,6 @@
 import matter from 'gray-matter';
 import { Frontmatter } from '@/types';
+import { randomBytes } from 'crypto';
 
 /**
  * Parse frontmatter from markdown content
@@ -74,11 +75,13 @@ export function getFilePathFromSlug(slug: string): string {
 
 /**
  * Get slug from file path
+ * Normalizes the filename to ensure consistency with wiki link slugs
  */
 export function getSlugFromFilePath(filePath: string): string {
-  return filePath
+  const filename = filePath
     .replace(/^notes\//, '')
     .replace(/\.md$/, '');
+  return normalizeSlug(filename);
 }
 
 /**
@@ -113,4 +116,45 @@ export function calculateBacklinks(
   });
 
   return backlinksMap;
+}
+
+/**
+ * Build a mapping from normalized slugs to original filenames
+ * This allows looking up files by their normalized slug
+ */
+export function buildSlugToFilenameMap(filenames: string[]): Map<string, string> {
+  const map = new Map<string, string>();
+  for (const filename of filenames) {
+    const originalSlug = filename.replace(/\.md$/, '');
+    const normalizedSlug = normalizeSlug(originalSlug);
+    map.set(normalizedSlug, filename);
+  }
+  return map;
+}
+
+/**
+ * Find the original filename for a normalized slug
+ */
+export function findFilenameBySlug(
+  normalizedSlug: string,
+  slugToFilenameMap: Map<string, string>
+): string | undefined {
+  return slugToFilenameMap.get(normalizedSlug);
+}
+
+/**
+ * Generate a short unique ID (6 characters)
+ */
+export function generateShortId(): string {
+  return randomBytes(3).toString('hex'); // 6 hex characters
+}
+
+/**
+ * Create a unique slug with ID suffix
+ * Example: "TN 죽이기 - 설계" -> "tn-죽이기-설계-a1b2c3"
+ */
+export function createUniqueSlug(title: string): string {
+  const baseSlug = normalizeSlug(title);
+  const shortId = generateShortId();
+  return `${baseSlug}-${shortId}`;
 }

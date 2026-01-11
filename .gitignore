@@ -84,3 +84,6 @@ Thumbs.db
 # OAuth tokens
 .vercel-token.json
 .github-token.json
+
+# Build version temp file
+.original-version

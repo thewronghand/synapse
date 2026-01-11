@@ -7,6 +7,9 @@ import {
   extractWikiLinks,
   calculateBacklinks,
   getSlugFromFilePath,
+  buildSlugToFilenameMap,
+  normalizeSlug,
+  createUniqueSlug,
 } from '@/lib/document-parser';
 import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
@@ -64,21 +67,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const filePath = path.join(NOTES_DIR, `${slug}.md`);
-
-    // Check if file already exists
-    try {
-      await fs.access(filePath);
-      return NextResponse.json(
-        {
-          success: false,
-          error: 'Document already exists',
-        },
-        { status: 409 }
-      );
-    } catch {
-      // File doesn't exist, proceed
-    }
+    // Create a unique slug with short ID to avoid collisions
+    // slug is actually the title from the client
+    const uniqueSlug = createUniqueSlug(slug);
+    const filePath = path.join(NOTES_DIR, `${uniqueSlug}.md`);
 
     // Move temp images to permanent location and update content
     const updatedContent = await moveImagesFromTemp(content);
@@ -95,15 +87,15 @@ export async function POST(request: NextRequest) {
 
     // Update document cache with new document
     const title = extractTitle(contentWithoutFrontmatter, frontmatter);
-    documentCache.addDocument(slug, title);
-    console.log(`[DocumentCache] Added document: ${slug} - ${title}`);
+    documentCache.addDocument(uniqueSlug, title);
+    console.log(`[DocumentCache] Added document: ${uniqueSlug} - ${title}`);
 
     // Update graph cache
-    await graphCache.addDocument(slug, updatedContent);
-    console.log(`[GraphCache] Added document: ${slug}`);
+    await graphCache.addDocument(uniqueSlug, updatedContent);
+    console.log(`[GraphCache] Added document: ${uniqueSlug}`);
 
     // Get the created document
-    const document = await getDocumentBySlug(slug);
+    const document = await getDocumentBySlug(uniqueSlug);
 
     return NextResponse.json({
       success: true,
@@ -185,8 +177,19 @@ async function getDocumentBySlug(slug: string): Promise<Document> {
     return JSON.parse(jsonData);
   }
 
-  // In normal mode, read from markdown file
-  const filePath = path.join(NOTES_DIR, `${slug}.md`);
+  // In normal mode, find the file by normalized slug
+  const files = await fs.readdir(NOTES_DIR);
+  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+  const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
+
+  const normalizedSlug = normalizeSlug(slug);
+  const filename = slugToFilenameMap.get(normalizedSlug);
+
+  if (!filename) {
+    throw new Error(`Document not found: ${slug}`);
+  }
+
+  const filePath = path.join(NOTES_DIR, filename);
   const content = await fs.readFile(filePath, 'utf-8');
   const stats = await fs.stat(filePath);
 
@@ -197,11 +200,11 @@ async function getDocumentBySlug(slug: string): Promise<Document> {
   // Get all documents to calculate backlinks
   const allDocuments = await getAllDocuments();
   const backlinks =
-    allDocuments.find((d) => d.slug === slug)?.backlinks || [];
+    allDocuments.find((d) => d.slug === normalizedSlug)?.backlinks || [];
 
   return {
-    slug,
-    filePath: `notes/${slug}.md`,
+    slug: normalizedSlug,
+    filePath: `notes/${filename}`,
     title,
     content,
     contentWithoutFrontmatter,
