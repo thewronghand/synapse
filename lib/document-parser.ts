@@ -52,12 +52,15 @@ export function extractWikiLinks(content: string): string[] {
 /**
  * Normalize a string to a valid slug
  * Example: "Getting Started" -> "getting-started"
+ * Example: "핀테크" -> "핀테크"
+ * Example: "BNPL 서비스" -> "bnpl-서비스"
  */
 export function normalizeSlug(text: string): string {
   return text
     .toLowerCase()
+    .trim()
     .replace(/\s+/g, '-') // spaces to hyphens
-    .replace(/[^a-z0-9-]/g, '') // remove special chars
+    .replace(/[^\p{L}\p{N}-]/gu, '') // keep unicode letters, numbers, hyphens
     .replace(/-+/g, '-') // multiple hyphens to single
     .replace(/^-|-$/g, ''); // remove leading/trailing hyphens
 }
