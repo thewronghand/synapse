@@ -1,7 +1,7 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import { Button } from "@/components/ui/button";
@@ -10,9 +10,11 @@ import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { normalizeSlug } from "@/lib/document-parser";
 
-export default function NewNotePage() {
+function NewNotePageContent() {
   const router = useRouter();
-  const [title, setTitle] = useState("");
+  const searchParams = useSearchParams();
+  const initialTitle = searchParams.get("title") || "";
+  const [title, setTitle] = useState(initialTitle);
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [content, setContent] = useState("");
@@ -250,5 +252,17 @@ ${bodyContent}`;
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewNotePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <NewNotePageContent />
+    </Suspense>
   );
 }

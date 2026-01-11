@@ -12,12 +12,15 @@ export async function GET() {
       await documentCache.initialize();
     }
 
-    const titles = documentCache.getTitles();
+    const documents = documentCache.getDocuments();
+    const titles = documents.map((doc) => doc.title);
+    const slugs = documents.map((doc) => doc.slug);
 
     return NextResponse.json({
       success: true,
       data: {
         titles,
+        slugs,
         cached: true,
         count: titles.length,
       },

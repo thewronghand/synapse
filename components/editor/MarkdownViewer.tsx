@@ -55,6 +55,7 @@ function ImageWithFallback({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLI
 interface MarkdownViewerProps {
   content: string;
   onWikiLinkClick?: (pageName: string) => void;
+  existingSlugs?: string[];
 }
 
 // Simple frontmatter parser for preview
@@ -92,7 +93,8 @@ function parseFrontmatter(content: string): {
 
 function MarkdownViewer({
   content,
-  onWikiLinkClick
+  onWikiLinkClick,
+  existingSlugs
 }: MarkdownViewerProps) {
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
 
@@ -172,13 +174,23 @@ function MarkdownViewer({
           a: ({ node, href, children, title, ...props }) => {
             // Wiki link 처리
             if (props.className?.includes("wiki-link")) {
+              const pageName = children?.toString() || "";
+              // href에서 slug 추출 (/doc/slug 형식)
+              const linkSlug = href?.replace("/doc/", "") || "";
+              // existingSlugs가 제공되지 않았으면 (undefined) 존재한다고 가정
+              // 제공되었으면 (빈 배열 포함) 실제로 확인
+              const exists = existingSlugs === undefined || existingSlugs.includes(linkSlug);
+
               return (
                 <a
                   {...props}
                   href={href}
+                  className={exists
+                    ? "wiki-link cursor-pointer no-underline"
+                    : "wiki-link wiki-link-missing cursor-pointer no-underline"
+                  }
                   onClick={(e) => {
                     e.preventDefault();
-                    const pageName = children?.toString() || "";
                     onWikiLinkClick?.(pageName);
                   }}
                 >

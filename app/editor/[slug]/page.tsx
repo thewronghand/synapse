@@ -20,6 +20,7 @@ export default function EditorPage() {
   const [initialTitle, setInitialTitle] = useState("");
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [existingSlugs, setExistingSlugs] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,20 +39,28 @@ export default function EditorPage() {
   const [isPending, startTransition] = useTransition();
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch available tags
+  // Fetch available tags and document slugs
   useEffect(() => {
-    async function fetchTags() {
+    async function fetchTagsAndSlugs() {
       try {
-        const res = await fetch("/api/tags");
-        const data = await res.json();
-        if (data.success) {
-          setAvailableTags(data.data.tags);
+        const [tagsRes, titlesRes] = await Promise.all([
+          fetch("/api/tags"),
+          fetch("/api/documents/titles"),
+        ]);
+        const tagsData = await tagsRes.json();
+        const titlesData = await titlesRes.json();
+
+        if (tagsData.success) {
+          setAvailableTags(tagsData.data.tags);
+        }
+        if (titlesData.success) {
+          setExistingSlugs(titlesData.data.slugs.map((s: string) => s.toLowerCase()));
         }
       } catch (err) {
-        console.error("Failed to fetch tags:", err);
+        console.error("Failed to fetch tags/slugs:", err);
       }
     }
-    fetchTags();
+    fetchTagsAndSlugs();
   }, []);
 
   // Fetch document
@@ -292,6 +301,7 @@ ${editorContent}`;
               <MarkdownViewer
                 content={previewContent}
                 onWikiLinkClick={handleWikiLinkClick}
+                existingSlugs={existingSlugs}
               />
             </div>
           </div>

@@ -104,11 +104,24 @@ export default function NotePage() {
   }
 
   if (error || !document) {
+    // slug를 제목으로 변환 (하이픈을 공백으로)
+    const displayTitle = decodeURIComponent(slug).replace(/-/g, ' ');
+
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-red-600 mb-4">{error || "문서를 찾을 수 없습니다"}</p>
-          <Button onClick={() => router.push("/")} className="cursor-pointer">홈으로</Button>
+          <h1 className="text-2xl font-bold mb-2">"{displayTitle}"</h1>
+          <p className="text-lg text-muted-foreground mb-6">문서가 존재하지 않습니다</p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+              홈으로
+            </Button>
+            {!isPublishedMode() && (
+              <Button onClick={() => router.push(`/editor/new?title=${encodeURIComponent(displayTitle)}`)} className="cursor-pointer">
+                "{displayTitle}" 문서 만들기
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -165,6 +178,7 @@ export default function NotePage() {
               <MarkdownViewer
                 content={document.contentWithoutFrontmatter}
                 onWikiLinkClick={handleWikiLinkClick}
+                existingSlugs={graph ? Object.keys(graph.nodes).map(url => url.replace('/', '').toLowerCase()) : undefined}
               />
             </div>
           </div>
