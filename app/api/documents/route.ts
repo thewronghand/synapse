@@ -11,6 +11,7 @@ import {
 import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
 import { documentCache } from '@/lib/document-cache';
+import { graphCache } from '@/lib/graph-cache';
 import { moveImagesFromTemp } from '@/lib/image-utils';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
@@ -96,6 +97,10 @@ export async function POST(request: NextRequest) {
     const title = extractTitle(contentWithoutFrontmatter, frontmatter);
     documentCache.addDocument(slug, title);
     console.log(`[DocumentCache] Added document: ${slug} - ${title}`);
+
+    // Update graph cache
+    await graphCache.addDocument(slug, updatedContent);
+    console.log(`[GraphCache] Added document: ${slug}`);
 
     // Get the created document
     const document = await getDocumentBySlug(slug);
