@@ -4,8 +4,6 @@ on:
   push:
     tags:
       - 'v*.*.*'  # Triggers on version tags like v0.1.0, v1.2.3, etc.
-    branches:
-      - 'fix/**'  # Test builds on fix branches
   workflow_dispatch:  # Manual trigger
 
 permissions:
