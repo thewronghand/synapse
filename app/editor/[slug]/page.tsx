@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { normalizeSlug } from "@/lib/document-parser";
 
 export default function EditorPage() {
   const params = useParams();
@@ -195,8 +196,7 @@ ${editorContent}`;
   }
 
   function handleWikiLinkClick(pageName: string) {
-    const normalizedSlug = pageName.toLowerCase().replace(/\s+/g, "-");
-    router.push(`/note/${normalizedSlug}`);
+    router.push(`/note/${normalizeSlug(pageName)}`);
   }
 
   if (isLoading) {

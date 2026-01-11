@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { normalizeSlug } from "@/lib/document-parser";
 
 export default function NewNotePage() {
   const router = useRouter();
@@ -103,7 +104,7 @@ ${bodyContent}`;
       return;
     }
 
-    const slug = title.toLowerCase().replace(/\s+/g, "-");
+    const slug = normalizeSlug(title);
 
     setIsSaving(true);
     setError(null);
@@ -132,9 +133,8 @@ ${bodyContent}`;
   }
 
   function handleWikiLinkClick(pageName: string) {
-    const normalizedSlug = pageName.toLowerCase().replace(/\s+/g, "-");
     // Open in new tab to prevent losing current work
-    window.open(`/note/${normalizedSlug}`, '_blank');
+    window.open(`/note/${normalizeSlug(pageName)}`, '_blank');
   }
 
   async function handleCancel() {

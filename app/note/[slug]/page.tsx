@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Slider } from "@/components/ui/slider";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { normalizeSlug } from "@/lib/document-parser";
 
 export default function NotePage() {
   const params = useParams();
@@ -72,8 +73,7 @@ export default function NotePage() {
   }, [slug]);
 
   function handleWikiLinkClick(pageName: string) {
-    const normalizedSlug = pageName.toLowerCase().replace(/\s+/g, "-");
-    router.push(`/note/${normalizedSlug}`);
+    router.push(`/note/${normalizeSlug(pageName)}`);
   }
 
   async function handleDelete() {
