@@ -1,4 +1,4 @@
-const { app, BrowserWindow } = require('electron');
+const { app, BrowserWindow, shell } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -144,6 +144,24 @@ function createWindow() {
 
   mainWindow.on('closed', () => {
     mainWindow = null;
+  });
+
+  // Open external links in system browser instead of Electron window
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    // Check if URL is external (not localhost)
+    if (!url.startsWith('http://localhost')) {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    }
+    return { action: 'allow' };
+  });
+
+  // Also handle link clicks with target="_blank"
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    if (!url.startsWith('http://localhost')) {
+      event.preventDefault();
+      shell.openExternal(url);
+    }
   });
 }
 

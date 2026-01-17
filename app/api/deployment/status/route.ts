@@ -18,9 +18,17 @@ export async function GET() {
       });
     }
 
-    // Get Vercel username for project naming
-    const vercelUser = await vercelClient.getCurrentUser() as { user: { username: string } };
-    const projectName = `synapse-published-${vercelUser.user.username}`;
+    // Get user ID for project naming
+    const userId = vercelClient.getUserId();
+    if (!userId) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          hasDeployment: false,
+        },
+      });
+    }
+    const projectName = `synapse-published-${userId.substring(0, 8).toLowerCase()}`;
 
     // Get project for production domain info
     const project = await vercelClient.getProject(projectName);

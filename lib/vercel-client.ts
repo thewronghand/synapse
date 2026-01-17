@@ -403,11 +403,9 @@ export class VercelClient {
     console.log(`[VercelClient] All files uploaded, creating deployment...`);
 
     // Create deployment with file references
+    // Note: Do NOT include teamId here - we want to create project in personal account
+    // Team deployments often have restricted permissions
     const url = new URL('/v13/deployments', 'https://api.vercel.com');
-
-    if (this.teamId) {
-      url.searchParams.set('teamId', this.teamId);
-    }
 
     const deploymentBody = {
       name: projectName,
@@ -429,12 +427,25 @@ export class VercelClient {
       body: JSON.stringify(deploymentBody),
     });
 
-    if (response.status === 401 || response.status === 403) {
-      throw new Error('TOKEN_EXPIRED');
-    }
-
     if (!response.ok) {
       const errorText = await response.text();
+      console.error(`[VercelClient] Deployment error (${response.status}):`, errorText);
+
+      if (response.status === 401) {
+        throw new Error('TOKEN_EXPIRED');
+      }
+      if (response.status === 403) {
+        // Parse error message for better user feedback
+        try {
+          const errorData = JSON.parse(errorText);
+          if (errorData.error?.message?.includes('permission')) {
+            throw new Error(`PERMISSION_DENIED: ${errorData.error.message}`);
+          }
+        } catch (parseError) {
+          // If parsing fails, continue with generic error
+        }
+        throw new Error('TOKEN_EXPIRED');
+      }
       throw new Error(`Vercel deployment error (${response.status}): ${errorText}`);
     }
 

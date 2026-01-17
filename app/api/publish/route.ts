@@ -60,7 +60,7 @@ export async function POST() {
         { status: 400 }
       );
     }
-    const projectName = `synapse-published-${userId.substring(0, 8)}`;
+    const projectName = `synapse-published-${userId.substring(0, 8).toLowerCase()}`;
 
     // Step 4: Read all project files
     console.log('[Publish] Reading project files...');
@@ -293,6 +293,18 @@ export async function POST() {
           code: 'TOKEN_EXPIRED',
         },
         { status: 401 }
+      );
+    }
+
+    // Check for permission denied (usually Team-related)
+    if (error instanceof Error && error.message.startsWith('PERMISSION_DENIED:')) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Permission denied. Please reconnect with a Personal Account (not a Team) or ensure you have project creation permissions.',
+          code: 'PERMISSION_DENIED',
+        },
+        { status: 403 }
       );
     }
 
