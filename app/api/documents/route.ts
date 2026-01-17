@@ -113,7 +113,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Move temp images and write file
-    const updatedContent = await moveImagesFromTemp(content);
+    const updatedContent = await moveImagesFromTemp(content, folder);
     await fs.writeFile(filePath, updatedContent, 'utf-8');
 
     // Update tag cache

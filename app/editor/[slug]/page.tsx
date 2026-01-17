@@ -117,7 +117,7 @@ tags: ${tagsYaml}
 ${editorContent}`;
   }, []);
 
-  // Auto-save (debounced) - 2초마다 저장
+  // Auto-save (debounced) - 30초마다 저장
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerAutoSave = useCallback(() => {
@@ -126,7 +126,7 @@ ${editorContent}`;
     }
     saveTimeoutRef.current = setTimeout(() => {
       saveDocument();
-    }, 2000);
+    }, 30000);
   }, []);
 
   // 디바운스된 프리뷰 업데이트 함수

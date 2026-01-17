@@ -40,8 +40,6 @@ function setupNotesDirectory() {
   const documentsPath = app.getPath('documents');
   const synapseDir = path.join(documentsPath, 'Synapse');
   const notesDir = path.join(synapseDir, 'notes');
-  const imagesDir = path.join(notesDir, 'images');
-  const tempImagesDir = path.join(imagesDir, 'temp');
 
   // Create directories if they don't exist
   if (!fs.existsSync(synapseDir)) {
@@ -54,15 +52,8 @@ function setupNotesDirectory() {
     console.log('Created notes directory:', notesDir);
   }
 
-  if (!fs.existsSync(imagesDir)) {
-    fs.mkdirSync(imagesDir, { recursive: true });
-    console.log('Created images directory:', imagesDir);
-  }
-
-  if (!fs.existsSync(tempImagesDir)) {
-    fs.mkdirSync(tempImagesDir, { recursive: true });
-    console.log('Created temp images directory:', tempImagesDir);
-  }
+  // Note: Image directories are now created per-folder (e.g., notes/default/images/)
+  // when images are uploaded, not globally in notes/images/
 
   // Copy default notes from app bundle if notes directory is empty
   // Check both root .md files and subfolders for existing notes

@@ -2,17 +2,29 @@ import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { randomBytes } from 'crypto';
-import { getImagesDir, getTempImagesDir } from '@/lib/notes-path';
-
-const IMAGES_DIR = getImagesDir();
-const TEMP_DIR = getTempImagesDir();
+import { getFolderTempImagesDir } from '@/lib/notes-path';
 
 /**
  * POST /api/upload/image
- * Upload an image file
+ * Upload an image file to a specific folder
+ * Query params:
+ *   - folder: The folder name (required, e.g., 'default')
  */
 export async function POST(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const folder = searchParams.get('folder');
+
+    if (!folder) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Folder parameter is required',
+        },
+        { status: 400 }
+      );
+    }
+
     const formData = await request.formData();
     const file = formData.get('image') as File;
 
@@ -56,24 +68,26 @@ export async function POST(request: NextRequest) {
     const extension = path.extname(file.name) || '.png';
     const filename = `${timestamp}-${randomId}${extension}`;
 
-    // Ensure temp directory exists
-    await fs.mkdir(TEMP_DIR, { recursive: true });
+    // Ensure temp directory exists for this folder
+    const tempDir = getFolderTempImagesDir(folder);
+    await fs.mkdir(tempDir, { recursive: true });
 
-    // Save file to temp directory
-    const filePath = path.join(TEMP_DIR, filename);
+    // Save file to folder's temp directory
+    const filePath = path.join(tempDir, filename);
     const buffer = Buffer.from(await file.arrayBuffer());
     await fs.writeFile(filePath, buffer);
 
-    // Return API path for markdown (with temp prefix)
-    const apiPath = `/api/images/temp/${filename}`;
+    // Return API path for markdown (with folder and temp prefix)
+    const apiPath = `/api/images/${folder}/temp/${filename}`;
 
-    console.log(`[ImageUpload] Uploaded temp image: ${filename} (${Math.round(file.size / 1024)}KB)`);
+    console.log(`[ImageUpload] Uploaded temp image: ${folder}/${filename} (${Math.round(file.size / 1024)}KB)`);
 
     return NextResponse.json({
       success: true,
       data: {
         filename,
         path: apiPath,
+        folder,
         size: file.size,
         type: file.type,
       },

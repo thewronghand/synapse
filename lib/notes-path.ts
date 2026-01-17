@@ -16,14 +16,32 @@ export function getNotesDir(): string {
 }
 
 /**
- * Get the images directory path
+ * Get the images directory path for a specific folder
+ * @param folder - The folder name (e.g., 'default', 'my-notes')
+ */
+export function getFolderImagesDir(folder: string): string {
+  return path.join(getNotesDir(), folder, 'images');
+}
+
+/**
+ * Get the temp images directory path for a specific folder
+ * @param folder - The folder name (e.g., 'default', 'my-notes')
+ */
+export function getFolderTempImagesDir(folder: string): string {
+  return path.join(getNotesDir(), folder, 'images', 'temp');
+}
+
+/**
+ * @deprecated Use getFolderImagesDir instead
+ * Get the images directory path (legacy - central images folder)
  */
 export function getImagesDir(): string {
   return path.join(getNotesDir(), 'images');
 }
 
 /**
- * Get the temp images directory path
+ * @deprecated Use getFolderTempImagesDir instead
+ * Get the temp images directory path (legacy - central temp folder)
  */
 export function getTempImagesDir(): string {
   return path.join(getNotesDir(), 'images', 'temp');

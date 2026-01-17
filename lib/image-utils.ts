@@ -1,29 +1,44 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getImagesDir, getTempImagesDir } from './notes-path';
-
-const IMAGES_DIR = getImagesDir();
-const TEMP_DIR = getTempImagesDir();
+import { getFolderImagesDir, getFolderTempImagesDir } from './notes-path';
 
 /**
- * Move images from temp to permanent storage
- * Extracts image paths from markdown content and moves them
+ * Ensure folder images directories exist
  */
-export async function moveImagesFromTemp(content: string): Promise<string> {
-  // Extract all image paths from markdown: ![alt](/api/images/temp/filename.png)
-  const imageRegex = /!\[([^\]]*)\]\(\/api\/images\/temp\/([^)]+)\)/g;
+async function ensureFolderImagesDirs(folder: string): Promise<void> {
+  const imagesDir = getFolderImagesDir(folder);
+  const tempDir = getFolderTempImagesDir(folder);
+
+  await fs.mkdir(imagesDir, { recursive: true });
+  await fs.mkdir(tempDir, { recursive: true });
+}
+
+/**
+ * Move images from temp to permanent storage within a folder
+ * Extracts image paths from markdown content and moves them
+ * @param content - Markdown content
+ * @param folder - The folder name where the document belongs
+ */
+export async function moveImagesFromTemp(content: string, folder: string): Promise<string> {
+  // Extract all image paths from markdown: ![alt](/api/images/folder/temp/filename.png)
+  const imageRegex = new RegExp(`!\\[([^\\]]*)\\]\\(/api/images/${folder}/temp/([^)]+)\\)`, 'g');
   const matches = Array.from(content.matchAll(imageRegex));
 
   if (matches.length === 0) {
     return content; // No temp images found
   }
 
+  await ensureFolderImagesDirs(folder);
+
+  const imagesDir = getFolderImagesDir(folder);
+  const tempDir = getFolderTempImagesDir(folder);
+
   let updatedContent = content;
 
   for (const match of matches) {
     const filename = match[2];
-    const tempPath = path.join(TEMP_DIR, filename);
-    const permanentPath = path.join(IMAGES_DIR, filename);
+    const tempPath = path.join(tempDir, filename);
+    const permanentPath = path.join(imagesDir, filename);
 
     try {
       // Check if temp file exists
@@ -33,13 +48,13 @@ export async function moveImagesFromTemp(content: string): Promise<string> {
       await fs.rename(tempPath, permanentPath);
 
       // Update content to remove /temp/ from path
-      const oldPath = `/api/images/temp/${filename}`;
-      const newPath = `/api/images/${filename}`;
+      const oldPath = `/api/images/${folder}/temp/${filename}`;
+      const newPath = `/api/images/${folder}/${filename}`;
       updatedContent = updatedContent.replace(oldPath, newPath);
 
-      console.log(`[ImageUtils] Moved temp image to permanent: ${filename}`);
+      console.log(`[ImageUtils] Moved temp image to permanent: ${folder}/${filename}`);
     } catch (error) {
-      console.error(`[ImageUtils] Failed to move temp image ${filename}:`, error);
+      console.error(`[ImageUtils] Failed to move temp image ${folder}/${filename}:`, error);
       // Continue with other images even if one fails
     }
   }
@@ -49,18 +64,22 @@ export async function moveImagesFromTemp(content: string): Promise<string> {
 
 /**
  * Delete temp images referenced in content
+ * @param content - Markdown content
+ * @param folder - The folder name where the document belongs
  */
-export async function deleteTempImages(content: string): Promise<void> {
-  const imageRegex = /!\[([^\]]*)\]\(\/api\/images\/temp\/([^)]+)\)/g;
+export async function deleteTempImages(content: string, folder: string): Promise<void> {
+  const imageRegex = new RegExp(`!\\[([^\\]]*)\\]\\(/api/images/${folder}/temp/([^)]+)\\)`, 'g');
   const matches = Array.from(content.matchAll(imageRegex));
+
+  const tempDir = getFolderTempImagesDir(folder);
 
   for (const match of matches) {
     const filename = match[2];
-    const tempPath = path.join(TEMP_DIR, filename);
+    const tempPath = path.join(tempDir, filename);
 
     try {
       await fs.unlink(tempPath);
-      console.log(`[ImageUtils] Deleted temp image: ${filename}`);
+      console.log(`[ImageUtils] Deleted temp image: ${folder}/${filename}`);
     } catch (error) {
       // Ignore errors (file might not exist)
     }
@@ -69,13 +88,16 @@ export async function deleteTempImages(content: string): Promise<void> {
 
 /**
  * Delete a specific temp image file
+ * @param filename - The image filename
+ * @param folder - The folder name where the image belongs
  */
-export async function deleteTempImage(filename: string): Promise<void> {
-  const tempPath = path.join(TEMP_DIR, filename);
+export async function deleteTempImage(filename: string, folder: string): Promise<void> {
+  const tempDir = getFolderTempImagesDir(folder);
+  const tempPath = path.join(tempDir, filename);
 
   try {
     await fs.unlink(tempPath);
-    console.log(`[ImageUtils] Deleted temp image: ${filename}`);
+    console.log(`[ImageUtils] Deleted temp image: ${folder}/${filename}`);
   } catch (error) {
     // Ignore errors (file might not exist)
   }
