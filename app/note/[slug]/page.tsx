@@ -9,6 +9,36 @@ import { Button } from "@/components/ui/button";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 
+// Filter graph to only include nodes and links from the same folder
+function filterGraphByFolder(graph: Graph, folder: string): Graph {
+  // Filter nodes by folder
+  const filteredNodes: { [url: string]: DigitalGardenNode } = {};
+  const validNodeIds = new Set<number>();
+
+  Object.entries(graph.nodes).forEach(([url, node]) => {
+    const nodeWithFolder = node as DigitalGardenNode & { folder?: string };
+    const nodeFolder = nodeWithFolder.folder || "default";
+
+    if (nodeFolder === folder) {
+      filteredNodes[url] = node;
+      validNodeIds.add(node.id);
+    }
+  });
+
+  // Filter links to only include connections between valid nodes
+  const filteredLinks = (graph.links || []).filter(
+    (link) => validNodeIds.has(link.source as number) && validNodeIds.has(link.target as number)
+  );
+
+  // Update neighbors and backLinks to only include same-folder nodes
+  Object.values(filteredNodes).forEach((node) => {
+    node.neighbors = node.neighbors.filter((neighborUrl) => filteredNodes[neighborUrl]);
+    node.backLinks = node.backLinks.filter((backLinkUrl) => filteredNodes[backLinkUrl]);
+  });
+
+  return { nodes: filteredNodes, links: filteredLinks };
+}
+
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
@@ -18,6 +48,7 @@ export default function NotePage() {
 
   const [document, setDocument] = useState<Document | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
+  const [folderTitles, setFolderTitles] = useState<string[]>([]);
   const [depth, setDepth] = useState<number>(2);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -54,13 +85,25 @@ export default function NotePage() {
         const graphData = await graphRes.json();
 
         if (docData.success) {
-          setDocument(docData.data.document);
+          const doc = docData.data.document;
+          setDocument(doc);
+
+          // Fetch folder-scoped titles for wiki link validation
+          const folder = doc.folder || "default";
+          const titlesRes = await fetch(`/api/documents/titles?folder=${encodeURIComponent(folder)}`);
+          const titlesData = await titlesRes.json();
+          if (titlesData.success) {
+            setFolderTitles(titlesData.data.titles || []);
+          }
         } else {
           setError("Document not found");
         }
 
         if (graphData.success) {
-          setGraph(graphData.data);
+          // Filter graph to only show same-folder nodes and links
+          const currentFolder = docData.success ? (docData.data.document.folder || "default") : "default";
+          const filteredGraph = filterGraphByFolder(graphData.data, currentFolder);
+          setGraph(filteredGraph);
         }
       } catch (err) {
         setError("Failed to load document");
@@ -128,11 +171,6 @@ export default function NotePage() {
     );
   }
 
-  // Get existing titles from graph for wiki link validation
-  const existingTitles = graph
-    ? Object.values(graph.nodes).map(node => node.title)
-    : undefined;
-
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
@@ -184,7 +222,7 @@ export default function NotePage() {
               <MarkdownViewer
                 content={document.contentWithoutFrontmatter}
                 onWikiLinkClick={handleWikiLinkClick}
-                existingTitles={existingTitles}
+                existingTitles={folderTitles}
               />
             </div>
           </div>

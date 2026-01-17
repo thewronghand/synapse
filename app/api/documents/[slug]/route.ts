@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import fs from 'fs/promises';
+import fss from 'fs';
 import path from 'path';
 import {
   parseFrontmatter,
@@ -16,25 +17,71 @@ import { documentCache } from '@/lib/document-cache';
 import { graphCache } from '@/lib/graph-cache';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
+import { ensureDefaultFolder } from '@/lib/folder-utils';
 
 const NOTES_DIR = getNotesDir();
 
-/**
- * Find a document file by title (case-insensitive, NFC normalized)
- */
-async function findFileByTitle(requestedTitle: string): Promise<{ filename: string; title: string } | null> {
-  const files = await fs.readdir(NOTES_DIR);
-  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+interface FoundDocument {
+  filename: string;
+  folder: string;
+  title: string;
+}
 
-  for (const file of markdownFiles) {
-    const filePath = path.join(NOTES_DIR, file);
+/**
+ * Find a document file by title (searches all folders)
+ */
+async function findFileByTitle(requestedTitle: string): Promise<FoundDocument | null> {
+  // First, check cache
+  const cached = documentCache.getByTitle(requestedTitle);
+  if (cached) {
+    const filePath = cached.folder
+      ? path.join(NOTES_DIR, cached.folder, cached.filename)
+      : path.join(NOTES_DIR, cached.filename);
+
+    if (fss.existsSync(filePath)) {
+      return {
+        filename: cached.filename,
+        folder: cached.folder,
+        title: cached.title,
+      };
+    }
+  }
+
+  // Fallback: scan all folders
+  await ensureDefaultFolder();
+  const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
+  const folders = entries.filter((e) => e.isDirectory());
+  const rootFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));
+
+  // Search in folders
+  for (const folder of folders) {
+    const folderPath = path.join(NOTES_DIR, folder.name);
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith('.md'));
+
+    for (const file of markdownFiles) {
+      const filePath = path.join(folderPath, file);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+      const filenameTitle = getTitleFromFilename(file);
+      const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+
+      if (titlesMatch(title, requestedTitle)) {
+        return { filename: file, folder: folder.name, title };
+      }
+    }
+  }
+
+  // Search root files (legacy)
+  for (const file of rootFiles) {
+    const filePath = path.join(NOTES_DIR, file.name);
     const content = await fs.readFile(filePath, 'utf-8');
     const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-    const filenameTitle = getTitleFromFilename(file);
+    const filenameTitle = getTitleFromFilename(file.name);
     const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
 
     if (titlesMatch(title, requestedTitle)) {
-      return { filename: file, title };
+      return { filename: file.name, folder: '', title };
     }
   }
 
@@ -43,7 +90,7 @@ async function findFileByTitle(requestedTitle: string): Promise<{ filename: stri
 
 /**
  * GET /api/documents/[slug]
- * Get a single document by title (slug is now title)
+ * Get a single document by title
  */
 export async function GET(
   request: NextRequest,
@@ -51,7 +98,6 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    // Decode URL-encoded title
     const requestedTitle = decodeURIComponent(slug).normalize('NFC');
     const document = await getDocumentByTitle(requestedTitle);
 
@@ -74,7 +120,6 @@ export async function GET(
 /**
  * PUT /api/documents/[slug]
  * Update a document
- * Body: { content: string, newTitle?: string }
  */
 export async function PUT(
   request: NextRequest,
@@ -88,10 +133,7 @@ export async function PUT(
 
     if (!content) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Missing content',
-        },
+        { success: false, error: 'Missing content' },
         { status: 400 }
       );
     }
@@ -100,35 +142,31 @@ export async function PUT(
     const found = await findFileByTitle(requestedTitle);
     if (!found) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Document not found',
-        },
+        { success: false, error: 'Document not found' },
         { status: 404 }
       );
     }
 
-    const { filename: oldFilename, title: oldTitle } = found;
-    const oldFilePath = path.join(NOTES_DIR, oldFilename);
+    const { filename: oldFilename, folder, title: oldTitle } = found;
+    const oldFilePath = folder
+      ? path.join(NOTES_DIR, folder, oldFilename)
+      : path.join(NOTES_DIR, oldFilename);
 
-    // Parse the new content to get the new title
+    // Parse the new content
     const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-    const extractedNewTitle = newTitle || extractTitle(contentWithoutFrontmatter, frontmatter) || oldTitle;
+    const extractedNewTitle =
+      newTitle || extractTitle(contentWithoutFrontmatter, frontmatter) || oldTitle;
 
-    // Check if title is changing
     const titleChanged = !titlesMatch(oldTitle, extractedNewTitle);
 
     if (titleChanged) {
-      // Check for duplicate title
-      if (documentCache.hasTitle(extractedNewTitle)) {
+      // Check for duplicate title within the same folder (allows same title in different folders)
+      if (documentCache.hasTitleInFolder(extractedNewTitle, folder)) {
         const existingDoc = documentCache.getByTitle(extractedNewTitle);
-        // Make sure it's not the same document
-        if (existingDoc && existingDoc.filename !== oldFilename) {
+        // Only block if it's a different file (not just renaming case normalization)
+        if (existingDoc && (existingDoc.filename !== oldFilename || existingDoc.folder !== folder)) {
           return NextResponse.json(
-            {
-              success: false,
-              error: '동일한 제목의 문서가 이미 존재합니다',
-            },
+            { success: false, error: '이 폴더에 동일한 제목의 문서가 이미 존재합니다' },
             { status: 409 }
           );
         }
@@ -137,48 +175,43 @@ export async function PUT(
       // Create new filename
       const newSafeFilename = sanitizeFilename(extractedNewTitle);
       const newFilename = `${newSafeFilename}.md`;
-      const newFilePath = path.join(NOTES_DIR, newFilename);
+      const newFilePath = folder
+        ? path.join(NOTES_DIR, folder, newFilename)
+        : path.join(NOTES_DIR, newFilename);
 
-      // Check if new filename already exists (different title but same sanitized name)
+      // Check if new filename already exists
       if (newFilename !== oldFilename) {
         try {
           await fs.access(newFilePath);
           return NextResponse.json(
-            {
-              success: false,
-              error: '동일한 파일명의 문서가 이미 존재합니다',
-            },
+            { success: false, error: '동일한 파일명의 문서가 이미 존재합니다' },
             { status: 409 }
           );
         } catch {
-          // File doesn't exist, continue
+          // OK
         }
       }
 
-      // Update all documents that reference this document
-      await updateReferencingDocuments(oldTitle, extractedNewTitle);
+      // Update references only within the same folder (folder isolation)
+      await updateReferencingDocuments(oldTitle, extractedNewTitle, folder);
 
-      // Rename the file
+      // Rename file
       if (newFilename !== oldFilename) {
         await fs.rename(oldFilePath, newFilePath);
       }
 
-      // Write updated content
+      // Write content
       await fs.writeFile(newFilePath, content, 'utf-8');
 
       // Update caches
-      documentCache.updateDocument(oldTitle, extractedNewTitle, newFilename);
+      documentCache.updateDocument(oldTitle, extractedNewTitle, newFilename, folder);
       graphCache.renameDocument(oldTitle, extractedNewTitle, newFilename, content);
 
       console.log(`[Document] Renamed: ${oldTitle} -> ${extractedNewTitle}`);
     } else {
-      // Title didn't change, just update content
       await fs.writeFile(oldFilePath, content, 'utf-8');
-
-      // Update caches
-      documentCache.updateDocument(oldTitle, oldTitle, oldFilename);
+      documentCache.updateDocument(oldTitle, oldTitle, oldFilename, folder);
       await graphCache.updateDocument(oldTitle, oldFilename, content);
-
       console.log(`[Document] Updated: ${oldTitle}`);
     }
 
@@ -187,7 +220,6 @@ export async function PUT(
       tagCache.addTags(frontmatter.tags);
     }
 
-    // Get updated document
     const document = await getDocumentByTitle(extractedNewTitle);
 
     return NextResponse.json({
@@ -197,10 +229,7 @@ export async function PUT(
   } catch (error) {
     console.error('Error updating document:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to update document',
-      },
+      { success: false, error: 'Failed to update document' },
       { status: 500 }
     );
   }
@@ -208,7 +237,6 @@ export async function PUT(
 
 /**
  * DELETE /api/documents/[slug]
- * Delete a document
  */
 export async function DELETE(
   request: NextRequest,
@@ -218,31 +246,24 @@ export async function DELETE(
     const { slug } = await params;
     const requestedTitle = decodeURIComponent(slug).normalize('NFC');
 
-    // Find the file
     const found = await findFileByTitle(requestedTitle);
     if (!found) {
       return NextResponse.json(
-        {
-          success: false,
-          error: 'Document not found',
-        },
+        { success: false, error: 'Document not found' },
         { status: 404 }
       );
     }
 
-    const { filename, title } = found;
-    const filePath = path.join(NOTES_DIR, filename);
+    const { filename, folder, title } = found;
+    const filePath = folder
+      ? path.join(NOTES_DIR, folder, filename)
+      : path.join(NOTES_DIR, filename);
 
-    // Delete file
     await fs.unlink(filePath);
-
-    // Remove document from caches
     documentCache.removeDocument(title);
     graphCache.removeDocument(title);
 
     console.log(`[Document] Deleted: ${title}`);
-
-    // Refresh tag cache since we don't know which tags are no longer used
     await tagCache.refreshTags();
 
     return NextResponse.json({
@@ -252,47 +273,50 @@ export async function DELETE(
   } catch (error) {
     console.error('Error deleting document:', error);
     return NextResponse.json(
-      {
-        success: false,
-        error: 'Failed to delete document',
-      },
+      { success: false, error: 'Failed to delete document' },
       { status: 500 }
     );
   }
 }
 
 /**
- * Helper: Get single document by title
+ * Helper: Get document by title
  */
 async function getDocumentByTitle(requestedTitle: string): Promise<Document> {
-  // In published mode, read from JSON file
   if (isPublishedMode()) {
-    const jsonPath = path.join(process.cwd(), 'public', 'data', 'docs', `${encodeURIComponent(requestedTitle)}.json`);
+    const jsonPath = path.join(
+      process.cwd(),
+      'public',
+      'data',
+      'docs',
+      `${encodeURIComponent(requestedTitle)}.json`
+    );
     const jsonData = await fs.readFile(jsonPath, 'utf-8');
     return JSON.parse(jsonData);
   }
 
-  // Find the file
   const found = await findFileByTitle(requestedTitle);
   if (!found) {
     throw new Error(`Document not found: ${requestedTitle}`);
   }
 
-  const { filename, title } = found;
-  const filePath = path.join(NOTES_DIR, filename);
+  const { filename, folder, title } = found;
+  const filePath = folder
+    ? path.join(NOTES_DIR, folder, filename)
+    : path.join(NOTES_DIR, filename);
+
   const content = await fs.readFile(filePath, 'utf-8');
   const stats = await fs.stat(filePath);
-
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
   const links = extractWikiLinks(content);
-
-  // Calculate backlinks
-  const backlinks = await calculateBacklinksForDocument(title);
+  // Calculate backlinks only from the same folder (folder isolation)
+  const backlinks = await calculateBacklinksForDocument(title, folder);
 
   return {
-    slug: title, // Use title as slug for backward compatibility
+    slug: title,
     title,
-    filePath: `notes/${filename}`,
+    folder: folder || '',
+    filePath: folder ? `notes/${folder}/${filename}` : `notes/${filename}`,
     content,
     contentWithoutFrontmatter,
     frontmatter,
@@ -304,60 +328,69 @@ async function getDocumentByTitle(requestedTitle: string): Promise<Document> {
 }
 
 /**
- * Helper: Calculate backlinks for a specific document (by title)
+ * Helper: Calculate backlinks for a document (folder-scoped)
+ * Only returns backlinks from documents in the same folder
  */
-async function calculateBacklinksForDocument(targetTitle: string): Promise<string[]> {
+async function calculateBacklinksForDocument(targetTitle: string, targetFolder: string): Promise<string[]> {
   const backlinks: string[] = [];
   const normalizedTarget = targetTitle.normalize('NFC').toLowerCase();
 
-  const files = await fs.readdir(NOTES_DIR);
-  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+  // Only scan the same folder for backlinks (folder isolation)
+  const folderToScan = targetFolder || 'default';
+  const folderPath = path.join(NOTES_DIR, folderToScan);
 
-  for (const file of markdownFiles) {
-    const filePath = path.join(NOTES_DIR, file);
-    const content = await fs.readFile(filePath, 'utf-8');
-    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-    const filenameTitle = getTitleFromFilename(file);
-    const docTitle = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+  try {
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith('.md'));
 
-    // Skip self
-    if (titlesMatch(docTitle, targetTitle)) continue;
+    for (const file of markdownFiles) {
+      const filePath = path.join(folderPath, file);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+      const filenameTitle = getTitleFromFilename(file);
+      const docTitle = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
 
-    // Get wiki links from this document
-    const links = extractWikiLinks(content);
+      if (titlesMatch(docTitle, targetTitle)) continue;
 
-    // Check if any link matches the target title
-    if (links.some(link => link.normalize('NFC').toLowerCase() === normalizedTarget)) {
-      backlinks.push(docTitle);
+      const links = extractWikiLinks(content);
+      if (links.some((link) => link.normalize('NFC').toLowerCase() === normalizedTarget)) {
+        backlinks.push(docTitle);
+      }
     }
+  } catch (error) {
+    console.error(`[calculateBacklinksForDocument] Error scanning folder ${folderToScan}:`, error);
   }
 
   return backlinks;
 }
 
 /**
- * Helper: Update wiki links in all documents that reference the old title
+ * Helper: Update wiki links in documents that reference the old title (folder-scoped)
+ * Only updates references within the same folder (folder isolation)
  */
-async function updateReferencingDocuments(oldTitle: string, newTitle: string): Promise<void> {
-  const files = await fs.readdir(NOTES_DIR);
-  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+async function updateReferencingDocuments(oldTitle: string, newTitle: string, targetFolder: string): Promise<void> {
+  // Only update references in the same folder (folder isolation)
+  const folderToUpdate = targetFolder || 'default';
+  const folderPath = path.join(NOTES_DIR, folderToUpdate);
 
-  for (const file of markdownFiles) {
-    const filePath = path.join(NOTES_DIR, file);
-    const content = await fs.readFile(filePath, 'utf-8');
-    const links = extractWikiLinks(content);
+  try {
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith('.md'));
 
-    // Check if this document references the old title
-    const hasReference = links.some(link => titlesMatch(link, oldTitle));
+    for (const file of markdownFiles) {
+      const filePath = path.join(folderPath, file);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const links = extractWikiLinks(content);
 
-    if (hasReference) {
-      // Update wiki links in content
-      const updatedContent = updateWikiLinksInContent(content, oldTitle, newTitle);
-
-      if (updatedContent !== content) {
-        await fs.writeFile(filePath, updatedContent, 'utf-8');
-        console.log(`[Document] Updated references in: ${file}`);
+      if (links.some((link) => titlesMatch(link, oldTitle))) {
+        const updatedContent = updateWikiLinksInContent(content, oldTitle, newTitle);
+        if (updatedContent !== content) {
+          await fs.writeFile(filePath, updatedContent, 'utf-8');
+          console.log(`[Document] Updated references in: ${folderToUpdate}/${file}`);
+        }
       }
     }
+  } catch (error) {
+    console.error(`[updateReferencingDocuments] Error updating folder ${folderToUpdate}:`, error);
   }
 }

@@ -1,30 +1,47 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/layout/AppHeader";
+import { FolderTabs } from "@/components/ui/FolderTabs";
 
 interface TagStats {
   tag: string;
   count: number;
 }
 
-export default function TagsPage() {
+function TagsContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [documents, setDocuments] = useState<Document[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [sortBy, setSortBy] = useState<"name" | "count">("count");
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+
+  // Read folder from URL params
+  useEffect(() => {
+    const folderParam = searchParams.get("folder");
+    if (folderParam) {
+      setSelectedFolder(decodeURIComponent(folderParam));
+    } else {
+      setSelectedFolder(null);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     fetchDocuments();
-  }, []);
+  }, [selectedFolder]);
 
   async function fetchDocuments() {
+    setIsLoading(true);
     try {
-      const res = await fetch("/api/documents");
+      const url = selectedFolder
+        ? `/api/documents?folder=${encodeURIComponent(selectedFolder)}`
+        : "/api/documents";
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success) {
@@ -37,7 +54,15 @@ export default function TagsPage() {
     }
   }
 
-  // Calculate tag statistics
+  function handleFolderChange(folder: string | null) {
+    if (folder) {
+      router.push(`/tags?folder=${encodeURIComponent(folder)}`);
+    } else {
+      router.push("/tags");
+    }
+  }
+
+  // Calculate tag statistics (only from filtered documents)
   const tagStats: TagStats[] = [];
   const tagMap = new Map<string, number>();
 
@@ -71,10 +96,14 @@ export default function TagsPage() {
   return (
     <div className="container mx-auto py-8 px-4">
       {/* Header */}
-      <div className="mb-8">
+      <div className="mb-4">
         <AppHeader
           title="태그 관리"
-          subtitle={`총 ${sortedTags.length}개의 태그 · ${documents.length}개의 문서`}
+          subtitle={
+            selectedFolder
+              ? `${selectedFolder} 폴더 · ${sortedTags.length}개 태그 · ${documents.length}개 문서`
+              : `전체 · ${sortedTags.length}개 태그 · ${documents.length}개 문서`
+          }
           actions={
             <>
               <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
@@ -85,6 +114,14 @@ export default function TagsPage() {
               </Button>
             </>
           }
+        />
+      </div>
+
+      {/* Folder Tabs */}
+      <div className="mb-6">
+        <FolderTabs
+          selectedFolder={selectedFolder}
+          onFolderChange={handleFolderChange}
         />
       </div>
 
@@ -114,7 +151,14 @@ export default function TagsPage() {
           <Badge
             key={tag}
             className="cursor-pointer bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 px-3 py-2 text-sm transition-colors"
-            onClick={() => router.push(`/documents?tags=${encodeURIComponent(tag)}`)}
+            onClick={() => {
+              const params = new URLSearchParams();
+              params.set("tags", tag);
+              if (selectedFolder) {
+                params.set("folder", selectedFolder);
+              }
+              router.push(`/documents?${params.toString()}`);
+            }}
           >
             <span className="font-medium">{tag}</span>
             <span className="ml-2 opacity-70">{count}</span>
@@ -125,10 +169,28 @@ export default function TagsPage() {
       {/* Empty State */}
       {sortedTags.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-muted-foreground mb-4">아직 태그가 없습니다.</p>
+          <p className="text-muted-foreground mb-4">
+            {selectedFolder
+              ? `"${selectedFolder}" 폴더에 태그가 없습니다.`
+              : "아직 태그가 없습니다."}
+          </p>
           <p className="text-sm text-muted-foreground">문서에 태그를 추가해보세요!</p>
         </div>
       )}
     </div>
+  );
+}
+
+export default function TagsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-screen items-center justify-center">
+          <p className="text-lg text-muted-foreground">Loading...</p>
+        </div>
+      }
+    >
+      <TagsContent />
+    </Suspense>
   );
 }

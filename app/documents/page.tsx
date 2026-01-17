@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
-import { X, Search } from "lucide-react";
+import { FolderTabs } from "@/components/ui/FolderTabs";
+import { X, Search, Folder } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 
@@ -26,6 +27,7 @@ function DocumentsContent() {
   const [showSearchSuggestions, setShowSearchSuggestions] = useState(false);
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const itemsPerPage = 12; // 3x4 grid
 
   // Track previous filter values to detect actual changes
@@ -33,13 +35,18 @@ function DocumentsContent() {
     searchQuery: "",
     selectedTags: [] as string[],
     excludedTags: [] as string[],
+    selectedFolder: null as string | null,
   });
 
   useEffect(() => {
     fetchDocuments();
-    fetchTags();
-    fetchTitles();
   }, []);
+
+  // Fetch tags and titles (folder-scoped) when folder changes
+  useEffect(() => {
+    fetchTags(selectedFolder);
+    fetchTitles(selectedFolder);
+  }, [selectedFolder]);
 
   // Debounce search input
   useEffect(() => {
@@ -58,10 +65,11 @@ function DocumentsContent() {
       prev.selectedTags.length !== selectedTags.length ||
       prev.selectedTags.some((tag, i) => tag !== selectedTags[i]) ||
       prev.excludedTags.length !== excludedTags.length ||
-      prev.excludedTags.some((tag, i) => tag !== excludedTags[i]);
+      prev.excludedTags.some((tag, i) => tag !== excludedTags[i]) ||
+      prev.selectedFolder !== selectedFolder;
 
     if (filtersChanged && currentPage > 1) {
-      updateFiltersInURL(selectedTags, excludedTags, 1);
+      updateFiltersInURL(selectedTags, excludedTags, 1, selectedFolder);
     }
 
     // Update ref with current values
@@ -69,14 +77,16 @@ function DocumentsContent() {
       searchQuery,
       selectedTags: [...selectedTags],
       excludedTags: [...excludedTags],
+      selectedFolder,
     };
-  }, [searchQuery, selectedTags, excludedTags]);
+  }, [searchQuery, selectedTags, excludedTags, selectedFolder]);
 
-  // Read tags and page from URL params
+  // Read tags, folder, and page from URL params
   useEffect(() => {
     const tagsParam = searchParams.get("tags");
     const excludeParam = searchParams.get("exclude");
     const pageParam = searchParams.get("page");
+    const folderParam = searchParams.get("folder");
 
     if (tagsParam) {
       const tags = tagsParam.split(",").filter(Boolean).map(decodeURIComponent);
@@ -102,6 +112,12 @@ function DocumentsContent() {
     } else {
       setCurrentPage(1);
     }
+
+    if (folderParam) {
+      setSelectedFolder(decodeURIComponent(folderParam));
+    } else {
+      setSelectedFolder(null);
+    }
   }, [searchParams]);
 
   async function fetchDocuments() {
@@ -119,9 +135,10 @@ function DocumentsContent() {
     }
   }
 
-  async function fetchTags() {
+  async function fetchTags(folder: string | null) {
     try {
-      const res = await fetch("/api/tags");
+      const folderParam = folder ? `?folder=${encodeURIComponent(folder)}` : "";
+      const res = await fetch(`/api/tags${folderParam}`);
       const data = await res.json();
       if (data.success) {
         setAvailableTags(data.data.tags);
@@ -131,9 +148,10 @@ function DocumentsContent() {
     }
   }
 
-  async function fetchTitles() {
+  async function fetchTitles(folder: string | null) {
     try {
-      const res = await fetch("/api/titles");
+      const folderParam = folder ? `?folder=${encodeURIComponent(folder)}` : "";
+      const res = await fetch(`/api/documents/titles${folderParam}`);
       const data = await res.json();
       if (data.success) {
         setAvailableTitles(data.data.titles);
@@ -148,18 +166,18 @@ function DocumentsContent() {
     const newTags = selectedTags.includes(tag)
       ? selectedTags.filter((t) => t !== tag)
       : [...selectedTags, tag];
-    updateFiltersInURL(newTags, excludedTags);
+    updateFiltersInURL(newTags, excludedTags, 1, selectedFolder);
   }
 
   function handleTagsChange(tags: string[]) {
-    updateFiltersInURL(tags, excludedTags);
+    updateFiltersInURL(tags, excludedTags, 1, selectedFolder);
   }
 
   function handleExcludedTagsChange(tags: string[]) {
-    updateFiltersInURL(selectedTags, tags);
+    updateFiltersInURL(selectedTags, tags, 1, selectedFolder);
   }
 
-  function updateFiltersInURL(includeTags: string[], excludeTags: string[], page: number = 1) {
+  function updateFiltersInURL(includeTags: string[], excludeTags: string[], page: number = 1, folder: string | null = null) {
     const params = new URLSearchParams();
 
     if (includeTags.length > 0) {
@@ -174,17 +192,25 @@ function DocumentsContent() {
       params.set("page", page.toString());
     }
 
+    if (folder) {
+      params.set("folder", encodeURIComponent(folder));
+    }
+
     const queryString = params.toString();
     router.push(queryString ? `/documents?${queryString}` : "/documents");
   }
 
+  function handleFolderChange(folder: string | null) {
+    updateFiltersInURL(selectedTags, excludedTags, 1, folder);
+  }
+
   function handlePageChange(page: number) {
-    updateFiltersInURL(selectedTags, excludedTags, page);
+    updateFiltersInURL(selectedTags, excludedTags, page, selectedFolder);
   }
 
   function removeTag(tagToRemove: string) {
     const newTags = selectedTags.filter((tag) => tag !== tagToRemove);
-    updateFiltersInURL(newTags, excludedTags);
+    updateFiltersInURL(newTags, excludedTags, 1, selectedFolder);
   }
 
   // Get search suggestions based on input
@@ -197,6 +223,10 @@ function DocumentsContent() {
     : [];
 
   const filteredDocuments = documents.filter((doc) => {
+    // Folder filter
+    const matchesFolder =
+      selectedFolder === null ? true : doc.folder === selectedFolder;
+
     // Text search filter - 제목 기반 검색
     const matchesSearch =
       doc.title.toLowerCase().includes(searchQuery.toLowerCase());
@@ -213,7 +243,7 @@ function DocumentsContent() {
         ? true
         : !excludedTags.some((tag) => doc.frontmatter.tags?.includes(tag));
 
-    return matchesSearch && matchesIncludeTags && matchesExcludeTags;
+    return matchesFolder && matchesSearch && matchesIncludeTags && matchesExcludeTags;
   });
 
   // Pagination
@@ -337,6 +367,13 @@ function DocumentsContent() {
         />
       </div>
 
+      {/* Folder Tabs */}
+      <FolderTabs
+        selectedFolder={selectedFolder}
+        onFolderChange={handleFolderChange}
+        className="mb-6"
+      />
+
       {/* Search and Actions */}
       <div className="mb-6 flex gap-4">
         <div className="relative flex-1">
@@ -396,7 +433,7 @@ function DocumentsContent() {
           )}
         </div>
         {!isPublishedMode() && (
-          <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">
+          <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
             + 새 노트
           </Button>
         )}
@@ -467,7 +504,19 @@ function DocumentsContent() {
             onClick={() => router.push(`/note/${encodeURIComponent(doc.title)}`)}
           >
             <CardHeader>
-              <CardTitle className="text-lg">{doc.title}</CardTitle>
+              <CardTitle className="text-lg">
+                {doc.title}
+                {/* Show folder badge when viewing All tab */}
+                {selectedFolder === null && doc.folder && (
+                  <Badge
+                    variant="outline"
+                    className="ml-2 text-xs font-normal bg-muted/50 text-muted-foreground border-border/50"
+                  >
+                    <Folder className="w-3 h-3 mr-1" />
+                    {doc.folder}
+                  </Badge>
+                )}
+              </CardTitle>
               <CardDescription>
                 <div className="flex flex-col gap-1 text-xs">
                   <span>Updated: {new Date(doc.updatedAt).toLocaleDateString()}</span>
@@ -517,7 +566,7 @@ function DocumentsContent() {
               : "아직 노트가 없습니다. 첫 노트를 만들어보세요!"}
           </p>
           {!isPublishedMode() && (
-            <Button onClick={() => router.push("/editor/new")} className="cursor-pointer">+ 새 노트</Button>
+            <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">+ 새 노트</Button>
           )}
         </div>
       )}

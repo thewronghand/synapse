@@ -4,50 +4,114 @@ import path from 'path';
 import { Document } from '@/types';
 import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename, titlesMatch } from './document-parser';
 import { getNotesDir } from './notes-path';
+import { ensureDefaultFolder } from './folder-utils';
 
 const NOTES_DIR = getNotesDir();
 
 /**
- * Get all documents (제목 기반)
+ * Get all documents (폴더 지원)
  */
 async function getAllDocuments(): Promise<Document[]> {
-  const files = await fs.readdir(NOTES_DIR);
-  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+  await ensureDefaultFolder();
 
-  const documentsWithoutBacklinks = await Promise.all(
-    markdownFiles.map(async (file) => {
-      const filePath = path.join(NOTES_DIR, file);
-      const content = await fs.readFile(filePath, 'utf-8');
-      const stats = await fs.stat(filePath);
+  const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
+  const folders = entries.filter((e) => e.isDirectory());
+  const rootFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));
 
-      const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-      const filenameTitle = getTitleFromFilename(file);
-      const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
-      const links = extractWikiLinks(content);
+  const documentsWithoutBacklinks: Document[] = [];
 
-      return {
-        slug: title, // 제목을 slug로 사용 (하위 호환성)
-        filePath: `notes/${file}`,
-        title,
-        content,
-        contentWithoutFrontmatter,
-        frontmatter,
-        links,
-        backlinks: [],
-        createdAt: stats.birthtime,
-        updatedAt: stats.mtime,
-      };
-    })
-  );
+  // Process folders
+  for (const folder of folders) {
+    const folderPath = path.join(NOTES_DIR, folder.name);
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith('.md'));
 
-  // Calculate backlinks (제목 기반)
-  const backlinksMap = calculateBacklinksByTitle(documentsWithoutBacklinks);
+    const folderDocs = await Promise.all(
+      markdownFiles.map(async (file) => {
+        const filePath = path.join(folderPath, file);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const stats = await fs.stat(filePath);
 
-  // Add backlinks to documents
-  const documents = documentsWithoutBacklinks.map((doc) => ({
-    ...doc,
-    backlinks: backlinksMap.get(doc.title) || [],
-  }));
+        const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+        const filenameTitle = getTitleFromFilename(file);
+        const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+        const links = extractWikiLinks(content);
+
+        return {
+          slug: title,
+          filePath: `notes/${folder.name}/${file}`,
+          title,
+          folder: folder.name,
+          content,
+          contentWithoutFrontmatter,
+          frontmatter,
+          links,
+          backlinks: [] as string[],
+          createdAt: stats.birthtime,
+          updatedAt: stats.mtime,
+        };
+      })
+    );
+    documentsWithoutBacklinks.push(...folderDocs);
+  }
+
+  // Process root-level files (legacy)
+  if (rootFiles.length > 0) {
+    const rootDocs = await Promise.all(
+      rootFiles.map(async (file) => {
+        const filePath = path.join(NOTES_DIR, file.name);
+        const content = await fs.readFile(filePath, 'utf-8');
+        const stats = await fs.stat(filePath);
+
+        const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+        const filenameTitle = getTitleFromFilename(file.name);
+        const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+        const links = extractWikiLinks(content);
+
+        return {
+          slug: title,
+          filePath: `notes/${file.name}`,
+          title,
+          folder: '',
+          content,
+          contentWithoutFrontmatter,
+          frontmatter,
+          links,
+          backlinks: [] as string[],
+          createdAt: stats.birthtime,
+          updatedAt: stats.mtime,
+        };
+      })
+    );
+    documentsWithoutBacklinks.push(...rootDocs);
+  }
+
+  // Calculate backlinks per folder (folder isolation)
+  const documentsByFolder = new Map<string, Document[]>();
+  documentsWithoutBacklinks.forEach(doc => {
+    const folder = doc.folder || 'default';
+    if (!documentsByFolder.has(folder)) {
+      documentsByFolder.set(folder, []);
+    }
+    documentsByFolder.get(folder)!.push(doc);
+  });
+
+  // Calculate backlinks within each folder separately
+  const folderBacklinksMaps = new Map<string, Map<string, string[]>>();
+  for (const [folder, docs] of documentsByFolder) {
+    const backlinksMap = calculateBacklinksByTitle(docs);
+    folderBacklinksMaps.set(folder, backlinksMap);
+  }
+
+  // Add folder-scoped backlinks to documents
+  const documents = documentsWithoutBacklinks.map((doc) => {
+    const folder = doc.folder || 'default';
+    const folderBacklinks = folderBacklinksMaps.get(folder);
+    return {
+      ...doc,
+      backlinks: folderBacklinks?.get(doc.title) || [],
+    };
+  });
 
   return documents;
 }
@@ -83,14 +147,32 @@ function calculateBacklinksByTitle(documents: Document[]): Map<string, string[]>
 
 /**
  * Build graph from documents (Digital Garden format) - 제목 기반
+ * Edges and neighbors are now folder-scoped (folder isolation)
  */
 function buildGraph(documents: Document[]) {
   const nodesObject: { [url: string]: any } = {};
   const links: any[] = [];
   let nodeId = 0;
 
+  // Create a map for quick title+folder lookup
+  const titleFolderToDoc = new Map<string, Document>();
+  documents.forEach(doc => {
+    const folder = doc.folder || 'default';
+    const key = `${folder}:${doc.title.normalize('NFC').toLowerCase()}`;
+    titleFolderToDoc.set(key, doc);
+  });
+
   documents.forEach((doc) => {
-    const allLinks = [...new Set([...doc.links, ...doc.backlinks])]; // Bidirectional neighbors
+    const folder = doc.folder || 'default';
+
+    // Only include links/neighbors that exist in the same folder
+    const sameFolderLinks = doc.links.filter(linkedTitle => {
+      const linkedKey = `${folder}:${linkedTitle.normalize('NFC').toLowerCase()}`;
+      return titleFolderToDoc.has(linkedKey);
+    });
+
+    // Combine forward links and backlinks for neighbors (all same-folder)
+    const allLinks = [...new Set([...sameFolderLinks, ...doc.backlinks])];
     const encodedTitle = encodeURIComponent(doc.title);
 
     nodesObject[`/${encodedTitle}`] = {
@@ -103,15 +185,20 @@ function buildGraph(documents: Document[]) {
       color: getNodeColor(doc.frontmatter.tags || [], doc.backlinks.length),
       hide: false,
       tags: doc.frontmatter.tags || [],
+      folder: doc.folder, // Include folder info in graph
     };
   });
 
-  // Build edges using node IDs
+  // Build edges only for links within the same folder (folder isolation)
   documents.forEach((doc) => {
+    const folder = doc.folder || 'default';
     const encodedSourceTitle = encodeURIComponent(doc.title);
+
     doc.links.forEach((targetTitle) => {
-      // Find target document by title (case-insensitive)
-      const targetDoc = documents.find(d => titlesMatch(d.title, targetTitle));
+      // Only create edge if target is in the same folder
+      const targetKey = `${folder}:${targetTitle.normalize('NFC').toLowerCase()}`;
+      const targetDoc = titleFolderToDoc.get(targetKey);
+
       if (!targetDoc) return;
 
       const encodedTargetTitle = encodeURIComponent(targetDoc.title);
@@ -134,26 +221,24 @@ function buildGraph(documents: Document[]) {
  * Get node color based on tags or backlink count
  */
 function getNodeColor(tags: string[], backlinkCount: number): string {
-  // Color by tag
   if (tags.includes('guide') || tags.includes('tutorial')) {
-    return '#3b82f6'; // blue
+    return '#3b82f6';
   }
   if (tags.includes('getting-started')) {
-    return '#10b981'; // green
+    return '#10b981';
   }
   if (tags.includes('features')) {
-    return '#8b5cf6'; // purple
+    return '#8b5cf6';
   }
 
-  // Color by importance (backlink count)
   if (backlinkCount >= 3) {
-    return '#ef4444'; // red - highly connected
+    return '#ef4444';
   }
   if (backlinkCount >= 1) {
-    return '#f59e0b'; // orange - connected
+    return '#f59e0b';
   }
 
-  return '#6b7280'; // gray - default
+  return '#6b7280';
 }
 
 /**
@@ -162,7 +247,6 @@ function getNodeColor(tags: string[], backlinkCount: number): string {
 export async function exportToJSON() {
   const exportDir = path.join(process.cwd(), 'public', 'data');
 
-  // Create export directory if it doesn't exist
   if (!fss.existsSync(exportDir)) {
     fss.mkdirSync(exportDir, { recursive: true });
   }
@@ -178,14 +262,13 @@ export async function exportToJSON() {
   );
   console.log(`[Export] Exported ${documents.length} documents`);
 
-  // 2. Export individual documents (제목을 인코딩하여 파일명으로 사용)
+  // 2. Export individual documents
   const docsDir = path.join(exportDir, 'docs');
   if (!fss.existsSync(docsDir)) {
     fss.mkdirSync(docsDir, { recursive: true });
   }
 
   for (const doc of documents) {
-    // 제목을 URL 인코딩하여 파일명으로 사용
     const encodedTitle = encodeURIComponent(doc.title);
     await fs.writeFile(
       path.join(docsDir, `${encodedTitle}.json`),
@@ -203,7 +286,7 @@ export async function exportToJSON() {
   );
   console.log('[Export] Exported graph data');
 
-  // 4. Export tags (as sorted string array)
+  // 4. Export tags
   const tagsSet = new Set<string>();
   documents.forEach(doc => {
     if (doc.frontmatter.tags) {
@@ -221,10 +304,8 @@ export async function exportToJSON() {
   );
   console.log(`[Export] Exported ${tagsArray.length} tags`);
 
-  // 5. Export titles (as sorted string array)
-  const titles = documents
-    .map(doc => doc.title)
-    .sort();
+  // 5. Export titles
+  const titles = documents.map(doc => doc.title).sort();
 
   await fs.writeFile(
     path.join(exportDir, 'titles.json'),
@@ -232,12 +313,29 @@ export async function exportToJSON() {
   );
   console.log(`[Export] Exported ${titles.length} titles`);
 
+  // 6. Export folders
+  const foldersSet = new Set<string>();
+  documents.forEach(doc => {
+    if (doc.folder) {
+      foldersSet.add(doc.folder);
+    }
+  });
+
+  const foldersArray = Array.from(foldersSet).sort();
+
+  await fs.writeFile(
+    path.join(exportDir, 'folders.json'),
+    JSON.stringify(foldersArray, null, 2)
+  );
+  console.log(`[Export] Exported ${foldersArray.length} folders`);
+
   console.log('[Export] Export complete!');
 
   return {
     success: true,
     documentsCount: documents.length,
     tagsCount: tagsArray.length,
+    foldersCount: foldersArray.length,
     exportPath: exportDir,
   };
 }
