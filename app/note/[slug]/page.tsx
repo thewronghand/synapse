@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import ForceGraphView from "@/components/graph/ForceGraphView";
@@ -11,6 +11,9 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { LoadingScreen } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-provider";
+import { TableOfContents } from "@/components/ui/TableOfContents";
+import { TocFab } from "@/components/ui/TocFab";
+import { extractHeadings, generateUniqueIds } from "@/lib/toc";
 
 // Filter graph to only include nodes and links from the same folder
 function filterGraphByFolder(graph: Graph, folder: string): Graph {
@@ -57,6 +60,12 @@ export default function NotePage() {
   const [error, setError] = useState<string | null>(null);
   const [graphHeight, setGraphHeight] = useState(320);
   const confirm = useConfirm();
+
+  // Extract headings for Table of Contents
+  const headings = useMemo(() => {
+    if (!document) return [];
+    return generateUniqueIds(extractHeadings(document.contentWithoutFrontmatter));
+  }, [document]);
 
   // Calculate responsive graph height
   useEffect(() => {
@@ -189,6 +198,9 @@ export default function NotePage() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* TOC FAB for mobile/tablet */}
+      <TocFab headings={headings} />
+
       {/* Header */}
       <header className="border-b bg-card p-4 sticky top-0 z-10">
         <div className="container mx-auto flex items-center justify-between">
@@ -243,46 +255,58 @@ export default function NotePage() {
             </div>
           </div>
 
-          {/* Local Graph Sidebar */}
-          {graph && graph.nodes && graph.links && (
+          {/* Sidebar: Local Graph + TOC */}
+          {(graph && graph.nodes && graph.links) || headings.length >= 2 ? (
             <div className="lg:col-span-1">
-              <div className="sticky top-20 bg-card border rounded-lg p-4 shadow-sm overflow-hidden">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-semibold">로컬 그래프</h3>
+              <div className="sticky top-20 space-y-4">
+                {/* Local Graph */}
+                {graph && graph.nodes && graph.links && (
+                  <div className="bg-card border rounded-lg p-4 shadow-sm overflow-hidden">
+                    <div className="flex items-center justify-between mb-4">
+                      <h3 className="text-sm font-semibold">로컬 그래프</h3>
 
-                  {/* Compact Depth Slider */}
-                  <div className="flex items-center gap-3">
-                    <span className="text-xs font-medium text-muted-foreground">깊이:</span>
-                    <div className="flex items-center gap-2">
-                      {[1, 2, 3].map((level) => (
-                        <button
-                          key={level}
-                          onClick={() => setDepth(level)}
-                          className={`
-                            w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer
-                            ${depth === level
-                              ? 'bg-primary text-primary-foreground shadow-md scale-110'
-                              : 'bg-muted text-muted-foreground hover:bg-accent'
-                            }
-                          `}
-                        >
-                          {level}
-                        </button>
-                      ))}
+                      {/* Compact Depth Slider */}
+                      <div className="flex items-center gap-3">
+                        <span className="text-xs font-medium text-muted-foreground">깊이:</span>
+                        <div className="flex items-center gap-2">
+                          {[1, 2, 3].map((level) => (
+                            <button
+                              key={level}
+                              onClick={() => setDepth(level)}
+                              className={`
+                                w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer
+                                ${depth === level
+                                  ? 'bg-primary text-primary-foreground shadow-md scale-110'
+                                  : 'bg-muted text-muted-foreground hover:bg-accent'
+                                }
+                              `}
+                            >
+                              {level}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                </div>
 
-                {/* Graph - use encoded title for URL */}
-                <ForceGraphView
-                  graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
-                  currentNodeUrl={`/${encodeURIComponent(document.title)}`}
-                  depth={depth}
-                  height={graphHeight}
-                />
+                    {/* Graph - use encoded title for URL */}
+                    <ForceGraphView
+                      graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
+                      currentNodeUrl={`/${encodeURIComponent(document.title)}`}
+                      depth={depth}
+                      height={graphHeight}
+                    />
+                  </div>
+                )}
+
+                {/* Table of Contents - shown below graph on large screens */}
+                {headings.length >= 2 && (
+                  <div className="bg-card border rounded-lg p-4 shadow-sm">
+                    <TableOfContents headings={headings} />
+                  </div>
+                )}
               </div>
             </div>
-          )}
+          ) : null}
         </div>
       </main>
 
