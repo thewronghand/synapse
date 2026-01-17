@@ -161,7 +161,7 @@ ${bodyContent}`;
         await fetch("/api/temp-images", {
           method: "DELETE",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ content }),
+          body: JSON.stringify({ content, folder }),
         });
       } catch (err) {
         console.error("Failed to clean temp images:", err);

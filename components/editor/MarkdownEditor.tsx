@@ -226,10 +226,15 @@ export default function MarkdownEditor({
     try {
       setIsUploading(true);
 
+      if (!folder) {
+        console.error('Cannot upload image: folder is not specified');
+        return null;
+      }
+
       const formData = new FormData();
       formData.append('image', file);
 
-      const response = await fetch('/api/upload/image', {
+      const response = await fetch(`/api/upload/image?folder=${encodeURIComponent(folder)}`, {
         method: 'POST',
         body: formData,
       });

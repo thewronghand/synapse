@@ -4,11 +4,11 @@ import { deleteTempImages } from '@/lib/image-utils';
 /**
  * DELETE /api/temp-images
  * Delete temp images from content
- * Body: { content: string }
+ * Body: { content: string, folder: string }
  */
 export async function DELETE(request: NextRequest) {
   try {
-    const { content } = await request.json();
+    const { content, folder } = await request.json();
 
     if (!content) {
       return NextResponse.json(
@@ -20,7 +20,17 @@ export async function DELETE(request: NextRequest) {
       );
     }
 
-    await deleteTempImages(content);
+    if (!folder) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Missing folder',
+        },
+        { status: 400 }
+      );
+    }
+
+    await deleteTempImages(content, folder);
 
     return NextResponse.json({
       success: true,

@@ -18,6 +18,7 @@ import { graphCache } from '@/lib/graph-cache';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
 import { ensureDefaultFolder } from '@/lib/folder-utils';
+import { moveImagesFromTemp } from '@/lib/image-utils';
 
 const NOTES_DIR = getNotesDir();
 
@@ -152,8 +153,11 @@ export async function PUT(
       ? path.join(NOTES_DIR, folder, oldFilename)
       : path.join(NOTES_DIR, oldFilename);
 
+    // Move temp images to permanent location
+    const processedContent = await moveImagesFromTemp(content, folder || 'default');
+
     // Parse the new content
-    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(processedContent);
     const extractedNewTitle =
       newTitle || extractTitle(contentWithoutFrontmatter, frontmatter) || oldTitle;
 
@@ -201,17 +205,17 @@ export async function PUT(
       }
 
       // Write content
-      await fs.writeFile(newFilePath, content, 'utf-8');
+      await fs.writeFile(newFilePath, processedContent, 'utf-8');
 
       // Update caches
       documentCache.updateDocument(oldTitle, extractedNewTitle, newFilename, folder);
-      graphCache.renameDocument(oldTitle, extractedNewTitle, newFilename, content);
+      graphCache.renameDocument(oldTitle, extractedNewTitle, newFilename, processedContent);
 
       console.log(`[Document] Renamed: ${oldTitle} -> ${extractedNewTitle}`);
     } else {
-      await fs.writeFile(oldFilePath, content, 'utf-8');
+      await fs.writeFile(oldFilePath, processedContent, 'utf-8');
       documentCache.updateDocument(oldTitle, oldTitle, oldFilename, folder);
-      await graphCache.updateDocument(oldTitle, oldFilename, content);
+      await graphCache.updateDocument(oldTitle, oldFilename, processedContent);
       console.log(`[Document] Updated: ${oldTitle}`);
     }
 
