@@ -6,6 +6,7 @@ import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/layout/AppHeader";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 interface TagStats {
   tag: string;
@@ -61,11 +62,7 @@ export default function TagsPage() {
   });
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen message="태그 로딩 중..." />;
   }
 
   return (

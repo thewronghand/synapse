@@ -8,6 +8,18 @@ import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LoadingScreen } from "@/components/ui/spinner";
+import { toast } from "sonner";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export default function NotePage() {
   const params = useParams();
@@ -22,6 +34,7 @@ export default function NotePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [graphHeight, setGraphHeight] = useState(320);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Calculate responsive graph height
   useEffect(() => {
@@ -77,10 +90,14 @@ export default function NotePage() {
     router.push(`/note/${encodeURIComponent(pageName)}`);
   }
 
-  async function handleDelete() {
-    if (!document || !confirm(`"${document.title}" 문서를 삭제하시겠습니까?`)) {
-      return;
-    }
+  function handleDelete() {
+    if (!document) return;
+    setShowDeleteConfirm(true);
+  }
+
+  async function executeDelete() {
+    if (!document) return;
+    setShowDeleteConfirm(false);
 
     try {
       const res = await fetch(`/api/documents/${encodeURIComponent(document.title)}`, {
@@ -92,16 +109,12 @@ export default function NotePage() {
       }
     } catch (err) {
       console.error("Failed to delete:", err);
-      alert("문서 삭제에 실패했습니다.");
+      toast.error("문서 삭제에 실패했습니다.");
     }
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen message="문서 로딩 중..." />;
   }
 
   if (error || !document) {
@@ -287,6 +300,27 @@ export default function NotePage() {
           )}
         </div>
       </footer>
+
+      {/* Delete Confirm Dialog */}
+      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>문서 삭제</AlertDialogTitle>
+            <AlertDialogDescription>
+              &quot;{document?.title}&quot; 문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              삭제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

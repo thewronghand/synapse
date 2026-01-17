@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
@@ -265,11 +266,7 @@ ${bodyContent}`;
 
 export default function NewNotePage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    }>
+    <Suspense fallback={<LoadingScreen message="에디터 준비 중..." />}>
       <NewNotePageContent />
     </Suspense>
   );

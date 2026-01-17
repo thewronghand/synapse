@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
@@ -247,11 +248,7 @@ ${editorContent}`;
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen message="에디터 로딩 중..." />;
   }
 
   if (error) {

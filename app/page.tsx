@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import AppHeader from "@/components/layout/AppHeader";
 import Logo from "@/components/ui/Logo";
 import { isPublishedMode } from "@/lib/env";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 export default function Home() {
   const router = useRouter();
@@ -50,11 +51,7 @@ export default function Home() {
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">그래프 로딩 중...</p>
-      </div>
-    );
+    return <LoadingScreen message="그래프 로딩 중..." />;
   }
 
   if (!graph) {

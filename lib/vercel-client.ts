@@ -50,6 +50,19 @@ export interface VercelDeployment {
   readyState: 'BUILDING' | 'ERROR' | 'READY' | 'QUEUED' | 'CANCELED';
 }
 
+export interface VercelDeploymentEvent {
+  type: string;
+  created: number;
+  date?: number;
+  text?: string; // Direct text field (v3 API)
+  payload: {
+    text?: string;
+    statusCode?: number;
+    deploymentId?: string;
+    info?: Record<string, unknown>;
+  };
+}
+
 export class VercelClient {
   private accessToken: string;
   private teamId?: string;
@@ -414,6 +427,39 @@ export class VercelClient {
     if (!response.ok) {
       const errorText = await response.text();
       throw new Error(`Vercel deployment error (${response.status}): ${errorText}`);
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Get deployment events/logs
+   * Returns build output logs for a deployment
+   * Uses v3 API with builds=1 to get build logs
+   */
+  async getDeploymentEvents(deploymentIdOrUrl: string): Promise<VercelDeploymentEvent[]> {
+    const url = new URL(`/v3/deployments/${deploymentIdOrUrl}/events`, 'https://api.vercel.com');
+
+    if (this.teamId) {
+      url.searchParams.set('teamId', this.teamId);
+    }
+
+    // Request build logs specifically
+    url.searchParams.set('builds', '1');
+
+    const response = await fetch(url.toString(), {
+      headers: {
+        Authorization: `Bearer ${this.accessToken}`,
+      },
+    });
+
+    if (response.status === 401 || response.status === 403) {
+      throw new Error('TOKEN_EXPIRED');
+    }
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Vercel API error (${response.status}): ${errorText}`);
     }
 
     return response.json();
