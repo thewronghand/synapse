@@ -65,9 +65,19 @@ function setupNotesDirectory() {
   }
 
   // Copy default notes from app bundle if notes directory is empty
-  const existingNotes = fs.readdirSync(notesDir).filter(file => file.endsWith('.md'));
+  // Check both root .md files and subfolders for existing notes
+  const rootNotes = fs.readdirSync(notesDir).filter(file => file.endsWith('.md'));
+  const subfolders = fs.readdirSync(notesDir).filter(file => {
+    const fullPath = path.join(notesDir, file);
+    return fs.statSync(fullPath).isDirectory() && !file.startsWith('.');
+  });
+  const hasNotesInFolders = subfolders.some(folder => {
+    const folderPath = path.join(notesDir, folder);
+    const folderFiles = fs.readdirSync(folderPath);
+    return folderFiles.some(file => file.endsWith('.md'));
+  });
 
-  if (existingNotes.length === 0) {
+  if (rootNotes.length === 0 && !hasNotesInFolders) {
     console.log('Notes directory is empty, copying default notes...');
 
     // Get the bundled notes directory
@@ -75,12 +85,19 @@ function setupNotesDirectory() {
       ? path.join(process.cwd(), 'notes')
       : path.join(process.resourcesPath, 'app', 'notes');
 
+    // Create default folder for default notes
+    const defaultFolderPath = path.join(notesDir, 'default');
+    if (!fs.existsSync(defaultFolderPath)) {
+      fs.mkdirSync(defaultFolderPath, { recursive: true });
+      console.log('Created default folder:', defaultFolderPath);
+    }
+
     try {
-      // Copy all .md files
+      // Copy all .md files to default folder
       const defaultNotes = fs.readdirSync(bundledNotesDir).filter(file => file.endsWith('.md'));
       defaultNotes.forEach(file => {
         const sourcePath = path.join(bundledNotesDir, file);
-        const destPath = path.join(notesDir, file);
+        const destPath = path.join(defaultFolderPath, file);
         fs.copyFileSync(sourcePath, destPath);
         console.log(`Copied: ${file}`);
       });
