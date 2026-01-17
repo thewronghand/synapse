@@ -6,15 +6,15 @@ import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { normalizeSlug } from "@/lib/document-parser";
 
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
+  // Decode URL-encoded title (slug is now the title)
   const slug = params.slug as string;
+  const title = decodeURIComponent(slug);
 
   const [document, setDocument] = useState<Document | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
@@ -27,7 +27,6 @@ export default function NotePage() {
   useEffect(() => {
     const calculateHeight = () => {
       if (typeof window !== 'undefined') {
-        // Use viewport height minus some offset for better responsiveness
         const vh = window.innerHeight;
         const minHeight = 280;
         const maxHeight = 500;
@@ -45,8 +44,9 @@ export default function NotePage() {
     async function fetchData() {
       try {
         // Fetch document and graph in parallel
+        // Use encodeURIComponent to handle special characters in title
         const [docRes, graphRes] = await Promise.all([
-          fetch(`/api/documents/${slug}`),
+          fetch(`/api/documents/${encodeURIComponent(title)}`),
           fetch(`/api/graph`),
         ]);
 
@@ -70,10 +70,11 @@ export default function NotePage() {
     }
 
     fetchData();
-  }, [slug]);
+  }, [title]);
 
+  // Wiki link click handler - navigate using encoded title
   function handleWikiLinkClick(pageName: string) {
-    router.push(`/note/${normalizeSlug(pageName)}`);
+    router.push(`/note/${encodeURIComponent(pageName)}`);
   }
 
   async function handleDelete() {
@@ -82,7 +83,7 @@ export default function NotePage() {
     }
 
     try {
-      const res = await fetch(`/api/documents/${slug}`, {
+      const res = await fetch(`/api/documents/${encodeURIComponent(document.title)}`, {
         method: "DELETE",
       });
 
@@ -104,8 +105,8 @@ export default function NotePage() {
   }
 
   if (error || !document) {
-    // slug를 제목으로 변환 (하이픈을 공백으로)
-    const displayTitle = decodeURIComponent(slug).replace(/-/g, ' ');
+    // Display the decoded title for user-friendly error message
+    const displayTitle = title;
 
     return (
       <div className="flex min-h-screen items-center justify-center">
@@ -126,6 +127,11 @@ export default function NotePage() {
       </div>
     );
   }
+
+  // Get existing titles from graph for wiki link validation
+  const existingTitles = graph
+    ? Object.values(graph.nodes).map(node => node.title)
+    : undefined;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -157,7 +163,7 @@ export default function NotePage() {
             <ThemeToggle />
             {!isPublishedMode() && (
               <>
-                <Button onClick={() => router.push(`/editor/${slug}`)} className="cursor-pointer">
+                <Button onClick={() => router.push(`/editor/${encodeURIComponent(document.title)}`)} className="cursor-pointer">
                   편집
                 </Button>
                 <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
@@ -178,7 +184,7 @@ export default function NotePage() {
               <MarkdownViewer
                 content={document.contentWithoutFrontmatter}
                 onWikiLinkClick={handleWikiLinkClick}
-                existingSlugs={graph ? Object.keys(graph.nodes).map(url => url.replace('/', '').toLowerCase()) : undefined}
+                existingTitles={existingTitles}
               />
             </div>
           </div>
@@ -213,10 +219,10 @@ export default function NotePage() {
                   </div>
                 </div>
 
-                {/* Graph */}
+                {/* Graph - use encoded title for URL */}
                 <ForceGraphView
                   graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
-                  currentNodeUrl={`/${slug}`}
+                  currentNodeUrl={`/${encodeURIComponent(document.title)}`}
                   depth={depth}
                   height={graphHeight}
                 />
@@ -240,7 +246,7 @@ export default function NotePage() {
             </div>
           </div>
 
-          {/* Links */}
+          {/* Links - these are now titles, not slugs */}
           {document.links.length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2">
@@ -250,7 +256,7 @@ export default function NotePage() {
                 {document.links.map((link) => (
                   <button
                     key={link}
-                    onClick={() => router.push(`/note/${link}`)}
+                    onClick={() => router.push(`/note/${encodeURIComponent(link)}`)}
                     className="text-sm px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 cursor-pointer"
                   >
                     {link}
@@ -260,7 +266,7 @@ export default function NotePage() {
             </div>
           )}
 
-          {/* Backlinks */}
+          {/* Backlinks - these are now titles, not slugs */}
           {document.backlinks.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">
@@ -270,7 +276,7 @@ export default function NotePage() {
                 {document.backlinks.map((backlink) => (
                   <button
                     key={backlink}
-                    onClick={() => router.push(`/note/${backlink}`)}
+                    onClick={() => router.push(`/note/${encodeURIComponent(backlink)}`)}
                     className="text-sm px-3 py-1 bg-secondary/10 text-secondary rounded-full hover:bg-secondary/20 cursor-pointer"
                   >
                     {backlink}

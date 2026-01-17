@@ -1,22 +1,31 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { parseFrontmatter, extractTitle, getSlugFromFilePath } from './document-parser';
+import { parseFrontmatter, extractTitle, getTitleFromFilename, titlesMatch } from './document-parser';
 import { getNotesDir } from './notes-path';
 import { isPublishedMode } from './env';
 
 const NOTES_DIR = getNotesDir();
 
 interface DocumentInfo {
-  slug: string;
-  title: string;
+  title: string;      // The document title (from frontmatter or filename)
+  filename: string;   // The actual filename (e.g., "회의록 (2024).md")
 }
 
 /**
  * In-memory document cache for fast title lookups
+ * Now uses title as the primary key instead of slug
  */
 class DocumentCache {
+  // Map key: normalized title (lowercase, NFC), value: DocumentInfo
   private documents: Map<string, DocumentInfo> = new Map();
   private isInitialized: boolean = false;
+
+  /**
+   * Normalize title for use as map key (lowercase, NFC)
+   */
+  private normalizeKey(title: string): string {
+    return title.normalize('NFC').toLowerCase();
+  }
 
   /**
    * Initialize the cache by scanning all documents
@@ -44,11 +53,18 @@ class DocumentCache {
         markdownFiles.map(async (file) => {
           const filePath = path.join(NOTES_DIR, file);
           const content = await fs.readFile(filePath, 'utf-8');
-          const slug = getSlugFromFilePath(file);
           const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
           const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+          const normalizedFilename = getTitleFromFilename(file);
 
-          this.documents.set(slug, { slug, title });
+          // Use extracted title as key, fallback to filename if no title
+          const effectiveTitle = title || normalizedFilename;
+          const key = this.normalizeKey(effectiveTitle);
+
+          this.documents.set(key, {
+            title: effectiveTitle,
+            filename: file,
+          });
         })
       );
 
@@ -66,22 +82,61 @@ class DocumentCache {
   /**
    * Add a document to the cache
    */
-  addDocument(slug: string, title: string): void {
-    this.documents.set(slug, { slug, title });
+  addDocument(title: string, filename: string): void {
+    const key = this.normalizeKey(title);
+    this.documents.set(key, { title, filename });
   }
 
   /**
-   * Remove a document from the cache
+   * Remove a document from the cache by title
    */
-  removeDocument(slug: string): void {
-    this.documents.delete(slug);
+  removeDocument(title: string): void {
+    const key = this.normalizeKey(title);
+    this.documents.delete(key);
   }
 
   /**
-   * Update a document in the cache
+   * Update a document in the cache (handles title changes)
    */
-  updateDocument(slug: string, title: string): void {
-    this.documents.set(slug, { slug, title });
+  updateDocument(oldTitle: string, newTitle: string, newFilename: string): void {
+    const oldKey = this.normalizeKey(oldTitle);
+    const newKey = this.normalizeKey(newTitle);
+
+    // Remove old entry if title changed
+    if (oldKey !== newKey) {
+      this.documents.delete(oldKey);
+    }
+
+    this.documents.set(newKey, { title: newTitle, filename: newFilename });
+  }
+
+  /**
+   * Check if a title exists (case-insensitive)
+   */
+  hasTitle(title: string): boolean {
+    const key = this.normalizeKey(title);
+    return this.documents.has(key);
+  }
+
+  /**
+   * Get document info by title
+   */
+  getByTitle(title: string): DocumentInfo | undefined {
+    const key = this.normalizeKey(title);
+    return this.documents.get(key);
+  }
+
+  /**
+   * Find document by filename
+   */
+  getByFilename(filename: string): DocumentInfo | undefined {
+    const normalizedFilename = filename.normalize('NFC');
+    for (const doc of this.documents.values()) {
+      if (doc.filename.normalize('NFC') === normalizedFilename) {
+        return doc;
+      }
+    }
+    return undefined;
   }
 
   /**
@@ -94,7 +149,7 @@ class DocumentCache {
   }
 
   /**
-   * Get all documents as array
+   * Get all documents as array with title and filename
    */
   getDocuments(): DocumentInfo[] {
     return Array.from(this.documents.values()).sort((a, b) =>

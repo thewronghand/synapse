@@ -426,9 +426,10 @@ export default function ForceGraphView({
         if (onNodeClick) {
           onNodeClick(node);
         } else {
-          // Remove leading slash for routing
-          const slug = node.url.replace(/^\//, "");
-          router.push(`/note/${slug}`);
+          // URL은 이미 /encodedTitle 형식이므로 그대로 사용
+          // node.url에는 이미 인코딩된 제목이 들어있음
+          const encodedTitle = node.url.replace(/^\//, "");
+          router.push(`/note/${encodedTitle}`);
         }
       })
       .onNodeHover((node: DigitalGardenNode | null) => {

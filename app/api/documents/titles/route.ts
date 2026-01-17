@@ -3,7 +3,7 @@ import { documentCache } from '@/lib/document-cache';
 
 /**
  * GET /api/documents/titles
- * Get all document titles from cache
+ * Get all document titles from cache (제목 기반)
  */
 export async function GET() {
   try {
@@ -14,13 +14,11 @@ export async function GET() {
 
     const documents = documentCache.getDocuments();
     const titles = documents.map((doc) => doc.title);
-    const slugs = documents.map((doc) => doc.slug);
 
     return NextResponse.json({
       success: true,
       data: {
         titles,
-        slugs,
         cached: true,
         count: titles.length,
       },

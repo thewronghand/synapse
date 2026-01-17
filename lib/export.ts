@@ -2,13 +2,13 @@ import fs from 'fs/promises';
 import fss from 'fs';
 import path from 'path';
 import { Document } from '@/types';
-import { parseFrontmatter, extractTitle, extractWikiLinks, calculateBacklinks, getSlugFromFilePath } from './document-parser';
+import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename, titlesMatch } from './document-parser';
 import { getNotesDir } from './notes-path';
 
 const NOTES_DIR = getNotesDir();
 
 /**
- * Get all documents
+ * Get all documents (제목 기반)
  */
 async function getAllDocuments(): Promise<Document[]> {
   const files = await fs.readdir(NOTES_DIR);
@@ -20,13 +20,13 @@ async function getAllDocuments(): Promise<Document[]> {
       const content = await fs.readFile(filePath, 'utf-8');
       const stats = await fs.stat(filePath);
 
-      const slug = getSlugFromFilePath(file);
       const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-      const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+      const filenameTitle = getTitleFromFilename(file);
+      const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
       const links = extractWikiLinks(content);
 
       return {
-        slug,
+        slug: title, // 제목을 slug로 사용 (하위 호환성)
         filePath: `notes/${file}`,
         title,
         content,
@@ -40,20 +40,49 @@ async function getAllDocuments(): Promise<Document[]> {
     })
   );
 
-  // Calculate backlinks
-  const backlinksMap = calculateBacklinks(documentsWithoutBacklinks);
+  // Calculate backlinks (제목 기반)
+  const backlinksMap = calculateBacklinksByTitle(documentsWithoutBacklinks);
 
   // Add backlinks to documents
   const documents = documentsWithoutBacklinks.map((doc) => ({
     ...doc,
-    backlinks: backlinksMap.get(doc.slug) || [],
+    backlinks: backlinksMap.get(doc.title) || [],
   }));
 
   return documents;
 }
 
 /**
- * Build graph from documents (Digital Garden format)
+ * Calculate backlinks by title (제목 기반)
+ */
+function calculateBacklinksByTitle(documents: Document[]): Map<string, string[]> {
+  const backlinksMap = new Map<string, string[]>();
+
+  // Initialize backlinks for all documents
+  documents.forEach(doc => {
+    backlinksMap.set(doc.title, []);
+  });
+
+  // For each document, check its links
+  documents.forEach(sourceDoc => {
+    sourceDoc.links.forEach(linkTitle => {
+      // Find the target document by title (case-insensitive)
+      const targetDoc = documents.find(d => titlesMatch(d.title, linkTitle));
+      if (targetDoc) {
+        const existingBacklinks = backlinksMap.get(targetDoc.title) || [];
+        if (!existingBacklinks.some(bl => titlesMatch(bl, sourceDoc.title))) {
+          existingBacklinks.push(sourceDoc.title);
+          backlinksMap.set(targetDoc.title, existingBacklinks);
+        }
+      }
+    });
+  });
+
+  return backlinksMap;
+}
+
+/**
+ * Build graph from documents (Digital Garden format) - 제목 기반
  */
 function buildGraph(documents: Document[]) {
   const nodesObject: { [url: string]: any } = {};
@@ -62,13 +91,14 @@ function buildGraph(documents: Document[]) {
 
   documents.forEach((doc) => {
     const allLinks = [...new Set([...doc.links, ...doc.backlinks])]; // Bidirectional neighbors
+    const encodedTitle = encodeURIComponent(doc.title);
 
-    nodesObject[`/${doc.slug}`] = {
+    nodesObject[`/${encodedTitle}`] = {
       id: nodeId++,
       title: doc.title,
-      url: `/${doc.slug}`,
-      neighbors: allLinks.map(slug => `/${slug}`),
-      backLinks: doc.backlinks.map(slug => `/${slug}`),
+      url: `/${encodedTitle}`,
+      neighbors: allLinks.map(title => `/${encodeURIComponent(title)}`),
+      backLinks: doc.backlinks.map(title => `/${encodeURIComponent(title)}`),
       size: Math.min(7, Math.max(2, allLinks.length / 2)),
       color: getNodeColor(doc.frontmatter.tags || [], doc.backlinks.length),
       hide: false,
@@ -78,9 +108,15 @@ function buildGraph(documents: Document[]) {
 
   // Build edges using node IDs
   documents.forEach((doc) => {
-    doc.links.forEach((targetSlug) => {
-      const sourceNode = nodesObject[`/${doc.slug}`];
-      const targetNode = nodesObject[`/${targetSlug}`];
+    const encodedSourceTitle = encodeURIComponent(doc.title);
+    doc.links.forEach((targetTitle) => {
+      // Find target document by title (case-insensitive)
+      const targetDoc = documents.find(d => titlesMatch(d.title, targetTitle));
+      if (!targetDoc) return;
+
+      const encodedTargetTitle = encodeURIComponent(targetDoc.title);
+      const sourceNode = nodesObject[`/${encodedSourceTitle}`];
+      const targetNode = nodesObject[`/${encodedTargetTitle}`];
 
       if (sourceNode && targetNode) {
         links.push({
@@ -142,15 +178,17 @@ export async function exportToJSON() {
   );
   console.log(`[Export] Exported ${documents.length} documents`);
 
-  // 2. Export individual documents
+  // 2. Export individual documents (제목을 인코딩하여 파일명으로 사용)
   const docsDir = path.join(exportDir, 'docs');
   if (!fss.existsSync(docsDir)) {
     fss.mkdirSync(docsDir, { recursive: true });
   }
 
   for (const doc of documents) {
+    // 제목을 URL 인코딩하여 파일명으로 사용
+    const encodedTitle = encodeURIComponent(doc.title);
     await fs.writeFile(
-      path.join(docsDir, `${doc.slug}.json`),
+      path.join(docsDir, `${encodedTitle}.json`),
       JSON.stringify(doc, null, 2)
     );
   }

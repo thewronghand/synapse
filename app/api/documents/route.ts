@@ -6,10 +6,9 @@ import {
   extractTitle,
   extractWikiLinks,
   calculateBacklinks,
-  getSlugFromFilePath,
-  buildSlugToFilenameMap,
-  normalizeSlug,
-  createUniqueSlug,
+  getTitleFromFilename,
+  sanitizeFilename,
+  titlesMatch,
 } from '@/lib/document-parser';
 import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
@@ -51,26 +50,54 @@ export async function GET() {
 /**
  * POST /api/documents
  * Create a new document
- * Body: { slug: string, content: string }
+ * Body: { title: string, content: string }
  */
 export async function POST(request: NextRequest) {
   try {
-    const { slug, content } = await request.json();
+    const body = await request.json();
+    // Support both 'slug' (legacy) and 'title' (new) parameter names
+    const title = body.title || body.slug;
+    const content = body.content;
 
-    if (!slug || !content) {
+    if (!title || !content) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Missing slug or content',
+          error: 'Missing title or content',
         },
         { status: 400 }
       );
     }
 
-    // Create a unique slug with short ID to avoid collisions
-    // slug is actually the title from the client
-    const uniqueSlug = createUniqueSlug(slug);
-    const filePath = path.join(NOTES_DIR, `${uniqueSlug}.md`);
+    // Check for duplicate title
+    if (documentCache.hasTitle(title)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: '동일한 제목의 문서가 이미 존재합니다',
+        },
+        { status: 409 }
+      );
+    }
+
+    // Create filename from title (sanitize for filesystem)
+    const safeFilename = sanitizeFilename(title);
+    const filename = `${safeFilename}.md`;
+    const filePath = path.join(NOTES_DIR, filename);
+
+    // Check if file already exists (edge case: different title but same sanitized filename)
+    try {
+      await fs.access(filePath);
+      return NextResponse.json(
+        {
+          success: false,
+          error: '동일한 파일명의 문서가 이미 존재합니다',
+        },
+        { status: 409 }
+      );
+    } catch {
+      // File doesn't exist, continue
+    }
 
     // Move temp images to permanent location and update content
     const updatedContent = await moveImagesFromTemp(content);
@@ -79,23 +106,25 @@ export async function POST(request: NextRequest) {
     await fs.writeFile(filePath, updatedContent, 'utf-8');
 
     // Update tag cache with new tags
-    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(updatedContent);
     if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
       tagCache.addTags(frontmatter.tags);
       console.log(`[TagCache] Added tags from new document: ${frontmatter.tags.join(', ')}`);
     }
 
-    // Update document cache with new document
-    const title = extractTitle(contentWithoutFrontmatter, frontmatter);
-    documentCache.addDocument(uniqueSlug, title);
-    console.log(`[DocumentCache] Added document: ${uniqueSlug} - ${title}`);
+    // Get extracted title (from frontmatter or content)
+    const extractedTitle = extractTitle(contentWithoutFrontmatter, frontmatter);
+
+    // Update document cache
+    documentCache.addDocument(extractedTitle, filename);
+    console.log(`[DocumentCache] Added document: ${extractedTitle} (${filename})`);
 
     // Update graph cache
-    await graphCache.addDocument(uniqueSlug, updatedContent);
-    console.log(`[GraphCache] Added document: ${uniqueSlug}`);
+    await graphCache.addDocument(extractedTitle, filename, updatedContent);
+    console.log(`[GraphCache] Added document: ${extractedTitle}`);
 
     // Get the created document
-    const document = await getDocumentBySlug(uniqueSlug);
+    const document = await getDocumentByTitle(extractedTitle);
 
     return NextResponse.json({
       success: true,
@@ -134,15 +163,16 @@ async function getAllDocuments(): Promise<Document[]> {
       const content = await fs.readFile(filePath, 'utf-8');
       const stats = await fs.stat(filePath);
 
-      const slug = getSlugFromFilePath(file);
+      const filenameTitle = getTitleFromFilename(file);
       const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-      const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+      const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
       const links = extractWikiLinks(content);
 
       return {
-        slug,
-        filePath: `notes/${file}`,
+        slug: title, // Use title as slug for backward compatibility
         title,
+        filePath: `notes/${file}`,
+        filename: file,
         content,
         contentWithoutFrontmatter,
         frontmatter,
@@ -154,58 +184,74 @@ async function getAllDocuments(): Promise<Document[]> {
     })
   );
 
-  // Calculate backlinks
-  const backlinksMap = calculateBacklinks(documentsWithoutBacklinks);
+  // Calculate backlinks using title-based system
+  const backlinksMap = calculateBacklinks(
+    documentsWithoutBacklinks.map(doc => ({ title: doc.title, links: doc.links }))
+  );
 
   // Add backlinks to documents
   const documents = documentsWithoutBacklinks.map((doc) => ({
     ...doc,
-    backlinks: backlinksMap.get(doc.slug) || [],
+    backlinks: backlinksMap.get(doc.title.normalize('NFC').toLowerCase()) || [],
   }));
 
   return documents;
 }
 
 /**
- * Helper: Get single document by slug
+ * Helper: Get single document by title
  */
-async function getDocumentBySlug(slug: string): Promise<Document> {
+async function getDocumentByTitle(requestedTitle: string): Promise<Document> {
   // In published mode, read from JSON file
   if (isPublishedMode()) {
-    const jsonPath = path.join(process.cwd(), 'public', 'data', 'docs', `${slug}.json`);
+    const jsonPath = path.join(process.cwd(), 'public', 'data', 'docs', `${encodeURIComponent(requestedTitle)}.json`);
     const jsonData = await fs.readFile(jsonPath, 'utf-8');
     return JSON.parse(jsonData);
   }
 
-  // In normal mode, find the file by normalized slug
+  // In normal mode, find the file by title
   const files = await fs.readdir(NOTES_DIR);
   const markdownFiles = files.filter((file) => file.endsWith('.md'));
-  const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
 
-  const normalizedSlug = normalizeSlug(slug);
-  const filename = slugToFilenameMap.get(normalizedSlug);
+  // Find matching file
+  let matchingFile: string | undefined;
+  for (const file of markdownFiles) {
+    const filePath = path.join(NOTES_DIR, file);
+    const content = await fs.readFile(filePath, 'utf-8');
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    const filenameTitle = getTitleFromFilename(file);
+    const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
 
-  if (!filename) {
-    throw new Error(`Document not found: ${slug}`);
+    if (titlesMatch(title, requestedTitle)) {
+      matchingFile = file;
+      break;
+    }
   }
 
-  const filePath = path.join(NOTES_DIR, filename);
+  if (!matchingFile) {
+    throw new Error(`Document not found: ${requestedTitle}`);
+  }
+
+  const filePath = path.join(NOTES_DIR, matchingFile);
   const content = await fs.readFile(filePath, 'utf-8');
   const stats = await fs.stat(filePath);
 
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-  const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+  const filenameTitle = getTitleFromFilename(matchingFile);
+  const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
   const links = extractWikiLinks(content);
 
   // Get all documents to calculate backlinks
   const allDocuments = await getAllDocuments();
-  const backlinks =
-    allDocuments.find((d) => d.slug === normalizedSlug)?.backlinks || [];
+  const normalizedTitle = title.normalize('NFC').toLowerCase();
+  const backlinks = allDocuments.find(d =>
+    d.title.normalize('NFC').toLowerCase() === normalizedTitle
+  )?.backlinks || [];
 
   return {
-    slug: normalizedSlug,
-    filePath: `notes/${filename}`,
+    slug: title, // Use title as slug for backward compatibility
     title,
+    filePath: `notes/${matchingFile}`,
     content,
     contentWithoutFrontmatter,
     frontmatter,
