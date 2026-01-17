@@ -49,9 +49,18 @@ export async function POST() {
     const exportResult = await exportResponse.json();
     console.log('[Publish] Export completed:', exportResult.data);
 
-    // Step 3: Get Vercel user info for unique naming
-    const vercelUser = await vercelClient.getCurrentUser() as { user: { username: string } };
-    const projectName = `synapse-published-${vercelUser.user.username}`;
+    // Step 3: Get user ID for unique naming
+    const userId = vercelClient.getUserId();
+    if (!userId) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'User ID not found. Please reconnect your Vercel account.',
+        },
+        { status: 400 }
+      );
+    }
+    const projectName = `synapse-published-${userId.substring(0, 8)}`;
 
     // Step 4: Read all project files
     console.log('[Publish] Reading project files...');
