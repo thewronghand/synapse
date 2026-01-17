@@ -722,22 +722,22 @@ function SettingsContent() {
                 {/* Details */}
                 {showMigrationDetails && migrationPreview.details.length > 0 && (
                   <div className="border rounded-md bg-background max-h-64 overflow-y-auto">
-                    <table className="w-full text-sm">
+                    <table className="w-full text-sm table-fixed">
                       <thead className="bg-muted sticky top-0">
                         <tr>
-                          <th className="text-left p-2 font-medium">현재 파일명</th>
-                          <th className="text-left p-2 font-medium">→</th>
-                          <th className="text-left p-2 font-medium">새 파일명</th>
-                          <th className="text-left p-2 font-medium">상태</th>
+                          <th className="text-left p-2 font-medium w-[40%]">현재 파일명</th>
+                          <th className="text-left p-2 font-medium w-6">→</th>
+                          <th className="text-left p-2 font-medium w-[40%]">새 파일명</th>
+                          <th className="text-left p-2 font-medium w-16 shrink-0">상태</th>
                         </tr>
                       </thead>
                       <tbody>
                         {migrationPreview.details.map((item, idx) => (
                           <tr key={idx} className={`border-t ${item.status === 'skipped' ? 'text-muted-foreground' : ''}`}>
-                            <td className="p-2 font-mono text-xs break-all">{item.oldFilename}</td>
+                            <td className="p-2 font-mono text-xs truncate" title={item.oldFilename}>{item.oldFilename}</td>
                             <td className="p-2">→</td>
-                            <td className="p-2 font-mono text-xs break-all">{item.newFilename}</td>
-                            <td className="p-2">
+                            <td className="p-2 font-mono text-xs truncate" title={item.newFilename}>{item.newFilename}</td>
+                            <td className="p-2 whitespace-nowrap">
                               <span className={`px-2 py-0.5 rounded text-xs ${
                                 item.status === 'renamed'
                                   ? 'bg-primary/10 text-primary'

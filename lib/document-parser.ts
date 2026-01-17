@@ -20,9 +20,9 @@ export function parseFrontmatter(content: string): {
  * Extract title from frontmatter or first # heading
  */
 export function extractTitle(content: string, frontmatter: Frontmatter): string {
-  // 1. frontmatter에 title이 있으면 사용
-  if (frontmatter.title) {
-    return frontmatter.title;
+  // 1. frontmatter에 title이 있으면 사용 (숫자일 경우 문자열로 변환)
+  if (frontmatter.title != null) {
+    return String(frontmatter.title);
   }
 
   // 2. 첫 번째 # 헤딩 찾기
