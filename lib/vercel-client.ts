@@ -66,10 +66,12 @@ export interface VercelDeploymentEvent {
 export class VercelClient {
   private accessToken: string;
   private teamId?: string;
+  private userId?: string;
 
-  constructor(accessToken: string, teamId?: string) {
+  constructor(accessToken: string, teamId?: string, userId?: string) {
     this.accessToken = accessToken;
     this.teamId = teamId;
+    this.userId = userId;
   }
 
   /**
@@ -81,7 +83,14 @@ export class VercelClient {
       return null;
     }
 
-    return new VercelClient(tokenInfo.accessToken, tokenInfo.teamId);
+    return new VercelClient(tokenInfo.accessToken, tokenInfo.teamId, tokenInfo.userId);
+  }
+
+  /**
+   * Get stored user ID
+   */
+  getUserId(): string | undefined {
+    return this.userId;
   }
 
   /**
