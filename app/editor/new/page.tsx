@@ -233,9 +233,9 @@ ${bodyContent}`;
       </header>
 
       {/* Editor + Preview */}
-      <div className="flex-1 flex gap-4 p-4 min-h-0 overflow-hidden">
+      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 min-h-0 overflow-hidden">
         {/* Editor */}
-        <div className="w-1/2 flex flex-col min-h-0">
+        <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
           <h2 className="text-lg font-semibold mb-2 shrink-0">Editor</h2>
           <div className="flex-1 border rounded-lg min-h-0 overflow-hidden">
             <MarkdownEditor
@@ -261,7 +261,7 @@ ${bodyContent}`;
         </div>
 
         {/* Preview */}
-        <div className="w-1/2 flex flex-col min-h-0">
+        <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
           <h2 className="text-lg font-semibold mb-2 shrink-0">Preview</h2>
           <div className="flex-1 border rounded-lg relative min-h-0">
             <div className="absolute inset-0 overflow-y-auto">
