@@ -4,6 +4,9 @@ import { useState, useEffect, useRef } from "react";
 import { cn } from "@/lib/utils";
 import { Plus, X, Check, Pencil } from "lucide-react";
 import { isPublishedMode } from "@/lib/env";
+import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-provider";
 
 interface FolderInfo {
   name: string;
@@ -36,6 +39,7 @@ export function FolderTabs({
   const newFolderInputRef = useRef<HTMLInputElement>(null);
   const editInputRef = useRef<HTMLInputElement>(null);
 
+  const confirm = useConfirm();
   const published = isPublishedMode();
 
   async function fetchFolders() {
@@ -104,12 +108,13 @@ export function FolderTabs({
       if (data.success) {
         await fetchFolders();
         onFolderChange(name);
+        toast.success("폴더가 생성되었습니다");
       } else {
-        alert(data.error || "폴더 생성 실패");
+        toast.error(data.error || "폴더 생성 실패");
       }
     } catch (error) {
       console.error("Failed to create folder:", error);
-      alert("폴더 생성 중 오류가 발생했습니다.");
+      toast.error("폴더 생성 중 오류가 발생했습니다");
     } finally {
       setIsCreating(false);
       setNewFolderName("");
@@ -142,12 +147,13 @@ export function FolderTabs({
         if (selectedFolder === oldName) {
           onFolderChange(newName);
         }
+        toast.success("폴더 이름이 변경되었습니다");
       } else {
-        alert(data.error || "폴더 이름 변경 실패");
+        toast.error(data.error || "폴더 이름 변경 실패");
       }
     } catch (error) {
       console.error("Failed to rename folder:", error);
-      alert("폴더 이름 변경 중 오류가 발생했습니다.");
+      toast.error("폴더 이름 변경 중 오류가 발생했습니다");
     } finally {
       setEditingFolder(null);
       setEditingName("");
@@ -159,13 +165,27 @@ export function FolderTabs({
     const folder = folders.find(f => f.name === name);
     const noteCount = folder?.noteCount || 0;
 
-    const message = noteCount > 0
-      ? `"${name}" 폴더와 그 안의 ${noteCount}개 노트를 모두 삭제합니다.\n\n이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?`
-      : `"${name}" 폴더를 삭제합니다.\n\n계속하시겠습니까?`;
+    const confirmed = await confirm({
+      title: "폴더 삭제",
+      description: noteCount > 0 ? (
+        <>
+          <strong>&quot;{name}&quot;</strong> 폴더와 그 안의{" "}
+          <strong>{noteCount}개 노트</strong>를 모두 삭제합니다.
+          <br /><br />
+          이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?
+        </>
+      ) : (
+        <>
+          <strong>&quot;{name}&quot;</strong> 폴더를 삭제합니다.
+          <br /><br />
+          계속하시겠습니까?
+        </>
+      ),
+      confirmLabel: "삭제",
+      variant: "destructive",
+    });
 
-    if (!confirm(message)) {
-      return;
-    }
+    if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/folders/${encodeURIComponent(name)}`, {
@@ -179,12 +199,13 @@ export function FolderTabs({
           onFolderChange(null);
         }
         await fetchFolders();
+        toast.success("폴더가 삭제되었습니다");
       } else {
-        alert(data.error || "폴더 삭제 실패");
+        toast.error(data.error || "폴더 삭제 실패");
       }
     } catch (error) {
       console.error("Failed to delete folder:", error);
-      alert("폴더 삭제 중 오류가 발생했습니다.");
+      toast.error("폴더 삭제 중 오류가 발생했습니다");
     }
   }
 
@@ -202,9 +223,10 @@ export function FolderTabs({
 
   if (loading) {
     return (
-      <div className={cn("flex gap-1 border-b", className)}>
-        <div className="px-4 py-2 text-sm text-muted-foreground">
-          Loading...
+      <div className={cn("flex gap-1 border-b items-center", className)}>
+        <div className="px-4 py-2 flex items-center gap-2 text-sm text-muted-foreground">
+          <Spinner size="sm" />
+          <span>폴더 로딩 중...</span>
         </div>
       </div>
     );
@@ -338,6 +360,7 @@ export function FolderTabs({
           )}
         </>
       )}
+
     </div>
   );
 }

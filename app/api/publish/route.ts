@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { VercelClient } from '@/lib/vercel-client';
 import { deleteVercelToken } from '@/lib/vercel-token';
 import fs from 'fs/promises';
@@ -14,8 +14,19 @@ import path from 'path';
  * 3. Create deployment with those files
  * 4. Wait for deployment to complete
  */
-export async function POST() {
+export async function POST(request: NextRequest) {
   try {
+    // Parse excludedFolders from request body
+    let excludedFolders: string[] = [];
+    try {
+      const body = await request.json();
+      if (Array.isArray(body.excludedFolders)) {
+        excludedFolders = body.excludedFolders;
+      }
+    } catch {
+      // No body or invalid JSON - use empty array
+    }
+
     // Step 1: Get Vercel client from stored token
     const vercelClient = await VercelClient.fromStoredToken();
 
@@ -29,10 +40,15 @@ export async function POST() {
       );
     }
 
-    // Step 2: Run export first
+    // Step 2: Run export first (pass excludedFolders)
     console.log('[Publish] Running export...');
+    if (excludedFolders.length > 0) {
+      console.log('[Publish] Excluding folders:', excludedFolders.join(', '));
+    }
     const exportResponse = await fetch('http://localhost:3000/api/export', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ excludedFolders }),
     });
 
     if (!exportResponse.ok) {

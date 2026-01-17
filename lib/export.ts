@@ -255,8 +255,9 @@ function getNodeColor(tags: string[], backlinkCount: number): string {
 
 /**
  * Export all documents and graph data to JSON files for static deployment
+ * @param excludedFolders - Array of folder names to exclude from export
  */
-export async function exportToJSON() {
+export async function exportToJSON(excludedFolders: string[] = []) {
   const exportDir = path.join(process.cwd(), 'public', 'data');
 
   if (!fss.existsSync(exportDir)) {
@@ -264,9 +265,16 @@ export async function exportToJSON() {
   }
 
   console.log('[Export] Starting data export...');
+  if (excludedFolders.length > 0) {
+    console.log(`[Export] Excluding folders: ${excludedFolders.join(', ')}`);
+  }
 
-  // 1. Export all documents
-  const documents = await getAllDocuments();
+  // 1. Export all documents (filter out excluded folders)
+  let documents = await getAllDocuments();
+  if (excludedFolders.length > 0) {
+    documents = documents.filter(doc => !excludedFolders.includes(doc.folder || 'default'));
+    console.log(`[Export] After filtering: ${documents.length} documents`);
+  }
 
   await fs.writeFile(
     path.join(exportDir, 'documents.json'),

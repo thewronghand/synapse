@@ -36,13 +36,29 @@ export function extractTitle(content: string, frontmatter: Frontmatter): string 
 }
 
 /**
+ * Remove code blocks from content to prevent parsing links inside them
+ * Handles both fenced code blocks (```) and inline code (`)
+ */
+function removeCodeBlocks(content: string): string {
+  // Remove fenced code blocks (``` ... ```)
+  let result = content.replace(/```[\s\S]*?```/g, '');
+  // Remove inline code (` ... `)
+  result = result.replace(/`[^`]+`/g, '');
+  return result;
+}
+
+/**
  * Extract wiki links from markdown content
  * Supports: [[link]], [[link|display text]], [[link#heading]]
  * Returns original link text with NFC normalization only (no slug conversion)
+ * Note: Links inside code blocks are ignored
  */
 export function extractWikiLinks(content: string): string[] {
+  // Remove code blocks before extracting links
+  const contentWithoutCode = removeCodeBlocks(content);
+
   const wikiLinkRegex = /\[\[([^\]|#]+)(?:[|#][^\]]+)?\]\]/g;
-  const matches = [...content.matchAll(wikiLinkRegex)];
+  const matches = [...contentWithoutCode.matchAll(wikiLinkRegex)];
 
   // Extract unique link names with NFC normalization only
   const links = matches.map(match => match[1].trim().normalize('NFC'));

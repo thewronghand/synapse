@@ -15,6 +15,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useConfirm } from "@/components/ui/confirm-provider";
 
 interface MigrationResult {
   oldFilename: string;
@@ -34,6 +35,7 @@ interface MigrationPreview {
 function SettingsContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const confirm = useConfirm();
   const [isPublishing, setIsPublishing] = useState(false);
   const [vercelConnected, setVercelConnected] = useState(false);
   const [vercelLoading, setVercelLoading] = useState(true);
@@ -76,12 +78,59 @@ function SettingsContent() {
   const [folderMigrationLoading, setFolderMigrationLoading] = useState(false);
   const [isFolderMigrating, setIsFolderMigrating] = useState(false);
 
+  // Error detail dialog state
+  const [errorDetail, setErrorDetail] = useState<{ error: string; stack?: string } | null>(null);
+
+  // Folder exclusion states for publish
+  const [allFolders, setAllFolders] = useState<{ name: string; noteCount: number }[]>([]);
+  const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
+  const [foldersLoading, setFoldersLoading] = useState(true);
+
   // Auto-scroll logs to bottom when new logs arrive
   useEffect(() => {
     if (logsContainerRef.current && showBuildLogs) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
     }
   }, [buildLogs, showBuildLogs]);
+
+  // Fetch folders and load excluded folders from localStorage
+  useEffect(() => {
+    async function fetchFolders() {
+      try {
+        const response = await fetch('/api/folders');
+        const result = await response.json();
+        if (result.success) {
+          setAllFolders(result.data.folders);
+        }
+      } catch (error) {
+        console.error('Error fetching folders:', error);
+      } finally {
+        setFoldersLoading(false);
+      }
+    }
+
+    // Load excluded folders from localStorage
+    const saved = localStorage.getItem('synapse-excluded-folders');
+    if (saved) {
+      try {
+        setExcludedFolders(JSON.parse(saved));
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    fetchFolders();
+  }, []);
+
+  function toggleFolderExclusion(folderName: string) {
+    setExcludedFolders(prev => {
+      const newExcluded = prev.includes(folderName)
+        ? prev.filter(f => f !== folderName)
+        : [...prev, folderName];
+      localStorage.setItem('synapse-excluded-folders', JSON.stringify(newExcluded));
+      return newExcluded;
+    });
+  }
 
   async function handlePreviewFolderMigration() {
     setFolderMigrationLoading(true);
@@ -110,9 +159,19 @@ function SettingsContent() {
       return;
     }
 
-    if (!confirm(`${folderMigrationPreview.count}개의 파일을 default 폴더로 이동합니다.\n\n계속하시겠습니까?`)) {
-      return;
-    }
+    const confirmed = await confirm({
+      title: "폴더 마이그레이션",
+      description: (
+        <>
+          <strong>{folderMigrationPreview.count}개</strong>의 파일을 default 폴더로 이동합니다.
+          <br /><br />
+          계속하시겠습니까?
+        </>
+      ),
+      confirmLabel: "이동",
+    });
+
+    if (!confirmed) return;
 
     setIsFolderMigrating(true);
 
@@ -154,7 +213,7 @@ function SettingsContent() {
         console.error('Migration preview error:', result);
         toast.error(`미리보기 실패: ${result.error}`);
         if (result.stack) {
-          alert(`상세 오류:\n\n${result.error}\n\n스택 트레이스:\n${result.stack}`);
+          setErrorDetail({ error: result.error, stack: result.stack });
         }
       }
     } catch (error) {
@@ -193,7 +252,7 @@ function SettingsContent() {
         console.error('Migration error:', result);
         toast.error(`마이그레이션 실패: ${result.error}`);
         if (result.stack) {
-          alert(`상세 오류:\n\n${result.error}\n\n스택 트레이스:\n${result.stack}`);
+          setErrorDetail({ error: result.error, stack: result.stack });
         }
       }
     } catch (error) {
@@ -373,6 +432,8 @@ function SettingsContent() {
     try {
       const response = await fetch('/api/publish', {
         method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excludedFolders }),
       });
 
       const result = await response.json();
@@ -684,6 +745,48 @@ function SettingsContent() {
               </div>
             )}
 
+            {/* Folder Exclusion */}
+            {vercelConnected && allFolders.length > 0 && (
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="font-semibold mb-2">배포 제외 폴더</h3>
+                <p className="text-sm text-muted-foreground mb-3">
+                  선택한 폴더는 배포에서 제외됩니다.
+                </p>
+                {foldersLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner size="sm" />
+                    <span>폴더 로딩 중...</span>
+                  </div>
+                ) : (
+                  <div className="flex flex-wrap gap-2">
+                    {allFolders.map(folder => {
+                      const isExcluded = excludedFolders.includes(folder.name);
+                      return (
+                        <button
+                          key={folder.name}
+                          onClick={() => toggleFolderExclusion(folder.name)}
+                          className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors cursor-pointer ${
+                            isExcluded
+                              ? 'bg-destructive/10 text-destructive border border-destructive/30'
+                              : 'bg-background border border-border hover:bg-muted-foreground/10'
+                          }`}
+                        >
+                          {folder.name}
+                          <span className="ml-1 text-xs opacity-60">({folder.noteCount})</span>
+                          {isExcluded && <span className="ml-1">✕</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+                {excludedFolders.length > 0 && (
+                  <p className="text-xs text-muted-foreground mt-3">
+                    {excludedFolders.length}개 폴더가 배포에서 제외됩니다
+                  </p>
+                )}
+              </div>
+            )}
+
             {/* Publish Button */}
             <div className="pt-4">
               <Button
@@ -702,7 +805,9 @@ function SettingsContent() {
               <p className="text-sm text-muted-foreground mt-2">
                 {!vercelConnected
                   ? "Vercel 연동 후 publish할 수 있습니다"
-                  : "노트를 Vercel에 직접 배포합니다"}
+                  : excludedFolders.length > 0
+                    ? `${excludedFolders.length}개 폴더 제외하고 배포합니다`
+                    : "모든 폴더를 배포합니다"}
               </p>
             </div>
           </div>
@@ -1019,6 +1124,34 @@ function SettingsContent() {
                 </span>
               ) : "연동하기"}
             </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Error Detail Dialog */}
+      <AlertDialog open={!!errorDetail} onOpenChange={(open) => !open && setErrorDetail(null)}>
+        <AlertDialogContent className="max-w-2xl max-h-[80vh] overflow-auto">
+          <AlertDialogHeader>
+            <AlertDialogTitle>오류 상세</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <div>
+                  <p className="font-semibold mb-1">오류 메시지:</p>
+                  <p className="text-destructive">{errorDetail?.error}</p>
+                </div>
+                {errorDetail?.stack && (
+                  <div>
+                    <p className="font-semibold mb-1">스택 트레이스:</p>
+                    <pre className="text-xs bg-muted p-3 rounded overflow-x-auto whitespace-pre-wrap">
+                      {errorDetail.stack}
+                    </pre>
+                  </div>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setErrorDetail(null)}>닫기</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
