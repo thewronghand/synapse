@@ -143,7 +143,13 @@ function SettingsContent() {
         setMigrationPreview(result.data);
         setShowMigrationDetails(true);
       } else {
+        // Show detailed error info for debugging
+        const errorDetail = result.stack || result.debugInfo || result.error;
+        console.error('Migration preview error:', result);
         toast.error(`미리보기 실패: ${result.error}`);
+        if (result.stack) {
+          alert(`상세 오류:\n\n${result.error}\n\n스택 트레이스:\n${result.stack}`);
+        }
       }
     } catch (error) {
       console.error('Migration preview error:', error);
@@ -178,7 +184,11 @@ function SettingsContent() {
         setMigrationPreview(null);
         setShowMigrationDetails(false);
       } else {
+        console.error('Migration error:', result);
         toast.error(`마이그레이션 실패: ${result.error}`);
+        if (result.stack) {
+          alert(`상세 오류:\n\n${result.error}\n\n스택 트레이스:\n${result.stack}`);
+        }
       }
     } catch (error) {
       console.error('Migration error:', error);

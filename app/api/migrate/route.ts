@@ -40,6 +40,8 @@ export async function GET() {
       {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        debugInfo: String(error),
       },
       { status: 500 }
     );
@@ -107,6 +109,8 @@ export async function POST() {
       {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
+        stack: error instanceof Error ? error.stack : undefined,
+        debugInfo: String(error),
       },
       { status: 500 }
     );
