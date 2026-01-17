@@ -29,7 +29,7 @@ jobs:
       - name: Build Electron app
         run: npm run electron:build
         env:
-          NEXT_PUBLIC_OAUTH_PROXY_URL: https://synapse-oauth-proxy.vercel.app
+          NEXT_PUBLIC_OAUTH_PROXY_URL: https://oauth-proxy-rho.vercel.app
 
       - name: Package macOS DMG
         run: |
