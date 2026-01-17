@@ -814,6 +814,7 @@ export default function MarkdownEditor({
                 activateOnTyping: true,
               }),
               markdownKeymap,
+              EditorView.lineWrapping,
               ...(mounted && resolvedTheme === 'dark' ? [darkTheme] : []),
             ]}
             placeholder={placeholder}

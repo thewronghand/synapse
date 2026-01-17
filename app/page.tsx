@@ -9,6 +9,7 @@ import { FolderTabs } from "@/components/ui/FolderTabs";
 import AppHeader from "@/components/layout/AppHeader";
 import Logo from "@/components/ui/Logo";
 import { isPublishedMode } from "@/lib/env";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 // Filter graph nodes and links by folder
 function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
@@ -127,11 +128,7 @@ function HomeContent() {
   const filteredGraph = graph ? filterGraphByFolder(graph, selectedFolder) : null;
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">그래프 로딩 중...</p>
-      </div>
-    );
+    return <LoadingScreen message="그래프 로딩 중..." />;
   }
 
   if (!graph) {
