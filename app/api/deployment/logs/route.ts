@@ -17,8 +17,17 @@ export async function GET() {
     }
 
     // Get Vercel username for project naming
-    const vercelUser = await vercelClient.getCurrentUser() as { user: { username: string } };
-    const projectName = `synapse-published-${vercelUser.user.username}`;
+    const userId = vercelClient.getUserId();
+    if (!userId) {
+      return NextResponse.json({
+        success: true,
+        data: {
+          hasDeployment: false,
+          logs: [],
+        },
+      });
+    }
+    const projectName = `synapse-published-${userId.substring(0, 8).toLowerCase()}`;
 
     // Get latest deployment
     console.log('[Deployment Logs] Looking for deployment in project:', projectName);

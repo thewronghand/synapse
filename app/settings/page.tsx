@@ -60,6 +60,12 @@ function SettingsContent() {
   const [showDeployComplete, setShowDeployComplete] = useState(false);
   const [deployCompleteUrl, setDeployCompleteUrl] = useState<string | null>(null);
 
+  // Token input dialog states
+  const [showTokenInput, setShowTokenInput] = useState(false);
+  const [tokenInputValue, setTokenInputValue] = useState('');
+  const [tokenSaving, setTokenSaving] = useState(false);
+  const [tokenError, setTokenError] = useState<string | null>(null);
+
   // Build logs state
   const [buildLogs, setBuildLogs] = useState<Array<{ timestamp: number; text: string; type: string }>>([]);
   const [showBuildLogs, setShowBuildLogs] = useState(false);
@@ -279,15 +285,44 @@ function SettingsContent() {
   }
 
   function handleConnectVercel() {
-    // Use OAuth Proxy if configured, otherwise fall back to local OAuth
-    const proxyUrl = process.env.NEXT_PUBLIC_OAUTH_PROXY_URL;
-    const callbackUrl = encodeURIComponent(`${window.location.origin}/oauth/callback`);
+    // Open token input dialog instead of OAuth flow
+    setShowTokenInput(true);
+    setTokenInputValue('');
+    setTokenError(null);
+  }
 
-    if (proxyUrl) {
-      window.location.href = `${proxyUrl}/api/vercel/start?callback_url=${callbackUrl}`;
-    } else {
-      // Fallback for local development with .env.local
-      window.location.href = '/api/auth/vercel/start';
+  async function handleSaveToken() {
+    if (!tokenInputValue.trim()) {
+      setTokenError('토큰을 입력해주세요');
+      return;
+    }
+
+    setTokenSaving(true);
+    setTokenError(null);
+
+    try {
+      const response = await fetch('/api/auth/vercel/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken: tokenInputValue.trim() }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        setShowTokenInput(false);
+        setTokenInputValue('');
+        toast.success('Vercel 연동 완료!');
+        checkVercelConnection();
+        checkDeploymentStatus();
+      } else {
+        setTokenError(result.error || '토큰 저장 실패');
+      }
+    } catch (error) {
+      console.error('Error saving token:', error);
+      setTokenError('토큰 저장 중 오류가 발생했습니다');
+    } finally {
+      setTokenSaving(false);
     }
   }
 
@@ -927,6 +962,63 @@ function SettingsContent() {
                 </a>
               </AlertDialogAction>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Token Input Dialog */}
+      <AlertDialog open={showTokenInput} onOpenChange={setShowTokenInput}>
+        <AlertDialogContent className="max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Vercel 토큰 입력</AlertDialogTitle>
+            <AlertDialogDescription asChild>
+              <div className="space-y-4">
+                <p>
+                  <a
+                    href="https://vercel.com/account/tokens/create"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Vercel 토큰 생성 페이지
+                  </a>
+                  에서 토큰을 생성하고 아래에 붙여넣기 하세요.
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  Scope는 &quot;Full Account&quot;를 선택해야 합니다.
+                </p>
+                <div className="pt-1">
+                  <input
+                    type="password"
+                    value={tokenInputValue}
+                    onChange={(e) => {
+                      setTokenInputValue(e.target.value);
+                      setTokenError(null);
+                    }}
+                    placeholder="토큰을 붙여넣기 하세요"
+                    className="w-full px-3 py-2 border rounded-md bg-background text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
+                    autoFocus
+                  />
+                  {tokenError && (
+                    <p className="text-sm text-destructive mt-2">{tokenError}</p>
+                  )}
+                </div>
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setShowTokenInput(false)}>취소</AlertDialogCancel>
+            <Button
+              onClick={handleSaveToken}
+              disabled={tokenSaving || !tokenInputValue.trim()}
+            >
+              {tokenSaving ? (
+                <span className="flex items-center gap-2">
+                  <Spinner size="sm" />
+                  확인 중...
+                </span>
+              ) : "연동하기"}
+            </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
