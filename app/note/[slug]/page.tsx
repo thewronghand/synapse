@@ -8,6 +8,9 @@ import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { LoadingScreen } from "@/components/ui/spinner";
+import { toast } from "sonner";
+import { useConfirm } from "@/components/ui/confirm-provider";
 
 // Filter graph to only include nodes and links from the same folder
 function filterGraphByFolder(graph: Graph, folder: string): Graph {
@@ -53,6 +56,7 @@ export default function NotePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [graphHeight, setGraphHeight] = useState(320);
+  const confirm = useConfirm();
 
   // Calculate responsive graph height
   useEffect(() => {
@@ -121,9 +125,22 @@ export default function NotePage() {
   }
 
   async function handleDelete() {
-    if (!document || !confirm(`"${document.title}" 문서를 삭제하시겠습니까?`)) {
-      return;
-    }
+    if (!document) return;
+
+    const confirmed = await confirm({
+      title: "문서 삭제",
+      description: (
+        <>
+          <strong>&quot;{document.title}&quot;</strong> 문서를 삭제합니다.
+          <br /><br />
+          이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?
+        </>
+      ),
+      confirmLabel: "삭제",
+      variant: "destructive",
+    });
+
+    if (!confirmed) return;
 
     try {
       const res = await fetch(`/api/documents/${encodeURIComponent(document.title)}`, {
@@ -131,20 +148,19 @@ export default function NotePage() {
       });
 
       if (res.ok) {
+        toast.success("문서가 삭제되었습니다");
         router.push("/documents");
+      } else {
+        toast.error("문서 삭제에 실패했습니다");
       }
     } catch (err) {
       console.error("Failed to delete:", err);
-      alert("문서 삭제에 실패했습니다.");
+      toast.error("문서 삭제에 실패했습니다");
     }
   }
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen message="문서 로딩 중..." />;
   }
 
   if (error || !document) {
@@ -291,15 +307,24 @@ export default function NotePage() {
                 링크 ({document.links.length})
               </h3>
               <div className="flex gap-2 flex-wrap">
-                {document.links.map((link) => (
-                  <button
-                    key={link}
-                    onClick={() => router.push(`/note/${encodeURIComponent(link)}`)}
-                    className="text-sm px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 cursor-pointer"
-                  >
-                    {link}
-                  </button>
-                ))}
+                {document.links.map((link) => {
+                  const linkExists = folderTitles.some(
+                    t => t.normalize('NFC').toLowerCase() === link.normalize('NFC').toLowerCase()
+                  );
+                  return (
+                    <button
+                      key={link}
+                      onClick={() => router.push(`/note/${encodeURIComponent(link)}`)}
+                      className={`text-sm px-3 py-1 rounded-full cursor-pointer ${
+                        linkExists
+                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
+                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                      }`}
+                    >
+                      {link}
+                    </button>
+                  );
+                })}
               </div>
             </div>
           )}
@@ -325,6 +350,7 @@ export default function NotePage() {
           )}
         </div>
       </footer>
+
     </div>
   );
 }

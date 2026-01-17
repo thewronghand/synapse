@@ -56,6 +56,8 @@ interface MarkdownViewerProps {
   content: string;
   onWikiLinkClick?: (pageName: string) => void;
   existingTitles?: string[];
+  /** When true, links are styled but not clickable (for editor preview) */
+  isPreview?: boolean;
 }
 
 
@@ -95,7 +97,8 @@ function parseFrontmatter(content: string): {
 function MarkdownViewer({
   content,
   onWikiLinkClick,
-  existingTitles
+  existingTitles,
+  isPreview = false
 }: MarkdownViewerProps) {
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
 
@@ -183,18 +186,35 @@ function MarkdownViewer({
               const exists = existingTitles === undefined ||
                 existingTitles.some(t => t.normalize('NFC').toLowerCase() === normalizedPageName);
 
-              // 존재하지 않는 링크는 비활성화 (클릭 불가)
-              if (!exists) {
+              // 프리뷰 모드에서는 링크 비활성화 (클릭 불가, 스타일만 표시)
+              // 존재하지 않는 링크는 회색으로 표시
+              if (isPreview) {
                 return (
-                  <span
-                    className="wiki-link wiki-link-missing no-underline cursor-not-allowed opacity-60"
-                    title="이 폴더에 해당 문서가 없습니다"
-                  >
+                  <span className={`wiki-link no-underline ${exists ? 'text-primary' : 'text-muted-foreground'}`}>
                     {children}
                   </span>
                 );
               }
 
+              // 존재하지 않는 링크: 회색으로 표시하지만 클릭은 가능 (새 문서 생성)
+              if (!exists) {
+                return (
+                  <a
+                    {...props}
+                    href={href}
+                    className="wiki-link wiki-link-missing cursor-pointer no-underline text-muted-foreground hover:text-muted-foreground/80"
+                    title="이 폴더에 해당 문서가 없습니다 (클릭하여 생성)"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      onWikiLinkClick?.(pageName);
+                    }}
+                  >
+                    {children}
+                  </a>
+                );
+              }
+
+              // 존재하는 링크: 정상 클릭 가능
               return (
                 <a
                   {...props}
@@ -207,6 +227,14 @@ function MarkdownViewer({
                 >
                   {children}
                 </a>
+              );
+            }
+            // 프리뷰 모드에서는 외부 링크도 비활성화 (스타일만 표시)
+            if (isPreview) {
+              return (
+                <span className="text-primary no-underline">
+                  {children}
+                </span>
               );
             }
             // 페이지 내 앵커 링크 (각주 등) - 히스토리 없이 스크롤

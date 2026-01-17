@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { Folder } from "lucide-react";
 
 // 파일 시스템 금지 문자
@@ -149,11 +150,6 @@ ${bodyContent}`;
     }
   }
 
-  function handleWikiLinkClick(pageName: string) {
-    // Open in new tab to prevent losing current work
-    window.open(`/note/${encodeURIComponent(pageName)}`, '_blank');
-  }
-
   async function handleCancel() {
     // Clean up temp images before leaving
     if (content) {
@@ -271,8 +267,8 @@ ${bodyContent}`;
             <div className="absolute inset-0 overflow-y-auto">
               <MarkdownViewer
                 content={content}
-                onWikiLinkClick={handleWikiLinkClick}
                 existingTitles={existingTitles}
+                isPreview
               />
             </div>
           </div>
@@ -284,11 +280,7 @@ ${bodyContent}`;
 
 export default function NewNotePage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    }>
+    <Suspense fallback={<LoadingScreen message="에디터 로딩 중..." />}>
       <NewNotePageContent />
     </Suspense>
   );

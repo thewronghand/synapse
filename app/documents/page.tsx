@@ -12,6 +12,7 @@ import { FolderTabs } from "@/components/ui/FolderTabs";
 import { X, Search, Folder } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
+import { LoadingScreen } from "@/components/ui/spinner";
 
 function DocumentsContent() {
   const router = useRouter();
@@ -340,11 +341,7 @@ function DocumentsContent() {
   );
 
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen message="문서 로딩 중..." />;
   }
 
   return (
@@ -584,11 +581,7 @@ function DocumentsContent() {
 
 export default function DocumentsPage() {
   return (
-    <Suspense fallback={
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-muted-foreground">Loading...</p>
-      </div>
-    }>
+    <Suspense fallback={<LoadingScreen message="문서 로딩 중..." />}>
       <DocumentsContent />
     </Suspense>
   );
