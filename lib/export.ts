@@ -158,6 +158,10 @@ function buildGraph(documents: Document[]) {
   const titleFolderToDoc = new Map<string, Document>();
   documents.forEach(doc => {
     const folder = doc.folder || 'default';
+    if (typeof doc.title !== 'string') {
+      console.error('[export] doc.title is not a string:', typeof doc.title, doc);
+      return;
+    }
     const key = `${folder}:${doc.title.normalize('NFC').toLowerCase()}`;
     titleFolderToDoc.set(key, doc);
   });
@@ -167,6 +171,10 @@ function buildGraph(documents: Document[]) {
 
     // Only include links/neighbors that exist in the same folder
     const sameFolderLinks = doc.links.filter(linkedTitle => {
+      if (typeof linkedTitle !== 'string') {
+        console.error('[export] linkedTitle is not a string:', typeof linkedTitle, linkedTitle);
+        return false;
+      }
       const linkedKey = `${folder}:${linkedTitle.normalize('NFC').toLowerCase()}`;
       return titleFolderToDoc.has(linkedKey);
     });
@@ -195,6 +203,10 @@ function buildGraph(documents: Document[]) {
     const encodedSourceTitle = encodeURIComponent(doc.title);
 
     doc.links.forEach((targetTitle) => {
+      if (typeof targetTitle !== 'string') {
+        console.error('[export] targetTitle is not a string:', typeof targetTitle, targetTitle);
+        return;
+      }
       // Only create edge if target is in the same folder
       const targetKey = `${folder}:${targetTitle.normalize('NFC').toLowerCase()}`;
       const targetDoc = titleFolderToDoc.get(targetKey);
