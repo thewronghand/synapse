@@ -52,6 +52,9 @@ firebase-debug.log
 *.swo
 *~
 
+# Claude Code
+.claude/
+
 # OS
 .DS_Store
 Thumbs.db
@@ -81,3 +84,6 @@ Thumbs.db
 # OAuth tokens
 .vercel-token.json
 .github-token.json
+
+# Build version temp file
+.original-version

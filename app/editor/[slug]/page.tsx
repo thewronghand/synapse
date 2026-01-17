@@ -9,16 +9,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Badge } from "@/components/ui/badge";
+import { Folder } from "lucide-react";
+
+// 파일 시스템 금지 문자
+const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
+const FORBIDDEN_CHARS_MESSAGE = '제목에 다음 문자는 사용할 수 없습니다: / \\ : * ? " < > |';
 
 export default function EditorPage() {
   const params = useParams();
   const router = useRouter();
+  // URL에서 제목 디코딩
   const slug = params.slug as string;
+  const requestedTitle = decodeURIComponent(slug);
 
   const [document, setDocument] = useState<Document | null>(null);
   const [initialTitle, setInitialTitle] = useState("");
+  const [folder, setFolder] = useState<string>("default");
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [existingTitles, setExistingTitles] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,27 +47,36 @@ export default function EditorPage() {
   const [isPending, startTransition] = useTransition();
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch available tags
+  // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
-    async function fetchTags() {
+    async function fetchTagsAndTitles() {
       try {
-        const res = await fetch("/api/tags");
-        const data = await res.json();
-        if (data.success) {
-          setAvailableTags(data.data.tags);
+        const folderParam = folder ? `?folder=${encodeURIComponent(folder)}` : "";
+        const [tagsRes, titlesRes] = await Promise.all([
+          fetch(`/api/tags${folderParam}`),
+          fetch(`/api/documents/titles${folderParam}`),
+        ]);
+        const tagsData = await tagsRes.json();
+        const titlesData = await titlesRes.json();
+
+        if (tagsData.success) {
+          setAvailableTags(tagsData.data.tags);
+        }
+        if (titlesData.success) {
+          setExistingTitles(titlesData.data.titles || []);
         }
       } catch (err) {
-        console.error("Failed to fetch tags:", err);
+        console.error("Failed to fetch tags/titles:", err);
       }
     }
-    fetchTags();
-  }, []);
+    fetchTagsAndTitles();
+  }, [folder]);
 
-  // Fetch document
+  // Fetch document using encoded title
   useEffect(() => {
     async function fetchDocument() {
       try {
-        const res = await fetch(`/api/documents/${slug}`);
+        const res = await fetch(`/api/documents/${encodeURIComponent(requestedTitle)}`);
         const data = await res.json();
 
         if (data.success) {
@@ -65,7 +84,9 @@ export default function EditorPage() {
           setDocument(doc);
           const docTitle = doc.frontmatter.title || doc.title;
           const docTags = doc.frontmatter.tags || [];
+          const docFolder = doc.folder || "default";
           setTags(docTags);
+          setFolder(docFolder);
           setInitialTitle(docTitle);
           titleRef.current = docTitle;
           tagsRef.current = docTags;
@@ -83,7 +104,7 @@ export default function EditorPage() {
     }
 
     fetchDocument();
-  }, [slug]);
+  }, [requestedTitle]);
 
   // 전체 content 생성 헬퍼 함수
   const buildFullContent = useCallback((editorContent: string, currentTitle: string, currentTags: string[]) => {
@@ -135,7 +156,14 @@ ${editorContent}`;
 
   // 제목 onChange - ref만 업데이트 (비제어 컴포넌트, state 업데이트 없음)
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    titleRef.current = e.target.value;
+    const newValue = e.target.value;
+    // 금지 문자 검증
+    if (FORBIDDEN_CHARS.test(newValue)) {
+      setError(FORBIDDEN_CHARS_MESSAGE);
+      return;
+    }
+    setError(null);
+    titleRef.current = newValue;
     schedulePreviewUpdate();
     triggerAutoSave();
   }, [schedulePreviewUpdate, triggerAutoSave]);
@@ -152,9 +180,12 @@ ${editorContent}`;
     const content = buildFullContent(editorContentRef.current, titleRef.current, tagsRef.current);
     if (!content || content === document?.content) return;
 
+    // 현재 문서의 제목 (저장 전)
+    const currentDocTitle = document?.title || requestedTitle;
+
     setIsSaving(true);
     try {
-      const res = await fetch(`/api/documents/${slug}`, {
+      const res = await fetch(`/api/documents/${encodeURIComponent(currentDocTitle)}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ content }),
@@ -163,8 +194,24 @@ ${editorContent}`;
       const data = await res.json();
 
       if (data.success) {
-        setDocument(data.data.document);
+        const updatedDoc = data.data.document;
+        setDocument(updatedDoc);
         setLastSaved(new Date());
+
+        // 제목이 변경되었으면 URL을 업데이트
+        if (updatedDoc.title !== currentDocTitle) {
+          // URL만 변경 (페이지 새로고침 없이)
+          window.history.replaceState(
+            null,
+            '',
+            `/editor/${encodeURIComponent(updatedDoc.title)}`
+          );
+          setInitialTitle(updatedDoc.title);
+        }
+      } else if (data.error) {
+        // 에러 표시 (예: 중복 제목)
+        setError(data.error);
+        setTimeout(() => setError(null), 3000);
       }
     } catch (err) {
       console.error("Failed to save:", err);
@@ -176,27 +223,33 @@ ${editorContent}`;
   async function handleDone() {
     // Save before navigating
     const content = buildFullContent(editorContentRef.current, titleRef.current, tagsRef.current);
+    const currentDocTitle = document?.title || requestedTitle;
+    let finalTitle = currentDocTitle;
+
     if (content && content !== document?.content) {
       setIsSaving(true);
       try {
-        await fetch(`/api/documents/${slug}`, {
+        const res = await fetch(`/api/documents/${encodeURIComponent(currentDocTitle)}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ content }),
         });
+        const data = await res.json();
+        if (data.success) {
+          finalTitle = data.data.document.title;
+        }
       } catch (err) {
         console.error("Failed to save:", err);
       } finally {
         setIsSaving(false);
       }
     }
-    // Navigate to document view
-    router.push(`/note/${slug}`);
+    // Navigate to document view (use potentially updated title)
+    router.push(`/note/${encodeURIComponent(finalTitle)}`);
   }
 
   function handleWikiLinkClick(pageName: string) {
-    const normalizedSlug = pageName.toLowerCase().replace(/\s+/g, "-");
-    router.push(`/note/${normalizedSlug}`);
+    router.push(`/note/${encodeURIComponent(pageName)}`);
   }
 
   if (isLoading) {
@@ -225,7 +278,11 @@ ${editorContent}`;
         <div className="container mx-auto">
           <div className="mb-4">
             <div className="flex items-center justify-between">
-              <div className="flex-1 max-w-md">
+              <div className="flex items-center gap-3 flex-1 max-w-lg">
+                <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50 shrink-0">
+                  <Folder className="w-3 h-3 mr-1" />
+                  {folder}
+                </Badge>
                 <Input
                   key={initialTitle} // key로 초기값이 변경되면 리마운트
                   type="text"
@@ -234,6 +291,9 @@ ${editorContent}`;
                   onChange={handleTitleChange}
                   className="text-lg font-bold"
                 />
+                {error && (
+                  <p className="text-sm text-red-600 mt-1">{error}</p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <ThemeToggle />
@@ -277,6 +337,7 @@ ${editorContent}`;
             <MarkdownEditor
               value={editorInitialValue}
               onChange={handleEditorChangeWithSave}
+              folder={folder}
             />
           </div>
         </div>
@@ -292,6 +353,7 @@ ${editorContent}`;
               <MarkdownViewer
                 content={previewContent}
                 onWikiLinkClick={handleWikiLinkClick}
+                existingTitles={existingTitles}
               />
             </div>
           </div>

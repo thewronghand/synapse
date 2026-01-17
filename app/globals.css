@@ -163,6 +163,15 @@ html {
   color: #6EE7E7;
 }
 
+/* Non-existent wiki links - muted/gray color */
+.prose a.wiki-link.wiki-link-missing {
+  color: #6b7280;
+}
+
+.dark .prose a.wiki-link.wiki-link-missing {
+  color: #9ca3af;
+}
+
 /* Anchor links (footnotes) - primary color */
 .prose a[href^="#"] {
   color: #008080;

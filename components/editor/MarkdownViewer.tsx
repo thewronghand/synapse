@@ -55,7 +55,9 @@ function ImageWithFallback({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLI
 interface MarkdownViewerProps {
   content: string;
   onWikiLinkClick?: (pageName: string) => void;
+  existingTitles?: string[];
 }
+
 
 // Simple frontmatter parser for preview
 function parseFrontmatter(content: string): {
@@ -92,7 +94,8 @@ function parseFrontmatter(content: string): {
 
 function MarkdownViewer({
   content,
-  onWikiLinkClick
+  onWikiLinkClick,
+  existingTitles
 }: MarkdownViewerProps) {
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
 
@@ -158,8 +161,9 @@ function MarkdownViewer({
           [
             remarkWikiLink,
             {
-              pageResolver: (name: string) => [name.replace(/ /g, "-").toLowerCase()],
-              hrefTemplate: (permalink: string) => `/doc/${permalink}`,
+              // 제목을 그대로 사용 (slug 변환 없음)
+              pageResolver: (name: string) => [name],
+              hrefTemplate: (permalink: string) => `/note/${encodeURIComponent(permalink)}`,
               wikiLinkClassName: "wiki-link text-primary hover:text-primary/80 cursor-pointer no-underline",
             },
           ],
@@ -172,13 +176,32 @@ function MarkdownViewer({
           a: ({ node, href, children, title, ...props }) => {
             // Wiki link 처리
             if (props.className?.includes("wiki-link")) {
+              const pageName = children?.toString() || "";
+              // existingTitles가 제공되지 않았으면 (undefined) 존재한다고 가정
+              // 제공되었으면 (빈 배열 포함) 실제로 제목이 있는지 확인 (대소문자 무시)
+              const normalizedPageName = pageName.normalize('NFC').toLowerCase();
+              const exists = existingTitles === undefined ||
+                existingTitles.some(t => t.normalize('NFC').toLowerCase() === normalizedPageName);
+
+              // 존재하지 않는 링크는 비활성화 (클릭 불가)
+              if (!exists) {
+                return (
+                  <span
+                    className="wiki-link wiki-link-missing no-underline cursor-not-allowed opacity-60"
+                    title="이 폴더에 해당 문서가 없습니다"
+                  >
+                    {children}
+                  </span>
+                );
+              }
+
               return (
                 <a
                   {...props}
                   href={href}
+                  className="wiki-link cursor-pointer no-underline"
                   onClick={(e) => {
                     e.preventDefault();
-                    const pageName = children?.toString() || "";
                     onWikiLinkClick?.(pageName);
                   }}
                 >

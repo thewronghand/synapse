@@ -6,17 +6,49 @@ import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
-import { Slider } from "@/components/ui/slider";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+
+// Filter graph to only include nodes and links from the same folder
+function filterGraphByFolder(graph: Graph, folder: string): Graph {
+  // Filter nodes by folder
+  const filteredNodes: { [url: string]: DigitalGardenNode } = {};
+  const validNodeIds = new Set<number>();
+
+  Object.entries(graph.nodes).forEach(([url, node]) => {
+    const nodeWithFolder = node as DigitalGardenNode & { folder?: string };
+    const nodeFolder = nodeWithFolder.folder || "default";
+
+    if (nodeFolder === folder) {
+      filteredNodes[url] = node;
+      validNodeIds.add(node.id);
+    }
+  });
+
+  // Filter links to only include connections between valid nodes
+  const filteredLinks = (graph.links || []).filter(
+    (link) => validNodeIds.has(link.source as number) && validNodeIds.has(link.target as number)
+  );
+
+  // Update neighbors and backLinks to only include same-folder nodes
+  Object.values(filteredNodes).forEach((node) => {
+    node.neighbors = node.neighbors.filter((neighborUrl) => filteredNodes[neighborUrl]);
+    node.backLinks = node.backLinks.filter((backLinkUrl) => filteredNodes[backLinkUrl]);
+  });
+
+  return { nodes: filteredNodes, links: filteredLinks };
+}
 
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
+  // Decode URL-encoded title (slug is now the title)
   const slug = params.slug as string;
+  const title = decodeURIComponent(slug);
 
   const [document, setDocument] = useState<Document | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
+  const [folderTitles, setFolderTitles] = useState<string[]>([]);
   const [depth, setDepth] = useState<number>(2);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -26,7 +58,6 @@ export default function NotePage() {
   useEffect(() => {
     const calculateHeight = () => {
       if (typeof window !== 'undefined') {
-        // Use viewport height minus some offset for better responsiveness
         const vh = window.innerHeight;
         const minHeight = 280;
         const maxHeight = 500;
@@ -44,8 +75,9 @@ export default function NotePage() {
     async function fetchData() {
       try {
         // Fetch document and graph in parallel
+        // Use encodeURIComponent to handle special characters in title
         const [docRes, graphRes] = await Promise.all([
-          fetch(`/api/documents/${slug}`),
+          fetch(`/api/documents/${encodeURIComponent(title)}`),
           fetch(`/api/graph`),
         ]);
 
@@ -53,13 +85,25 @@ export default function NotePage() {
         const graphData = await graphRes.json();
 
         if (docData.success) {
-          setDocument(docData.data.document);
+          const doc = docData.data.document;
+          setDocument(doc);
+
+          // Fetch folder-scoped titles for wiki link validation
+          const folder = doc.folder || "default";
+          const titlesRes = await fetch(`/api/documents/titles?folder=${encodeURIComponent(folder)}`);
+          const titlesData = await titlesRes.json();
+          if (titlesData.success) {
+            setFolderTitles(titlesData.data.titles || []);
+          }
         } else {
           setError("Document not found");
         }
 
         if (graphData.success) {
-          setGraph(graphData.data);
+          // Filter graph to only show same-folder nodes and links
+          const currentFolder = docData.success ? (docData.data.document.folder || "default") : "default";
+          const filteredGraph = filterGraphByFolder(graphData.data, currentFolder);
+          setGraph(filteredGraph);
         }
       } catch (err) {
         setError("Failed to load document");
@@ -69,11 +113,11 @@ export default function NotePage() {
     }
 
     fetchData();
-  }, [slug]);
+  }, [title]);
 
+  // Wiki link click handler - navigate using encoded title
   function handleWikiLinkClick(pageName: string) {
-    const normalizedSlug = pageName.toLowerCase().replace(/\s+/g, "-");
-    router.push(`/note/${normalizedSlug}`);
+    router.push(`/note/${encodeURIComponent(pageName)}`);
   }
 
   async function handleDelete() {
@@ -82,7 +126,7 @@ export default function NotePage() {
     }
 
     try {
-      const res = await fetch(`/api/documents/${slug}`, {
+      const res = await fetch(`/api/documents/${encodeURIComponent(document.title)}`, {
         method: "DELETE",
       });
 
@@ -104,11 +148,24 @@ export default function NotePage() {
   }
 
   if (error || !document) {
+    // Display the decoded title for user-friendly error message
+    const displayTitle = title;
+
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
-          <p className="text-lg text-red-600 mb-4">{error || "문서를 찾을 수 없습니다"}</p>
-          <Button onClick={() => router.push("/")} className="cursor-pointer">홈으로</Button>
+          <h1 className="text-2xl font-bold mb-2">"{displayTitle}"</h1>
+          <p className="text-lg text-muted-foreground mb-6">문서가 존재하지 않습니다</p>
+          <div className="flex gap-3 justify-center">
+            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+              홈으로
+            </Button>
+            {!isPublishedMode() && (
+              <Button onClick={() => router.push(`/editor/new?title=${encodeURIComponent(displayTitle)}`)} className="cursor-pointer">
+                "{displayTitle}" 문서 만들기
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
@@ -144,7 +201,7 @@ export default function NotePage() {
             <ThemeToggle />
             {!isPublishedMode() && (
               <>
-                <Button onClick={() => router.push(`/editor/${slug}`)} className="cursor-pointer">
+                <Button onClick={() => router.push(`/editor/${encodeURIComponent(document.title)}`)} className="cursor-pointer">
                   편집
                 </Button>
                 <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
@@ -165,6 +222,7 @@ export default function NotePage() {
               <MarkdownViewer
                 content={document.contentWithoutFrontmatter}
                 onWikiLinkClick={handleWikiLinkClick}
+                existingTitles={folderTitles}
               />
             </div>
           </div>
@@ -199,10 +257,10 @@ export default function NotePage() {
                   </div>
                 </div>
 
-                {/* Graph */}
+                {/* Graph - use encoded title for URL */}
                 <ForceGraphView
                   graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
-                  currentNodeUrl={`/${slug}`}
+                  currentNodeUrl={`/${encodeURIComponent(document.title)}`}
                   depth={depth}
                   height={graphHeight}
                 />
@@ -226,7 +284,7 @@ export default function NotePage() {
             </div>
           </div>
 
-          {/* Links */}
+          {/* Links - these are now titles, not slugs */}
           {document.links.length > 0 && (
             <div className="mb-4">
               <h3 className="text-sm font-semibold mb-2">
@@ -236,7 +294,7 @@ export default function NotePage() {
                 {document.links.map((link) => (
                   <button
                     key={link}
-                    onClick={() => router.push(`/note/${link}`)}
+                    onClick={() => router.push(`/note/${encodeURIComponent(link)}`)}
                     className="text-sm px-3 py-1 bg-primary/10 text-primary rounded-full hover:bg-primary/20 cursor-pointer"
                   >
                     {link}
@@ -246,7 +304,7 @@ export default function NotePage() {
             </div>
           )}
 
-          {/* Backlinks */}
+          {/* Backlinks - these are now titles, not slugs */}
           {document.backlinks.length > 0 && (
             <div>
               <h3 className="text-sm font-semibold mb-2">
@@ -256,7 +314,7 @@ export default function NotePage() {
                 {document.backlinks.map((backlink) => (
                   <button
                     key={backlink}
-                    onClick={() => router.push(`/note/${backlink}`)}
+                    onClick={() => router.push(`/note/${encodeURIComponent(backlink)}`)}
                     className="text-sm px-3 py-1 bg-secondary/10 text-secondary rounded-full hover:bg-secondary/20 cursor-pointer"
                   >
                     {backlink}

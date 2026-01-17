@@ -1,18 +1,27 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { documentCache } from '@/lib/document-cache';
 
 /**
  * GET /api/documents/titles
- * Get all document titles from cache
+ * Get document titles from cache (제목 기반)
+ * Query params:
+ *   - folder: Filter by folder (optional)
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Initialize cache if not ready
     if (!documentCache.isReady()) {
       await documentCache.initialize();
     }
 
-    const titles = documentCache.getTitles();
+    const searchParams = request.nextUrl.searchParams;
+    const folder = searchParams.get('folder');
+
+    // Get documents filtered by folder if specified
+    const documents = folder
+      ? documentCache.getDocumentsByFolder(folder)
+      : documentCache.getDocuments();
+    const titles = documents.map((doc) => doc.title);
 
     return NextResponse.json({
       success: true,

@@ -1,39 +1,58 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
+import { Badge } from "@/components/ui/badge";
+import { Folder } from "lucide-react";
 
-export default function NewNotePage() {
+// 파일 시스템 금지 문자
+const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
+const FORBIDDEN_CHARS_MESSAGE = '제목에 다음 문자는 사용할 수 없습니다: / \\ : * ? " < > |';
+
+function NewNotePageContent() {
   const router = useRouter();
-  const [title, setTitle] = useState("");
+  const searchParams = useSearchParams();
+  const initialTitle = searchParams.get("title") || "";
+  const folder = searchParams.get("folder") || "default";
+  const [title, setTitle] = useState(initialTitle);
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [existingTitles, setExistingTitles] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available tags on mount
+  // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
-    async function fetchTags() {
+    async function fetchTagsAndTitles() {
       try {
-        const res = await fetch("/api/tags");
-        const data = await res.json();
-        if (data.success) {
-          setAvailableTags(data.data.tags);
+        const folderParam = folder ? `?folder=${encodeURIComponent(folder)}` : "";
+        const [tagsRes, titlesRes] = await Promise.all([
+          fetch(`/api/tags${folderParam}`),
+          fetch(`/api/documents/titles${folderParam}`),
+        ]);
+        const tagsData = await tagsRes.json();
+        const titlesData = await titlesRes.json();
+
+        if (tagsData.success) {
+          setAvailableTags(tagsData.data.tags);
+        }
+        if (titlesData.success) {
+          setExistingTitles(titlesData.data.titles || []);
         }
       } catch (err) {
-        console.error("Failed to fetch tags:", err);
+        console.error("Failed to fetch tags/titles:", err);
       }
     }
-    fetchTags();
-  }, []);
+    fetchTagsAndTitles();
+  }, [folder]);
 
   // Initialize content with frontmatter on first title input
   useEffect(() => {
@@ -103,8 +122,6 @@ ${bodyContent}`;
       return;
     }
 
-    const slug = title.toLowerCase().replace(/\s+/g, "-");
-
     setIsSaving(true);
     setError(null);
 
@@ -112,14 +129,15 @@ ${bodyContent}`;
       const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, content }),
+        body: JSON.stringify({ slug: title, content, folder }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        // Redirect to the newly created document's view page
-        router.push(`/note/${slug}`);
+        // Redirect to the newly created document's view page using the server-generated slug
+        const createdSlug = data.data.document.slug;
+        router.push(`/note/${createdSlug}`);
       } else {
         setError(data.error || "문서 생성에 실패했습니다");
       }
@@ -132,9 +150,8 @@ ${bodyContent}`;
   }
 
   function handleWikiLinkClick(pageName: string) {
-    const normalizedSlug = pageName.toLowerCase().replace(/\s+/g, "-");
     // Open in new tab to prevent losing current work
-    window.open(`/note/${normalizedSlug}`, '_blank');
+    window.open(`/note/${encodeURIComponent(pageName)}`, '_blank');
   }
 
   async function handleCancel() {
@@ -164,13 +181,23 @@ ${bodyContent}`;
               <Button variant="outline" onClick={handleCancel} className="cursor-pointer">
                 ← 취소
               </Button>
+              <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50">
+                <Folder className="w-3 h-3 mr-1" />
+                {folder}
+              </Badge>
               <div className="flex-1 max-w-md">
                 <Input
                   type="text"
                   placeholder="노트 제목을 입력하세요..."
                   value={title}
                   onChange={(e) => {
-                    setTitle(e.target.value);
+                    const newValue = e.target.value;
+                    // 금지 문자 검증
+                    if (FORBIDDEN_CHARS.test(newValue)) {
+                      setError(FORBIDDEN_CHARS_MESSAGE);
+                      return;
+                    }
+                    setTitle(newValue);
                     setError(null);
                   }}
                   className="text-lg font-bold"
@@ -232,6 +259,7 @@ ${bodyContent}`;
                   setContent(newBody);
                 }
               }}
+              folder={folder}
             />
           </div>
         </div>
@@ -244,11 +272,24 @@ ${bodyContent}`;
               <MarkdownViewer
                 content={content}
                 onWikiLinkClick={handleWikiLinkClick}
+                existingTitles={existingTitles}
               />
             </div>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+export default function NewNotePage() {
+  return (
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-muted-foreground">Loading...</p>
+      </div>
+    }>
+      <NewNotePageContent />
+    </Suspense>
   );
 }
