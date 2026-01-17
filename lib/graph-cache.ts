@@ -38,6 +38,10 @@ class GraphCache {
    * Normalize title for use as map key
    */
   private normalizeKey(title: string): string {
+    if (typeof title !== 'string') {
+      console.error('[GraphCache.normalizeKey] title is not a string:', typeof title, title);
+      return String(title || '').normalize('NFC').toLowerCase();
+    }
     return title.normalize('NFC').toLowerCase();
   }
 

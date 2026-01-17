@@ -74,6 +74,7 @@ export async function POST() {
     let errorCount = 0;
 
     for (const result of toRename) {
+      // oldFilename and newFilename may contain folder path (e.g., "folder/file.md")
       const oldPath = path.join(notesDir, result.oldFilename);
       const newPath = path.join(notesDir, result.newFilename);
 
@@ -112,18 +113,48 @@ export async function POST() {
   }
 }
 
+interface FileEntry {
+  filename: string;
+  folder: string; // '' for root, 'foldername' for subfolders
+}
+
 /**
- * 파일 분석 및 새 파일명 결정
+ * 파일 분석 및 새 파일명 결정 (서브디렉토리 포함)
  */
 async function analyzeFiles(notesDir: string): Promise<MigrationResult[]> {
-  const files = await fs.readdir(notesDir);
-  const markdownFiles = files.filter(f => f.endsWith('.md'));
+  const fileEntries: FileEntry[] = [];
+
+  // Get all entries in notes directory
+  const entries = await fs.readdir(notesDir, { withFileTypes: true });
+
+  // Process root level markdown files
+  for (const entry of entries) {
+    if (entry.isFile() && entry.name.endsWith('.md')) {
+      fileEntries.push({ filename: entry.name, folder: '' });
+    }
+  }
+
+  // Process subdirectories
+  for (const entry of entries) {
+    if (entry.isDirectory()) {
+      const folderPath = path.join(notesDir, entry.name);
+      const folderFiles = await fs.readdir(folderPath);
+      const markdownFiles = folderFiles.filter(f => f.endsWith('.md'));
+
+      for (const file of markdownFiles) {
+        fileEntries.push({ filename: file, folder: entry.name });
+      }
+    }
+  }
 
   const results: MigrationResult[] = [];
-  const newFilenames = new Set<string>();
+  // Track new filenames per folder to avoid duplicates within same folder
+  const newFilenamesPerFolder = new Map<string, Set<string>>();
 
-  for (const file of markdownFiles) {
-    const filePath = path.join(notesDir, file);
+  for (const { filename, folder } of fileEntries) {
+    const filePath = folder
+      ? path.join(notesDir, folder, filename)
+      : path.join(notesDir, filename);
     const content = await fs.readFile(filePath, 'utf-8');
 
     // 제목 추출
@@ -132,37 +163,46 @@ async function analyzeFiles(notesDir: string): Promise<MigrationResult[]> {
 
     // frontmatter나 H1에서 제목을 찾지 못하면 파일명에서 추출
     if (!title) {
-      title = getTitleFromFilename(file);
+      title = getTitleFromFilename(filename);
     }
 
     // 파일명 생성
     const safeFilename = sanitizeFilename(title);
     let newFilename = `${safeFilename}.md`;
 
-    // 중복 파일명 처리
-    if (newFilenames.has(newFilename) && file !== newFilename) {
+    // Get or create filename set for this folder
+    if (!newFilenamesPerFolder.has(folder)) {
+      newFilenamesPerFolder.set(folder, new Set<string>());
+    }
+    const folderFilenames = newFilenamesPerFolder.get(folder)!;
+
+    // 중복 파일명 처리 (같은 폴더 내에서만)
+    if (folderFilenames.has(newFilename) && filename !== newFilename) {
       let counter = 1;
       const baseName = safeFilename;
-      while (newFilenames.has(newFilename)) {
+      while (folderFilenames.has(newFilename)) {
         newFilename = `${baseName}-${counter}.md`;
         counter++;
       }
     }
 
-    newFilenames.add(newFilename);
+    folderFilenames.add(newFilename);
 
-    if (file === newFilename) {
+    const displayOldPath = folder ? `${folder}/${filename}` : filename;
+    const displayNewPath = folder ? `${folder}/${newFilename}` : newFilename;
+
+    if (filename === newFilename) {
       results.push({
-        oldFilename: file,
-        newFilename: newFilename,
+        oldFilename: displayOldPath,
+        newFilename: displayNewPath,
         title,
         status: 'skipped',
         reason: '이미 제목 기반 파일명',
       });
     } else {
       results.push({
-        oldFilename: file,
-        newFilename: newFilename,
+        oldFilename: displayOldPath,
+        newFilename: displayNewPath,
         title,
         status: 'renamed',
       });

@@ -77,6 +77,15 @@ export function sanitizeFilename(title: string): string {
  * Used for checking duplicate titles and matching wiki links to files
  */
 export function titlesMatch(title1: string, title2: string): boolean {
+  // Debug: Check if inputs are strings
+  if (typeof title1 !== 'string') {
+    console.error('[titlesMatch] title1 is not a string:', typeof title1, title1);
+    return false;
+  }
+  if (typeof title2 !== 'string') {
+    console.error('[titlesMatch] title2 is not a string:', typeof title2, title2);
+    return false;
+  }
   return title1.normalize('NFC').toLowerCase() === title2.normalize('NFC').toLowerCase();
 }
 
@@ -100,12 +109,21 @@ export function calculateBacklinks(
 
   // Initialize empty arrays for all documents
   documents.forEach(doc => {
+    if (typeof doc.title !== 'string') {
+      console.error('[calculateBacklinks] doc.title is not a string:', typeof doc.title, doc);
+      return;
+    }
     backlinksMap.set(doc.title.normalize('NFC').toLowerCase(), []);
   });
 
   // Build backlinks
   documents.forEach(doc => {
+    if (typeof doc.title !== 'string') return;
     doc.links.forEach(linkedTitle => {
+      if (typeof linkedTitle !== 'string') {
+        console.error('[calculateBacklinks] linkedTitle is not a string:', typeof linkedTitle, linkedTitle);
+        return;
+      }
       const normalizedLinkedTitle = linkedTitle.normalize('NFC').toLowerCase();
       const backlinks = backlinksMap.get(normalizedLinkedTitle) || [];
       backlinks.push(doc.title);
