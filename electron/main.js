@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell } = require('electron');
+const { app, BrowserWindow, shell, ipcMain } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -163,7 +163,21 @@ function createWindow() {
       shell.openExternal(url);
     }
   });
+
 }
+
+// Handle mouse button navigation via IPC from preload
+ipcMain.on('nav-back', () => {
+  if (mainWindow && mainWindow.webContents.canGoBack()) {
+    mainWindow.webContents.goBack();
+  }
+});
+
+ipcMain.on('nav-forward', () => {
+  if (mainWindow && mainWindow.webContents.canGoForward()) {
+    mainWindow.webContents.goForward();
+  }
+});
 
 function startNextServer() {
   return new Promise((resolve, reject) => {
