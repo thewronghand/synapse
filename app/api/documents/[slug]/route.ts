@@ -5,10 +5,10 @@ import {
   parseFrontmatter,
   extractTitle,
   extractWikiLinks,
-  calculateBacklinks,
-  buildSlugToFilenameMap,
-  getSlugFromFilePath,
-  normalizeSlug,
+  getTitleFromFilename,
+  sanitizeFilename,
+  titlesMatch,
+  updateWikiLinksInContent,
 } from '@/lib/document-parser';
 import { Document } from '@/types';
 import { tagCache } from '@/lib/tag-cache';
@@ -20,8 +20,30 @@ import { isPublishedMode } from '@/lib/env';
 const NOTES_DIR = getNotesDir();
 
 /**
+ * Find a document file by title (case-insensitive, NFC normalized)
+ */
+async function findFileByTitle(requestedTitle: string): Promise<{ filename: string; title: string } | null> {
+  const files = await fs.readdir(NOTES_DIR);
+  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+
+  for (const file of markdownFiles) {
+    const filePath = path.join(NOTES_DIR, file);
+    const content = await fs.readFile(filePath, 'utf-8');
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    const filenameTitle = getTitleFromFilename(file);
+    const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+
+    if (titlesMatch(title, requestedTitle)) {
+      return { filename: file, title };
+    }
+  }
+
+  return null;
+}
+
+/**
  * GET /api/documents/[slug]
- * Get a single document by slug
+ * Get a single document by title (slug is now title)
  */
 export async function GET(
   request: NextRequest,
@@ -29,7 +51,9 @@ export async function GET(
 ) {
   try {
     const { slug } = await params;
-    const document = await getDocumentBySlug(slug);
+    // Decode URL-encoded title
+    const requestedTitle = decodeURIComponent(slug).normalize('NFC');
+    const document = await getDocumentByTitle(requestedTitle);
 
     return NextResponse.json({
       success: true,
@@ -50,7 +74,7 @@ export async function GET(
 /**
  * PUT /api/documents/[slug]
  * Update a document
- * Body: { content: string }
+ * Body: { content: string, newTitle?: string }
  */
 export async function PUT(
   request: NextRequest,
@@ -58,7 +82,9 @@ export async function PUT(
 ) {
   try {
     const { slug } = await params;
-    const { content } = await request.json();
+    const requestedTitle = decodeURIComponent(slug).normalize('NFC');
+    const body = await request.json();
+    const { content, newTitle } = body;
 
     if (!content) {
       return NextResponse.json(
@@ -70,15 +96,9 @@ export async function PUT(
       );
     }
 
-    // Find the file by normalized slug
-    const files = await fs.readdir(NOTES_DIR);
-    const markdownFiles = files.filter((file) => file.endsWith('.md'));
-    const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
-
-    const normalizedSlug = normalizeSlug(slug);
-    const filename = slugToFilenameMap.get(normalizedSlug);
-
-    if (!filename) {
+    // Find the existing file
+    const found = await findFileByTitle(requestedTitle);
+    if (!found) {
       return NextResponse.json(
         {
           success: false,
@@ -88,29 +108,87 @@ export async function PUT(
       );
     }
 
-    const filePath = path.join(NOTES_DIR, filename);
+    const { filename: oldFilename, title: oldTitle } = found;
+    const oldFilePath = path.join(NOTES_DIR, oldFilename);
 
-    // Write updated content
-    await fs.writeFile(filePath, content, 'utf-8');
-
-    // Update tag cache with new tags
+    // Parse the new content to get the new title
     const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-    if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
-      tagCache.addTags(frontmatter.tags);
-      console.log(`[TagCache] Added tags from updated document: ${frontmatter.tags.join(', ')}`);
+    const extractedNewTitle = newTitle || extractTitle(contentWithoutFrontmatter, frontmatter) || oldTitle;
+
+    // Check if title is changing
+    const titleChanged = !titlesMatch(oldTitle, extractedNewTitle);
+
+    if (titleChanged) {
+      // Check for duplicate title
+      if (documentCache.hasTitle(extractedNewTitle)) {
+        const existingDoc = documentCache.getByTitle(extractedNewTitle);
+        // Make sure it's not the same document
+        if (existingDoc && existingDoc.filename !== oldFilename) {
+          return NextResponse.json(
+            {
+              success: false,
+              error: '동일한 제목의 문서가 이미 존재합니다',
+            },
+            { status: 409 }
+          );
+        }
+      }
+
+      // Create new filename
+      const newSafeFilename = sanitizeFilename(extractedNewTitle);
+      const newFilename = `${newSafeFilename}.md`;
+      const newFilePath = path.join(NOTES_DIR, newFilename);
+
+      // Check if new filename already exists (different title but same sanitized name)
+      if (newFilename !== oldFilename) {
+        try {
+          await fs.access(newFilePath);
+          return NextResponse.json(
+            {
+              success: false,
+              error: '동일한 파일명의 문서가 이미 존재합니다',
+            },
+            { status: 409 }
+          );
+        } catch {
+          // File doesn't exist, continue
+        }
+      }
+
+      // Update all documents that reference this document
+      await updateReferencingDocuments(oldTitle, extractedNewTitle);
+
+      // Rename the file
+      if (newFilename !== oldFilename) {
+        await fs.rename(oldFilePath, newFilePath);
+      }
+
+      // Write updated content
+      await fs.writeFile(newFilePath, content, 'utf-8');
+
+      // Update caches
+      documentCache.updateDocument(oldTitle, extractedNewTitle, newFilename);
+      graphCache.renameDocument(oldTitle, extractedNewTitle, newFilename, content);
+
+      console.log(`[Document] Renamed: ${oldTitle} -> ${extractedNewTitle}`);
+    } else {
+      // Title didn't change, just update content
+      await fs.writeFile(oldFilePath, content, 'utf-8');
+
+      // Update caches
+      documentCache.updateDocument(oldTitle, oldTitle, oldFilename);
+      await graphCache.updateDocument(oldTitle, oldFilename, content);
+
+      console.log(`[Document] Updated: ${oldTitle}`);
     }
 
-    // Update document cache with new title
-    const title = extractTitle(contentWithoutFrontmatter, frontmatter);
-    documentCache.updateDocument(normalizedSlug, title);
-    console.log(`[DocumentCache] Updated document: ${normalizedSlug} - ${title}`);
-
-    // Update graph cache
-    await graphCache.updateDocument(normalizedSlug, content);
-    console.log(`[GraphCache] Updated document: ${normalizedSlug}`);
+    // Update tag cache
+    if (frontmatter.tags && Array.isArray(frontmatter.tags)) {
+      tagCache.addTags(frontmatter.tags);
+    }
 
     // Get updated document
-    const document = await getDocumentBySlug(slug);
+    const document = await getDocumentByTitle(extractedNewTitle);
 
     return NextResponse.json({
       success: true,
@@ -138,16 +216,11 @@ export async function DELETE(
 ) {
   try {
     const { slug } = await params;
+    const requestedTitle = decodeURIComponent(slug).normalize('NFC');
 
-    // Find the file by normalized slug
-    const files = await fs.readdir(NOTES_DIR);
-    const markdownFiles = files.filter((file) => file.endsWith('.md'));
-    const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
-
-    const normalizedSlug = normalizeSlug(slug);
-    const filename = slugToFilenameMap.get(normalizedSlug);
-
-    if (!filename) {
+    // Find the file
+    const found = await findFileByTitle(requestedTitle);
+    if (!found) {
       return NextResponse.json(
         {
           success: false,
@@ -157,22 +230,20 @@ export async function DELETE(
       );
     }
 
+    const { filename, title } = found;
     const filePath = path.join(NOTES_DIR, filename);
 
     // Delete file
     await fs.unlink(filePath);
 
-    // Remove document from cache
-    documentCache.removeDocument(normalizedSlug);
-    console.log(`[DocumentCache] Removed document: ${normalizedSlug}`);
+    // Remove document from caches
+    documentCache.removeDocument(title);
+    graphCache.removeDocument(title);
 
-    // Update graph cache
-    graphCache.removeDocument(normalizedSlug);
-    console.log(`[GraphCache] Removed document: ${normalizedSlug}`);
+    console.log(`[Document] Deleted: ${title}`);
 
     // Refresh tag cache since we don't know which tags are no longer used
     await tagCache.refreshTags();
-    console.log(`[TagCache] Refreshed tags after document deletion`);
 
     return NextResponse.json({
       success: true,
@@ -191,44 +262,37 @@ export async function DELETE(
 }
 
 /**
- * Helper: Get single document by slug
+ * Helper: Get single document by title
  */
-async function getDocumentBySlug(slug: string): Promise<Document> {
+async function getDocumentByTitle(requestedTitle: string): Promise<Document> {
   // In published mode, read from JSON file
   if (isPublishedMode()) {
-    const jsonPath = path.join(process.cwd(), 'public', 'data', 'docs', `${slug}.json`);
+    const jsonPath = path.join(process.cwd(), 'public', 'data', 'docs', `${encodeURIComponent(requestedTitle)}.json`);
     const jsonData = await fs.readFile(jsonPath, 'utf-8');
     return JSON.parse(jsonData);
   }
 
-  // In normal mode, find the file by normalized slug
-  const files = await fs.readdir(NOTES_DIR);
-  const markdownFiles = files.filter((file) => file.endsWith('.md'));
-  const slugToFilenameMap = buildSlugToFilenameMap(markdownFiles);
-
-  // Normalize the requested slug and find the matching file
-  const normalizedSlug = normalizeSlug(slug);
-  const filename = slugToFilenameMap.get(normalizedSlug);
-
-  if (!filename) {
-    throw new Error(`Document not found: ${slug}`);
+  // Find the file
+  const found = await findFileByTitle(requestedTitle);
+  if (!found) {
+    throw new Error(`Document not found: ${requestedTitle}`);
   }
 
+  const { filename, title } = found;
   const filePath = path.join(NOTES_DIR, filename);
   const content = await fs.readFile(filePath, 'utf-8');
   const stats = await fs.stat(filePath);
 
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-  const title = extractTitle(contentWithoutFrontmatter, frontmatter);
   const links = extractWikiLinks(content);
 
-  // Calculate backlinks by checking all other documents
-  const backlinks = await calculateBacklinksForDocument(normalizedSlug, slugToFilenameMap);
+  // Calculate backlinks
+  const backlinks = await calculateBacklinksForDocument(title);
 
   return {
-    slug: normalizedSlug,
-    filePath: `notes/${filename}`,
+    slug: title, // Use title as slug for backward compatibility
     title,
+    filePath: `notes/${filename}`,
     content,
     contentWithoutFrontmatter,
     frontmatter,
@@ -240,26 +304,60 @@ async function getDocumentBySlug(slug: string): Promise<Document> {
 }
 
 /**
- * Helper: Calculate backlinks for a specific document
+ * Helper: Calculate backlinks for a specific document (by title)
  */
-async function calculateBacklinksForDocument(
-  targetSlug: string,
-  slugToFilenameMap: Map<string, string>
-): Promise<string[]> {
+async function calculateBacklinksForDocument(targetTitle: string): Promise<string[]> {
   const backlinks: string[] = [];
+  const normalizedTarget = targetTitle.normalize('NFC').toLowerCase();
 
-  for (const [normalizedSlug, filename] of slugToFilenameMap) {
-    if (normalizedSlug === targetSlug) continue; // Skip self
+  const files = await fs.readdir(NOTES_DIR);
+  const markdownFiles = files.filter((file) => file.endsWith('.md'));
 
-    const filePath = path.join(NOTES_DIR, filename);
+  for (const file of markdownFiles) {
+    const filePath = path.join(NOTES_DIR, file);
     const content = await fs.readFile(filePath, 'utf-8');
+    const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+    const filenameTitle = getTitleFromFilename(file);
+    const docTitle = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+
+    // Skip self
+    if (titlesMatch(docTitle, targetTitle)) continue;
+
+    // Get wiki links from this document
     const links = extractWikiLinks(content);
 
-    // links are already normalized by extractWikiLinks
-    if (links.includes(targetSlug)) {
-      backlinks.push(normalizedSlug);
+    // Check if any link matches the target title
+    if (links.some(link => link.normalize('NFC').toLowerCase() === normalizedTarget)) {
+      backlinks.push(docTitle);
     }
   }
 
   return backlinks;
+}
+
+/**
+ * Helper: Update wiki links in all documents that reference the old title
+ */
+async function updateReferencingDocuments(oldTitle: string, newTitle: string): Promise<void> {
+  const files = await fs.readdir(NOTES_DIR);
+  const markdownFiles = files.filter((file) => file.endsWith('.md'));
+
+  for (const file of markdownFiles) {
+    const filePath = path.join(NOTES_DIR, file);
+    const content = await fs.readFile(filePath, 'utf-8');
+    const links = extractWikiLinks(content);
+
+    // Check if this document references the old title
+    const hasReference = links.some(link => titlesMatch(link, oldTitle));
+
+    if (hasReference) {
+      // Update wiki links in content
+      const updatedContent = updateWikiLinksInContent(content, oldTitle, newTitle);
+
+      if (updatedContent !== content) {
+        await fs.writeFile(filePath, updatedContent, 'utf-8');
+        console.log(`[Document] Updated references in: ${file}`);
+      }
+    }
+  }
 }

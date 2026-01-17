@@ -55,8 +55,9 @@ function ImageWithFallback({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLI
 interface MarkdownViewerProps {
   content: string;
   onWikiLinkClick?: (pageName: string) => void;
-  existingSlugs?: string[];
+  existingTitles?: string[];
 }
+
 
 // Simple frontmatter parser for preview
 function parseFrontmatter(content: string): {
@@ -94,7 +95,7 @@ function parseFrontmatter(content: string): {
 function MarkdownViewer({
   content,
   onWikiLinkClick,
-  existingSlugs
+  existingTitles
 }: MarkdownViewerProps) {
   const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
 
@@ -160,8 +161,9 @@ function MarkdownViewer({
           [
             remarkWikiLink,
             {
-              pageResolver: (name: string) => [name.replace(/ /g, "-").toLowerCase()],
-              hrefTemplate: (permalink: string) => `/doc/${permalink}`,
+              // 제목을 그대로 사용 (slug 변환 없음)
+              pageResolver: (name: string) => [name],
+              hrefTemplate: (permalink: string) => `/note/${encodeURIComponent(permalink)}`,
               wikiLinkClassName: "wiki-link text-primary hover:text-primary/80 cursor-pointer no-underline",
             },
           ],
@@ -175,11 +177,11 @@ function MarkdownViewer({
             // Wiki link 처리
             if (props.className?.includes("wiki-link")) {
               const pageName = children?.toString() || "";
-              // href에서 slug 추출 (/doc/slug 형식)
-              const linkSlug = href?.replace("/doc/", "") || "";
-              // existingSlugs가 제공되지 않았으면 (undefined) 존재한다고 가정
-              // 제공되었으면 (빈 배열 포함) 실제로 확인
-              const exists = existingSlugs === undefined || existingSlugs.includes(linkSlug);
+              // existingTitles가 제공되지 않았으면 (undefined) 존재한다고 가정
+              // 제공되었으면 (빈 배열 포함) 실제로 제목이 있는지 확인 (대소문자 무시)
+              const normalizedPageName = pageName.normalize('NFC').toLowerCase();
+              const exists = existingTitles === undefined ||
+                existingTitles.some(t => t.normalize('NFC').toLowerCase() === normalizedPageName);
 
               return (
                 <a

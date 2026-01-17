@@ -197,10 +197,9 @@ function DocumentsContent() {
     : [];
 
   const filteredDocuments = documents.filter((doc) => {
-    // Text search filter
+    // Text search filter - 제목 기반 검색
     const matchesSearch =
-      doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      doc.slug.toLowerCase().includes(searchQuery.toLowerCase());
+      doc.title.toLowerCase().includes(searchQuery.toLowerCase());
 
     // Include tags filter (AND logic - document must have ALL selected tags)
     const matchesIncludeTags =
@@ -463,9 +462,9 @@ function DocumentsContent() {
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         {paginatedDocuments.map((doc) => (
           <Card
-            key={doc.slug}
+            key={doc.title}
             className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => router.push(`/note/${doc.slug}`)}
+            onClick={() => router.push(`/note/${encodeURIComponent(doc.title)}`)}
           >
             <CardHeader>
               <CardTitle className="text-lg">{doc.title}</CardTitle>

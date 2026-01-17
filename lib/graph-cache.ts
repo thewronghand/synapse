@@ -5,7 +5,8 @@ import {
   extractTitle,
   extractWikiLinks,
   calculateBacklinks,
-  getSlugFromFilePath,
+  getTitleFromFilename,
+  titlesMatch,
 } from './document-parser';
 import { getNotesDir } from './notes-path';
 import { isPublishedMode } from './env';
@@ -14,22 +15,30 @@ import { Graph, GraphEdge, DigitalGardenNode } from '@/types';
 const NOTES_DIR = getNotesDir();
 
 interface DocumentData {
-  slug: string;
-  title: string;
-  links: string[];
+  title: string;      // Document title (from frontmatter or filename)
+  filename: string;   // Actual filename (e.g., "회의록 (2024).md")
+  links: string[];    // Wiki link targets (as titles)
   tags: string[];
 }
 
 /**
  * In-memory graph cache for fast graph data access
- * Avoids full filesystem scan on every /api/graph request
+ * Now uses title as the primary identifier instead of slug
  */
 class GraphCache {
   private graph: Graph | null = null;
+  // Map key: normalized title (lowercase, NFC)
   private documents: Map<string, DocumentData> = new Map();
   private isDirty: boolean = true;
   private isInitialized: boolean = false;
   private initPromise: Promise<void> | null = null;
+
+  /**
+   * Normalize title for use as map key
+   */
+  private normalizeKey(title: string): string {
+    return title.normalize('NFC').toLowerCase();
+  }
 
   /**
    * Initialize the cache by scanning all documents
@@ -71,14 +80,15 @@ class GraphCache {
         markdownFiles.map(async (file) => {
           const filePath = path.join(NOTES_DIR, file);
           const content = await fs.readFile(filePath, 'utf-8');
-          const slug = getSlugFromFilePath(file);
           const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-          const title = extractTitle(contentWithoutFrontmatter, frontmatter);
-          const links = extractWikiLinks(content);
+          const filenameTitle = getTitleFromFilename(file);
+          const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+          const links = extractWikiLinks(content); // Now returns titles, not slugs
 
-          this.documents.set(slug, {
-            slug,
+          const key = this.normalizeKey(title);
+          this.documents.set(key, {
             title,
+            filename: file,
             links,
             tags: frontmatter.tags || [],
           });
@@ -101,36 +111,57 @@ class GraphCache {
 
   /**
    * Build graph data from cached documents
+   * URLs now use encodeURIComponent(title) instead of slug
    */
   private buildGraphFromDocuments(): Graph {
     const documents = Array.from(this.documents.values());
-    const backlinksMap = calculateBacklinks(documents);
+
+    // Calculate backlinks using title-based system
+    const backlinksMap = calculateBacklinks(
+      documents.map(doc => ({ title: doc.title, links: doc.links }))
+    );
 
     const nodesObject: { [url: string]: DigitalGardenNode } = {};
     const links: GraphEdge[] = [];
     let nodeId = 0;
 
-    documents.forEach((doc) => {
-      const backlinks = backlinksMap.get(doc.slug) || [];
-      const allLinks = [...new Set([...doc.links, ...backlinks])];
+    // Create a map for quick title lookup
+    const titleToDoc = new Map<string, DocumentData>();
+    documents.forEach(doc => {
+      titleToDoc.set(this.normalizeKey(doc.title), doc);
+    });
 
-      nodesObject[`/${doc.slug}`] = {
+    documents.forEach((doc) => {
+      const normalizedTitle = this.normalizeKey(doc.title);
+      const backlinks = backlinksMap.get(normalizedTitle) || [];
+
+      // Combine forward links and backlinks for neighbors
+      const allLinkedTitles = [...new Set([...doc.links, ...backlinks])];
+
+      // URL uses encoded title
+      const url = `/${encodeURIComponent(doc.title)}`;
+
+      nodesObject[url] = {
         id: nodeId++,
         title: doc.title,
-        url: `/${doc.slug}`,
-        neighbors: allLinks.map(slug => `/${slug}`),
-        backLinks: backlinks.map(slug => `/${slug}`),
-        size: Math.min(7, Math.max(2, allLinks.length / 2)),
+        url: url,
+        neighbors: allLinkedTitles.map(t => `/${encodeURIComponent(t)}`),
+        backLinks: backlinks.map(t => `/${encodeURIComponent(t)}`),
+        size: Math.min(7, Math.max(2, allLinkedTitles.length / 2)),
         color: this.getNodeColor(doc.tags, backlinks.length),
         hide: false,
         tags: doc.tags,
       };
     });
 
+    // Create edges for links between existing documents
     documents.forEach((doc) => {
-      doc.links.forEach((targetSlug) => {
-        const sourceNode = nodesObject[`/${doc.slug}`];
-        const targetNode = nodesObject[`/${targetSlug}`];
+      const sourceUrl = `/${encodeURIComponent(doc.title)}`;
+      const sourceNode = nodesObject[sourceUrl];
+
+      doc.links.forEach((linkedTitle) => {
+        const targetUrl = `/${encodeURIComponent(linkedTitle)}`;
+        const targetNode = nodesObject[targetUrl];
 
         if (sourceNode && targetNode) {
           links.push({
@@ -186,11 +217,18 @@ class GraphCache {
   }
 
   /**
+   * Get all existing titles (for wiki link validation)
+   */
+  getExistingTitles(): string[] {
+    return Array.from(this.documents.values()).map(doc => doc.title);
+  }
+
+  /**
    * Invalidate cache for a specific document or entire cache
    */
-  invalidate(slug?: string): void {
-    if (slug) {
-      console.log(`[GraphCache] Invalidating document: ${slug}`);
+  invalidate(title?: string): void {
+    if (title) {
+      console.log(`[GraphCache] Invalidating document: ${title}`);
     } else {
       console.log('[GraphCache] Invalidating entire cache');
     }
@@ -201,36 +239,63 @@ class GraphCache {
   /**
    * Update a single document in the cache (for incremental updates)
    */
-  async updateDocument(slug: string, content: string): Promise<void> {
+  async updateDocument(title: string, filename: string, content: string): Promise<void> {
     const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-    const title = extractTitle(contentWithoutFrontmatter, frontmatter);
+    const extractedTitle = extractTitle(contentWithoutFrontmatter, frontmatter) || title;
     const links = extractWikiLinks(content);
 
-    this.documents.set(slug, {
-      slug,
-      title,
+    const key = this.normalizeKey(extractedTitle);
+    this.documents.set(key, {
+      title: extractedTitle,
+      filename,
       links,
       tags: frontmatter.tags || [],
     });
 
     this.isDirty = true;
-    console.log(`[GraphCache] Updated document: ${slug}`);
+    console.log(`[GraphCache] Updated document: ${extractedTitle}`);
   }
 
   /**
-   * Remove a document from the cache
+   * Remove a document from the cache by title
    */
-  removeDocument(slug: string): void {
-    this.documents.delete(slug);
+  removeDocument(title: string): void {
+    const key = this.normalizeKey(title);
+    this.documents.delete(key);
     this.isDirty = true;
-    console.log(`[GraphCache] Removed document: ${slug}`);
+    console.log(`[GraphCache] Removed document: ${title}`);
+  }
+
+  /**
+   * Handle document rename (title change)
+   */
+  renameDocument(oldTitle: string, newTitle: string, newFilename: string, content: string): void {
+    const oldKey = this.normalizeKey(oldTitle);
+    const newKey = this.normalizeKey(newTitle);
+
+    // Remove old entry
+    this.documents.delete(oldKey);
+
+    // Parse and add new entry
+    const { frontmatter } = parseFrontmatter(content);
+    const links = extractWikiLinks(content);
+
+    this.documents.set(newKey, {
+      title: newTitle,
+      filename: newFilename,
+      links,
+      tags: frontmatter.tags || [],
+    });
+
+    this.isDirty = true;
+    console.log(`[GraphCache] Renamed document: ${oldTitle} -> ${newTitle}`);
   }
 
   /**
    * Add a new document to the cache
    */
-  async addDocument(slug: string, content: string): Promise<void> {
-    await this.updateDocument(slug, content);
+  async addDocument(title: string, filename: string, content: string): Promise<void> {
+    await this.updateDocument(title, filename, content);
   }
 
   /**

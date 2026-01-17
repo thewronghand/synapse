@@ -8,7 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { normalizeSlug } from "@/lib/document-parser";
+
+// 파일 시스템 금지 문자
+const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
+const FORBIDDEN_CHARS_MESSAGE = '제목에 다음 문자는 사용할 수 없습니다: / \\ : * ? " < > |';
 
 function NewNotePageContent() {
   const router = useRouter();
@@ -106,8 +109,6 @@ ${bodyContent}`;
       return;
     }
 
-    const slug = normalizeSlug(title);
-
     setIsSaving(true);
     setError(null);
 
@@ -115,14 +116,15 @@ ${bodyContent}`;
       const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug, content }),
+        body: JSON.stringify({ slug: title, content }),
       });
 
       const data = await res.json();
 
       if (data.success) {
-        // Redirect to the newly created document's view page
-        router.push(`/note/${slug}`);
+        // Redirect to the newly created document's view page using the server-generated slug
+        const createdSlug = data.data.document.slug;
+        router.push(`/note/${createdSlug}`);
       } else {
         setError(data.error || "문서 생성에 실패했습니다");
       }
@@ -136,7 +138,7 @@ ${bodyContent}`;
 
   function handleWikiLinkClick(pageName: string) {
     // Open in new tab to prevent losing current work
-    window.open(`/note/${normalizeSlug(pageName)}`, '_blank');
+    window.open(`/note/${encodeURIComponent(pageName)}`, '_blank');
   }
 
   async function handleCancel() {
@@ -172,7 +174,13 @@ ${bodyContent}`;
                   placeholder="노트 제목을 입력하세요..."
                   value={title}
                   onChange={(e) => {
-                    setTitle(e.target.value);
+                    const newValue = e.target.value;
+                    // 금지 문자 검증
+                    if (FORBIDDEN_CHARS.test(newValue)) {
+                      setError(FORBIDDEN_CHARS_MESSAGE);
+                      return;
+                    }
+                    setTitle(newValue);
                     setError(null);
                   }}
                   className="text-lg font-bold"
