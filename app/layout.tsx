@@ -3,6 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
+import { ConfirmProvider } from "@/components/ui/confirm-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -17,6 +18,9 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Synapse",
   description: "로컬 마크다운 파일 기반의 개인 지식 관리 시스템",
+  icons: {
+    icon: "/favicon.ico",
+  },
   openGraph: {
     title: "Synapse",
     description: "로컬 마크다운 파일 기반의 개인 지식 관리 시스템",
@@ -49,8 +53,10 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
-          {children}
-          <Toaster />
+          <ConfirmProvider>
+            {children}
+            <Toaster />
+          </ConfirmProvider>
         </ThemeProvider>
       </body>
     </html>

@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
+import { LoadingScreen } from "@/components/ui/spinner";
 import { Folder } from "lucide-react";
 
 // 파일 시스템 금지 문자
@@ -248,16 +249,8 @@ ${editorContent}`;
     router.push(`/note/${encodeURIComponent(finalTitle)}`);
   }
 
-  function handleWikiLinkClick(pageName: string) {
-    router.push(`/note/${encodeURIComponent(pageName)}`);
-  }
-
   if (isLoading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center">
-        <p className="text-lg text-gray-600">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen message="문서 로딩 중..." />;
   }
 
   if (error) {
@@ -352,8 +345,8 @@ ${editorContent}`;
             <div className="absolute inset-0 overflow-y-auto">
               <MarkdownViewer
                 content={previewContent}
-                onWikiLinkClick={handleWikiLinkClick}
                 existingTitles={existingTitles}
+                isPreview
               />
             </div>
           </div>
