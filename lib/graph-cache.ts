@@ -17,6 +17,7 @@ const NOTES_DIR = getNotesDir();
 interface DocumentData {
   title: string;      // Document title (from frontmatter or filename)
   filename: string;   // Actual filename (e.g., "회의록 (2024).md")
+  folder: string;     // Folder name (empty string for root-level files)
   links: string[];    // Wiki link targets (as titles)
   tags: string[];
 }
@@ -71,29 +72,61 @@ class GraphCache {
     const startTime = Date.now();
 
     try {
-      const files = await fs.readdir(NOTES_DIR);
-      const markdownFiles = files.filter((file) => file.endsWith('.md'));
+      const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
+      const folders = entries.filter((e) => e.isDirectory());
+      const rootFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));
 
       this.documents.clear();
 
-      await Promise.all(
-        markdownFiles.map(async (file) => {
-          const filePath = path.join(NOTES_DIR, file);
-          const content = await fs.readFile(filePath, 'utf-8');
-          const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
-          const filenameTitle = getTitleFromFilename(file);
-          const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
-          const links = extractWikiLinks(content); // Now returns titles, not slugs
+      // Process folders
+      for (const folder of folders) {
+        const folderPath = path.join(NOTES_DIR, folder.name);
+        const files = await fs.readdir(folderPath);
+        const markdownFiles = files.filter((f) => f.endsWith('.md'));
 
-          const key = this.normalizeKey(title);
-          this.documents.set(key, {
-            title,
-            filename: file,
-            links,
-            tags: frontmatter.tags || [],
-          });
-        })
-      );
+        await Promise.all(
+          markdownFiles.map(async (file) => {
+            const filePath = path.join(folderPath, file);
+            const content = await fs.readFile(filePath, 'utf-8');
+            const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+            const filenameTitle = getTitleFromFilename(file);
+            const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+            const links = extractWikiLinks(content);
+
+            const key = this.normalizeKey(title);
+            this.documents.set(key, {
+              title,
+              filename: file,
+              folder: folder.name,
+              links,
+              tags: frontmatter.tags || [],
+            });
+          })
+        );
+      }
+
+      // Process root-level files (legacy support)
+      if (rootFiles.length > 0) {
+        await Promise.all(
+          rootFiles.map(async (entry) => {
+            const filePath = path.join(NOTES_DIR, entry.name);
+            const content = await fs.readFile(filePath, 'utf-8');
+            const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+            const filenameTitle = getTitleFromFilename(entry.name);
+            const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+            const links = extractWikiLinks(content);
+
+            const key = this.normalizeKey(title);
+            this.documents.set(key, {
+              title,
+              filename: entry.name,
+              folder: '',
+              links,
+              tags: frontmatter.tags || [],
+            });
+          })
+        );
+      }
 
       // Build graph from documents
       this.graph = this.buildGraphFromDocuments();
@@ -112,31 +145,55 @@ class GraphCache {
   /**
    * Build graph data from cached documents
    * URLs now use encodeURIComponent(title) instead of slug
+   * Backlinks and edges are now folder-scoped (folder isolation)
    */
   private buildGraphFromDocuments(): Graph {
     const documents = Array.from(this.documents.values());
 
-    // Calculate backlinks using title-based system
-    const backlinksMap = calculateBacklinks(
-      documents.map(doc => ({ title: doc.title, links: doc.links }))
-    );
+    // Group documents by folder for folder-scoped backlink calculation
+    const documentsByFolder = new Map<string, DocumentData[]>();
+    documents.forEach(doc => {
+      const folder = doc.folder || 'default';
+      if (!documentsByFolder.has(folder)) {
+        documentsByFolder.set(folder, []);
+      }
+      documentsByFolder.get(folder)!.push(doc);
+    });
+
+    // Calculate backlinks per folder (folder isolation)
+    const folderBacklinksMaps = new Map<string, Map<string, string[]>>();
+    for (const [folder, docs] of documentsByFolder) {
+      const backlinksMap = calculateBacklinks(
+        docs.map(doc => ({ title: doc.title, links: doc.links }))
+      );
+      folderBacklinksMaps.set(folder, backlinksMap);
+    }
+
+    // Create a map for quick title+folder lookup
+    const titleFolderToDoc = new Map<string, DocumentData>();
+    documents.forEach(doc => {
+      const key = `${doc.folder || 'default'}:${this.normalizeKey(doc.title)}`;
+      titleFolderToDoc.set(key, doc);
+    });
 
     const nodesObject: { [url: string]: DigitalGardenNode } = {};
     const links: GraphEdge[] = [];
     let nodeId = 0;
 
-    // Create a map for quick title lookup
-    const titleToDoc = new Map<string, DocumentData>();
-    documents.forEach(doc => {
-      titleToDoc.set(this.normalizeKey(doc.title), doc);
-    });
-
     documents.forEach((doc) => {
+      const folder = doc.folder || 'default';
       const normalizedTitle = this.normalizeKey(doc.title);
-      const backlinks = backlinksMap.get(normalizedTitle) || [];
+      const folderBacklinks = folderBacklinksMaps.get(folder);
+      const backlinks = folderBacklinks?.get(normalizedTitle) || [];
 
-      // Combine forward links and backlinks for neighbors
-      const allLinkedTitles = [...new Set([...doc.links, ...backlinks])];
+      // Only include links/neighbors that exist in the same folder
+      const sameFolderLinks = doc.links.filter(linkedTitle => {
+        const linkedKey = `${folder}:${this.normalizeKey(linkedTitle)}`;
+        return titleFolderToDoc.has(linkedKey);
+      });
+
+      // Combine forward links and backlinks for neighbors (all same-folder)
+      const allLinkedTitles = [...new Set([...sameFolderLinks, ...backlinks])];
 
       // URL uses encoded title
       const url = `/${encodeURIComponent(doc.title)}`;
@@ -151,23 +208,31 @@ class GraphCache {
         color: this.getNodeColor(doc.tags, backlinks.length),
         hide: false,
         tags: doc.tags,
-      };
+        folder: doc.folder,
+      } as DigitalGardenNode & { folder: string };
     });
 
-    // Create edges for links between existing documents
+    // Create edges only for links within the same folder (folder isolation)
     documents.forEach((doc) => {
+      const folder = doc.folder || 'default';
       const sourceUrl = `/${encodeURIComponent(doc.title)}`;
       const sourceNode = nodesObject[sourceUrl];
 
       doc.links.forEach((linkedTitle) => {
-        const targetUrl = `/${encodeURIComponent(linkedTitle)}`;
-        const targetNode = nodesObject[targetUrl];
+        // Only create edge if target is in the same folder
+        const targetKey = `${folder}:${this.normalizeKey(linkedTitle)}`;
+        const targetDoc = titleFolderToDoc.get(targetKey);
 
-        if (sourceNode && targetNode) {
-          links.push({
-            source: sourceNode.id,
-            target: targetNode.id,
-          });
+        if (targetDoc) {
+          const targetUrl = `/${encodeURIComponent(linkedTitle)}`;
+          const targetNode = nodesObject[targetUrl];
+
+          if (sourceNode && targetNode) {
+            links.push({
+              source: sourceNode.id,
+              target: targetNode.id,
+            });
+          }
         }
       });
     });
@@ -239,7 +304,7 @@ class GraphCache {
   /**
    * Update a single document in the cache (for incremental updates)
    */
-  async updateDocument(title: string, filename: string, content: string): Promise<void> {
+  async updateDocument(title: string, filename: string, content: string, folder: string = ''): Promise<void> {
     const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
     const extractedTitle = extractTitle(contentWithoutFrontmatter, frontmatter) || title;
     const links = extractWikiLinks(content);
@@ -248,6 +313,7 @@ class GraphCache {
     this.documents.set(key, {
       title: extractedTitle,
       filename,
+      folder,
       links,
       tags: frontmatter.tags || [],
     });
@@ -269,7 +335,7 @@ class GraphCache {
   /**
    * Handle document rename (title change)
    */
-  renameDocument(oldTitle: string, newTitle: string, newFilename: string, content: string): void {
+  renameDocument(oldTitle: string, newTitle: string, newFilename: string, content: string, folder: string = ''): void {
     const oldKey = this.normalizeKey(oldTitle);
     const newKey = this.normalizeKey(newTitle);
 
@@ -283,6 +349,7 @@ class GraphCache {
     this.documents.set(newKey, {
       title: newTitle,
       filename: newFilename,
+      folder,
       links,
       tags: frontmatter.tags || [],
     });
@@ -294,8 +361,8 @@ class GraphCache {
   /**
    * Add a new document to the cache
    */
-  async addDocument(title: string, filename: string, content: string): Promise<void> {
-    await this.updateDocument(title, filename, content);
+  async addDocument(title: string, filename: string, content: string, folder: string = ''): Promise<void> {
+    await this.updateDocument(title, filename, content, folder);
   }
 
   /**

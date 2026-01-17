@@ -183,14 +183,23 @@ function MarkdownViewer({
               const exists = existingTitles === undefined ||
                 existingTitles.some(t => t.normalize('NFC').toLowerCase() === normalizedPageName);
 
+              // 존재하지 않는 링크는 비활성화 (클릭 불가)
+              if (!exists) {
+                return (
+                  <span
+                    className="wiki-link wiki-link-missing no-underline cursor-not-allowed opacity-60"
+                    title="이 폴더에 해당 문서가 없습니다"
+                  >
+                    {children}
+                  </span>
+                );
+              }
+
               return (
                 <a
                   {...props}
                   href={href}
-                  className={exists
-                    ? "wiki-link cursor-pointer no-underline"
-                    : "wiki-link wiki-link-missing cursor-pointer no-underline"
-                  }
+                  className="wiki-link cursor-pointer no-underline"
                   onClick={(e) => {
                     e.preventDefault();
                     onWikiLinkClick?.(pageName);

@@ -8,18 +8,36 @@ import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { isPublishedMode } from "@/lib/env";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { LoadingScreen } from "@/components/ui/spinner";
-import { toast } from "sonner";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+
+// Filter graph to only include nodes and links from the same folder
+function filterGraphByFolder(graph: Graph, folder: string): Graph {
+  // Filter nodes by folder
+  const filteredNodes: { [url: string]: DigitalGardenNode } = {};
+  const validNodeIds = new Set<number>();
+
+  Object.entries(graph.nodes).forEach(([url, node]) => {
+    const nodeWithFolder = node as DigitalGardenNode & { folder?: string };
+    const nodeFolder = nodeWithFolder.folder || "default";
+
+    if (nodeFolder === folder) {
+      filteredNodes[url] = node;
+      validNodeIds.add(node.id);
+    }
+  });
+
+  // Filter links to only include connections between valid nodes
+  const filteredLinks = (graph.links || []).filter(
+    (link) => validNodeIds.has(link.source as number) && validNodeIds.has(link.target as number)
+  );
+
+  // Update neighbors and backLinks to only include same-folder nodes
+  Object.values(filteredNodes).forEach((node) => {
+    node.neighbors = node.neighbors.filter((neighborUrl) => filteredNodes[neighborUrl]);
+    node.backLinks = node.backLinks.filter((backLinkUrl) => filteredNodes[backLinkUrl]);
+  });
+
+  return { nodes: filteredNodes, links: filteredLinks };
+}
 
 export default function NotePage() {
   const params = useParams();
@@ -30,11 +48,11 @@ export default function NotePage() {
 
   const [document, setDocument] = useState<Document | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
+  const [folderTitles, setFolderTitles] = useState<string[]>([]);
   const [depth, setDepth] = useState<number>(2);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [graphHeight, setGraphHeight] = useState(320);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Calculate responsive graph height
   useEffect(() => {
@@ -67,13 +85,25 @@ export default function NotePage() {
         const graphData = await graphRes.json();
 
         if (docData.success) {
-          setDocument(docData.data.document);
+          const doc = docData.data.document;
+          setDocument(doc);
+
+          // Fetch folder-scoped titles for wiki link validation
+          const folder = doc.folder || "default";
+          const titlesRes = await fetch(`/api/documents/titles?folder=${encodeURIComponent(folder)}`);
+          const titlesData = await titlesRes.json();
+          if (titlesData.success) {
+            setFolderTitles(titlesData.data.titles || []);
+          }
         } else {
           setError("Document not found");
         }
 
         if (graphData.success) {
-          setGraph(graphData.data);
+          // Filter graph to only show same-folder nodes and links
+          const currentFolder = docData.success ? (docData.data.document.folder || "default") : "default";
+          const filteredGraph = filterGraphByFolder(graphData.data, currentFolder);
+          setGraph(filteredGraph);
         }
       } catch (err) {
         setError("Failed to load document");
@@ -90,14 +120,10 @@ export default function NotePage() {
     router.push(`/note/${encodeURIComponent(pageName)}`);
   }
 
-  function handleDelete() {
-    if (!document) return;
-    setShowDeleteConfirm(true);
-  }
-
-  async function executeDelete() {
-    if (!document) return;
-    setShowDeleteConfirm(false);
+  async function handleDelete() {
+    if (!document || !confirm(`"${document.title}" 문서를 삭제하시겠습니까?`)) {
+      return;
+    }
 
     try {
       const res = await fetch(`/api/documents/${encodeURIComponent(document.title)}`, {
@@ -109,12 +135,16 @@ export default function NotePage() {
       }
     } catch (err) {
       console.error("Failed to delete:", err);
-      toast.error("문서 삭제에 실패했습니다.");
+      alert("문서 삭제에 실패했습니다.");
     }
   }
 
   if (isLoading) {
-    return <LoadingScreen message="문서 로딩 중..." />;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-muted-foreground">Loading...</p>
+      </div>
+    );
   }
 
   if (error || !document) {
@@ -140,11 +170,6 @@ export default function NotePage() {
       </div>
     );
   }
-
-  // Get existing titles from graph for wiki link validation
-  const existingTitles = graph
-    ? Object.values(graph.nodes).map(node => node.title)
-    : undefined;
 
   return (
     <div className="flex flex-col min-h-screen">
@@ -197,7 +222,7 @@ export default function NotePage() {
               <MarkdownViewer
                 content={document.contentWithoutFrontmatter}
                 onWikiLinkClick={handleWikiLinkClick}
-                existingTitles={existingTitles}
+                existingTitles={folderTitles}
               />
             </div>
           </div>
@@ -300,27 +325,6 @@ export default function NotePage() {
           )}
         </div>
       </footer>
-
-      {/* Delete Confirm Dialog */}
-      <AlertDialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>문서 삭제</AlertDialogTitle>
-            <AlertDialogDescription>
-              &quot;{document?.title}&quot; 문서를 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>취소</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={executeDelete}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              삭제
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

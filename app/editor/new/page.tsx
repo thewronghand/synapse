@@ -8,7 +8,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { LoadingScreen } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge";
+import { Folder } from "lucide-react";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
@@ -18,29 +19,40 @@ function NewNotePageContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const initialTitle = searchParams.get("title") || "";
+  const folder = searchParams.get("folder") || "default";
   const [title, setTitle] = useState(initialTitle);
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
+  const [existingTitles, setExistingTitles] = useState<string[]>([]);
   const [content, setContent] = useState("");
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Fetch available tags on mount
+  // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
-    async function fetchTags() {
+    async function fetchTagsAndTitles() {
       try {
-        const res = await fetch("/api/tags");
-        const data = await res.json();
-        if (data.success) {
-          setAvailableTags(data.data.tags);
+        const folderParam = folder ? `?folder=${encodeURIComponent(folder)}` : "";
+        const [tagsRes, titlesRes] = await Promise.all([
+          fetch(`/api/tags${folderParam}`),
+          fetch(`/api/documents/titles${folderParam}`),
+        ]);
+        const tagsData = await tagsRes.json();
+        const titlesData = await titlesRes.json();
+
+        if (tagsData.success) {
+          setAvailableTags(tagsData.data.tags);
+        }
+        if (titlesData.success) {
+          setExistingTitles(titlesData.data.titles || []);
         }
       } catch (err) {
-        console.error("Failed to fetch tags:", err);
+        console.error("Failed to fetch tags/titles:", err);
       }
     }
-    fetchTags();
-  }, []);
+    fetchTagsAndTitles();
+  }, [folder]);
 
   // Initialize content with frontmatter on first title input
   useEffect(() => {
@@ -117,7 +129,7 @@ ${bodyContent}`;
       const res = await fetch("/api/documents", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ slug: title, content }),
+        body: JSON.stringify({ slug: title, content, folder }),
       });
 
       const data = await res.json();
@@ -169,6 +181,10 @@ ${bodyContent}`;
               <Button variant="outline" onClick={handleCancel} className="cursor-pointer">
                 ← 취소
               </Button>
+              <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50">
+                <Folder className="w-3 h-3 mr-1" />
+                {folder}
+              </Badge>
               <div className="flex-1 max-w-md">
                 <Input
                   type="text"
@@ -243,6 +259,7 @@ ${bodyContent}`;
                   setContent(newBody);
                 }
               }}
+              folder={folder}
             />
           </div>
         </div>
@@ -255,6 +272,7 @@ ${bodyContent}`;
               <MarkdownViewer
                 content={content}
                 onWikiLinkClick={handleWikiLinkClick}
+                existingTitles={existingTitles}
               />
             </div>
           </div>
@@ -266,7 +284,11 @@ ${bodyContent}`;
 
 export default function NewNotePage() {
   return (
-    <Suspense fallback={<LoadingScreen message="에디터 준비 중..." />}>
+    <Suspense fallback={
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-muted-foreground">Loading...</p>
+      </div>
+    }>
       <NewNotePageContent />
     </Suspense>
   );

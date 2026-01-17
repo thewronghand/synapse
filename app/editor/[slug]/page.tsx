@@ -9,7 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
-import { LoadingScreen } from "@/components/ui/spinner";
+import { Badge } from "@/components/ui/badge";
+import { Folder } from "lucide-react";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
@@ -24,6 +25,7 @@ export default function EditorPage() {
 
   const [document, setDocument] = useState<Document | null>(null);
   const [initialTitle, setInitialTitle] = useState("");
+  const [folder, setFolder] = useState<string>("default");
   const [tags, setTags] = useState<string[]>([]);
   const [availableTags, setAvailableTags] = useState<string[]>([]);
   const [existingTitles, setExistingTitles] = useState<string[]>([]);
@@ -45,13 +47,14 @@ export default function EditorPage() {
   const [isPending, startTransition] = useTransition();
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Fetch available tags and existing titles
+  // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
     async function fetchTagsAndTitles() {
       try {
+        const folderParam = folder ? `?folder=${encodeURIComponent(folder)}` : "";
         const [tagsRes, titlesRes] = await Promise.all([
-          fetch("/api/tags"),
-          fetch("/api/documents/titles"),
+          fetch(`/api/tags${folderParam}`),
+          fetch(`/api/documents/titles${folderParam}`),
         ]);
         const tagsData = await tagsRes.json();
         const titlesData = await titlesRes.json();
@@ -67,7 +70,7 @@ export default function EditorPage() {
       }
     }
     fetchTagsAndTitles();
-  }, []);
+  }, [folder]);
 
   // Fetch document using encoded title
   useEffect(() => {
@@ -81,7 +84,9 @@ export default function EditorPage() {
           setDocument(doc);
           const docTitle = doc.frontmatter.title || doc.title;
           const docTags = doc.frontmatter.tags || [];
+          const docFolder = doc.folder || "default";
           setTags(docTags);
+          setFolder(docFolder);
           setInitialTitle(docTitle);
           titleRef.current = docTitle;
           tagsRef.current = docTags;
@@ -248,7 +253,11 @@ ${editorContent}`;
   }
 
   if (isLoading) {
-    return <LoadingScreen message="에디터 로딩 중..." />;
+    return (
+      <div className="flex min-h-screen items-center justify-center">
+        <p className="text-lg text-gray-600">Loading...</p>
+      </div>
+    );
   }
 
   if (error) {
@@ -269,7 +278,11 @@ ${editorContent}`;
         <div className="container mx-auto">
           <div className="mb-4">
             <div className="flex items-center justify-between">
-              <div className="flex-1 max-w-md">
+              <div className="flex items-center gap-3 flex-1 max-w-lg">
+                <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50 shrink-0">
+                  <Folder className="w-3 h-3 mr-1" />
+                  {folder}
+                </Badge>
                 <Input
                   key={initialTitle} // key로 초기값이 변경되면 리마운트
                   type="text"
@@ -324,6 +337,7 @@ ${editorContent}`;
             <MarkdownEditor
               value={editorInitialValue}
               onChange={handleEditorChangeWithSave}
+              folder={folder}
             />
           </div>
         </div>

@@ -49,6 +49,7 @@ interface MarkdownEditorProps {
   value: string;
   onChange: (value: string) => void;
   placeholder?: string;
+  folder?: string; // Folder for scoped wiki link autocomplete
 }
 
 // Dark theme for CodeMirror
@@ -84,6 +85,7 @@ export default function MarkdownEditor({
   value,
   onChange,
   placeholder = 'Start writing...',
+  folder,
 }: MarkdownEditorProps) {
   const { resolvedTheme } = useTheme();
   const [isUploading, setIsUploading] = useState(false);
@@ -97,11 +99,14 @@ export default function MarkdownEditor({
     setMounted(true);
   }, []);
 
-  // Fetch document titles for wiki link autocomplete
+  // Fetch document titles for wiki link autocomplete (folder-scoped)
   useEffect(() => {
     async function fetchDocumentTitles() {
       try {
-        const res = await fetch('/api/documents/titles');
+        const url = folder
+          ? `/api/documents/titles?folder=${encodeURIComponent(folder)}`
+          : '/api/documents/titles';
+        const res = await fetch(url);
         const data = await res.json();
         if (data.success) {
           setDocumentTitles(data.data.titles);
@@ -111,7 +116,7 @@ export default function MarkdownEditor({
       }
     }
     fetchDocumentTitles();
-  }, []);
+  }, [folder]);
 
   // Wiki link autocomplete function
   const wikiLinkCompletion = (context: CompletionContext) => {

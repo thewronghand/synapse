@@ -2,13 +2,14 @@
 
 export interface Document {
   slug: string; // 파일명 (예: "getting-started")
-  filePath: string; // 상대 경로 (예: "notes/getting-started.md")
+  filePath: string; // 상대 경로 (예: "notes/default/getting-started.md")
   title: string; // frontmatter의 title 또는 첫 번째 # 헤더
+  folder: string; // 폴더명 (예: "default", "work")
   content: string; // 전체 마크다운 텍스트 (frontmatter 포함)
   contentWithoutFrontmatter: string; // frontmatter 제거된 본문
   frontmatter: Frontmatter; // frontmatter 데이터
-  links: string[]; // 이 문서가 링크하는 다른 문서 slug들
-  backlinks: string[]; // 이 문서를 링크하는 문서 slug들 (계산됨)
+  links: string[]; // 이 문서가 링크하는 다른 문서 제목들
+  backlinks: string[]; // 이 문서를 링크하는 문서 제목들 (계산됨)
   createdAt: Date; // 파일 생성 시간
   updatedAt: Date; // 파일 수정 시간
 }
