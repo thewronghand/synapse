@@ -1,7 +1,7 @@
 name: Dev Build
 
 on:
-  workflow_dispatch:  # Manual trigger only
+  workflow_dispatch: # Manual trigger only
 
 jobs:
   build:
@@ -34,4 +34,4 @@ jobs:
         with:
           name: macos-dmg-dev
           path: macos-installers-dev.zip
-          retention-days: 7  # Keep dev builds for 7 days only
+          retention-days: 7 # Keep dev builds for 7 days only
