@@ -440,6 +440,12 @@ function SettingsContent() {
       const result = await response.json();
 
       if (result.success) {
+        // Log debug info if available
+        if (result.data?.debug) {
+          const debug = result.data.debug;
+          console.log('[Publish Debug]', debug);
+          toast.info(`업로드: ${debug.totalFiles}개 파일 (public/data: ${debug.publicDataFiles}개, graph.json: ${debug.hasGraphJson ? '✓' : '✗'})`);
+        }
         // Start polling for deployment status
         pollDeploymentStatus();
       } else {

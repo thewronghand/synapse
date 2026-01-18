@@ -252,6 +252,11 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Publish] Found ${filesToPush.length} files to deploy`);
 
+    // Debug: Check if public/data files are included
+    const publicDataFiles = filesToPush.filter(f => f.path.startsWith('public/data'));
+    console.log(`[Publish] public/data files: ${publicDataFiles.length}`);
+    publicDataFiles.forEach(f => console.log(`  - ${f.path}`));
+
     // Step 5: Create direct deployment to Vercel
     console.log('[Publish] Creating Vercel deployment...');
     const deployment = await vercelClient.createDirectDeployment(
@@ -291,6 +296,13 @@ export async function POST(request: NextRequest) {
         projectUrl: `https://vercel.com/dashboard`,
         message: 'Published successfully! Vercel is building your site.',
         state: deployment.state,
+        // Debug info
+        debug: {
+          totalFiles: filesToPush.length,
+          publicDataFiles: publicDataFiles.length,
+          hasGraphJson: publicDataFiles.some(f => f.path === 'public/data/graph.json'),
+          hasDocumentsJson: publicDataFiles.some(f => f.path === 'public/data/documents.json'),
+        },
       },
     });
   } catch (error) {
