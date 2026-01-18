@@ -91,11 +91,11 @@ function TagsContent() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="mb-4">
+      <div className="shrink-0">
         <AppHeader
-          title="태그 관리"
+          showLogo
           subtitle={
             selectedFolder
               ? `${selectedFolder} 폴더 · ${sortedTags.length}개 태그 · ${documents.length}개 문서`
@@ -115,12 +115,15 @@ function TagsContent() {
       </div>
 
       {/* Folder Tabs */}
-      <div className="mb-6">
+      <div className="shrink-0 px-4 pt-2 bg-background">
         <FolderTabs
           selectedFolder={selectedFolder}
           onFolderChange={handleFolderChange}
         />
       </div>
+
+      {/* Main Content */}
+      <main className="flex-1 container mx-auto py-6 px-4">
 
       {/* Sort Controls */}
       <div className="mb-6 flex gap-2">
@@ -174,6 +177,7 @@ function TagsContent() {
           <p className="text-sm text-muted-foreground">문서에 태그를 추가해보세요!</p>
         </div>
       )}
+      </main>
     </div>
   );
 }

@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { useState, useEffect, Suspense, useRef } from "react";
 import { LoadingScreen, Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import AppHeader from "@/components/layout/AppHeader";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -532,24 +533,26 @@ function SettingsContent() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="mb-8">
-        <div className="flex items-center gap-4 mb-4">
-          <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
-            ← 뒤로
-          </Button>
-          <h1 className="text-4xl font-bold">설정</h1>
-        </div>
-        <p className="text-muted-foreground">
-          Synapse 앱 설정 및 publish 관리
-        </p>
+      <div className="shrink-0">
+        <AppHeader
+          showLogo
+          subtitle="앱 설정 및 publish 관리"
+          actions={
+            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+              ← 뒤로
+            </Button>
+          }
+          showSettings={false}
+        />
       </div>
 
-      {/* Settings Sections */}
-      <div className="max-w-3xl mx-auto space-y-8">
+      {/* Main Content */}
+      <main className="flex-1 container mx-auto py-6 px-4">
+        <div className="max-w-3xl mx-auto space-y-8">
         {/* Publish Section */}
-        <section className="border rounded-lg p-6 bg-card shadow-sm">
+        <section className="border rounded-lg p-6 bg-card">
           <h2 className="text-2xl font-semibold mb-4">Publish</h2>
           <p className="text-muted-foreground mb-6">
             로컬 노트를 읽기 전용 웹사이트로 배포하세요. Vercel을 통해 무료로 publish할 수 있습니다.
@@ -814,7 +817,7 @@ function SettingsContent() {
         </section>
 
         {/* Migration Section */}
-        <section className="border rounded-lg p-6 bg-card shadow-sm">
+        <section className="border rounded-lg p-6 bg-card">
           <h2 className="text-2xl font-semibold mb-4">파일명 마이그레이션</h2>
           <p className="text-muted-foreground mb-6">
             기존 파일명(UUID 기반)을 새 시스템(제목 기반)으로 변환합니다.
@@ -911,7 +914,7 @@ function SettingsContent() {
         </section>
 
         {/* Folder Migration Section */}
-        <section className="border rounded-lg p-6 bg-card shadow-sm">
+        <section className="border rounded-lg p-6 bg-card">
           <h2 className="text-2xl font-semibold mb-4">폴더 마이그레이션</h2>
           <p className="text-muted-foreground mb-6">
             루트 디렉토리에 있는 노트들을 default 폴더로 이동합니다.
@@ -1155,6 +1158,7 @@ function SettingsContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      </main>
     </div>
   );
 }

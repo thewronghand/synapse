@@ -12,6 +12,12 @@ contextBridge.exposeInMainWorld('electron', {
   // Navigation functions for mouse back/forward buttons
   goBack: () => ipcRenderer.send('nav-back'),
   goForward: () => ipcRenderer.send('nav-forward'),
+  // Find in page functions
+  findInPage: (text) => ipcRenderer.send('find-in-page', text),
+  findNext: () => ipcRenderer.send('find-in-page-next'),
+  findPrev: () => ipcRenderer.send('find-in-page-prev'),
+  stopFind: () => ipcRenderer.send('stop-find-in-page'),
+  onToggleFind: (callback) => ipcRenderer.on('toggle-find', callback),
 });
 
 // Listen for mouse back/forward buttons (button 3 = back, button 4 = forward)

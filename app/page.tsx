@@ -7,7 +7,6 @@ import { Graph, DigitalGardenNode, GraphEdge } from "@/types";
 import { Button } from "@/components/ui/button";
 import { FolderTabs } from "@/components/ui/FolderTabs";
 import AppHeader from "@/components/layout/AppHeader";
-import Logo from "@/components/ui/Logo";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
 
@@ -156,12 +155,8 @@ function HomeContent() {
       <div className="flex flex-col h-screen overflow-hidden">
         <div className="shrink-0">
           <AppHeader
-            title={<Logo width={160} height={45} />}
-            subtitle={
-              <p className="text-sm text-muted-foreground mt-1">
-                노트가 없습니다
-              </p>
-            }
+            showLogo
+            subtitle="노트가 없습니다"
             actions={
               !isPublishedMode() ? (
                 <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
@@ -220,14 +215,11 @@ function HomeContent() {
       {/* Header */}
       <div className="shrink-0">
         <AppHeader
-          title={<Logo width={160} height={45} />}
+          showLogo
           subtitle={
-            <p className="text-sm text-muted-foreground mt-1">
-              {selectedFolder
-                ? `${nodeCount}개 노트, ${linkCount}개 연결 (${selectedFolder})`
-                : `${totalNodeCount}개 노트`
-              }
-            </p>
+            selectedFolder
+              ? `${nodeCount}개 노트, ${linkCount}개 연결 (${selectedFolder})`
+              : `${totalNodeCount}개 노트`
           }
           actions={
             <>

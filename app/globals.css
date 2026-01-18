@@ -12,7 +12,7 @@
   --muted-foreground: #6B7280;
   --card: #FFFFFF;
   --card-foreground: #1F2937;
-  --border: #E5E7EB;
+  --border: #D1D5DB;
   --input: #E5E7EB;
   --accent: #E5E7EB;
   --accent-foreground: #1F2937;
@@ -67,6 +67,7 @@
   --color-destructive-muted: var(--destructive-muted);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+  --default-border-color: var(--border);
 }
 
 body {
@@ -77,6 +78,13 @@ body {
 
 html {
   scrollbar-gutter: stable;
+}
+
+/* Default border color for Tailwind v4 */
+*,
+*::before,
+*::after {
+  border-color: var(--border);
 }
 
 /* Dark mode prose typography */

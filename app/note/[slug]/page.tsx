@@ -202,7 +202,7 @@ export default function NotePage() {
       <TocFab headings={headings} />
 
       {/* Header */}
-      <header className="border-b bg-card p-4 sticky top-0 z-10">
+      <header className="border-b bg-background p-4 sticky top-0 z-10">
         <div className="container mx-auto flex items-center justify-between">
           <div className="flex items-center gap-4">
             <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
@@ -261,7 +261,7 @@ export default function NotePage() {
               <div className="sticky top-20 space-y-4">
                 {/* Local Graph */}
                 {graph && graph.nodes && graph.links && (
-                  <div className="bg-card border rounded-lg p-4 shadow-sm overflow-hidden">
+                  <div className="bg-card border rounded-lg p-4 overflow-hidden">
                     <div className="flex items-center justify-between mb-4">
                       <h3 className="text-sm font-semibold">로컬 그래프</h3>
 
@@ -276,7 +276,7 @@ export default function NotePage() {
                               className={`
                                 w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer
                                 ${depth === level
-                                  ? 'bg-primary text-primary-foreground shadow-md scale-110'
+                                  ? 'bg-primary text-primary-foreground scale-110'
                                   : 'bg-muted text-muted-foreground hover:bg-accent'
                                 }
                               `}
@@ -299,11 +299,7 @@ export default function NotePage() {
                 )}
 
                 {/* Table of Contents - shown below graph on large screens */}
-                {headings.length >= 2 && (
-                  <div className="bg-card border rounded-lg p-4 shadow-sm">
-                    <TableOfContents headings={headings} />
-                  </div>
-                )}
+                <TableOfContents headings={headings} />
               </div>
             </div>
           ) : null}

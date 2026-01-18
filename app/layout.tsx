@@ -4,6 +4,7 @@ import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { ConfirmProvider } from "@/components/ui/confirm-provider";
+import { FindInPage } from "@/components/ui/FindInPage";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -54,6 +55,7 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <ConfirmProvider>
+            <FindInPage />
             {children}
             <Toaster />
           </ConfirmProvider>

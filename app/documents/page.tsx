@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState, useRef } from "react";
+import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -9,10 +9,20 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
-import { X, Search, Folder } from "lucide-react";
+import { Search, Folder, FileText, Type } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
+import { cn } from "@/lib/utils";
+
+interface SearchResult {
+  title: string;
+  folder: string;
+  snippet: string;
+  matchStart: number;
+  matchEnd: number;
+  tags: string[];
+}
 
 function DocumentsContent() {
   const router = useRouter();
@@ -29,6 +39,9 @@ function DocumentsContent() {
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
+  const [searchMode, setSearchMode] = useState<"title" | "content">("title");
+  const [contentSearchResults, setContentSearchResults] = useState<SearchResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
   const itemsPerPage = 12; // 3x4 grid
 
   // Track previous filter values to detect actual changes
@@ -57,6 +70,33 @@ function DocumentsContent() {
 
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  // Content search when query changes and mode is content
+  useEffect(() => {
+    if (searchMode === "content" && searchQuery.trim()) {
+      searchContent(searchQuery);
+    } else {
+      setContentSearchResults([]);
+    }
+  }, [searchQuery, searchMode, selectedFolder]);
+
+  async function searchContent(query: string) {
+    if (!query.trim()) return;
+
+    setIsSearching(true);
+    try {
+      const folderParam = selectedFolder ? `&folder=${encodeURIComponent(selectedFolder)}` : "";
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${folderParam}`);
+      const data = await res.json();
+      if (data.success) {
+        setContentSearchResults(data.data.results);
+      }
+    } catch (err) {
+      console.error("Failed to search content:", err);
+    } finally {
+      setIsSearching(false);
+    }
+  }
 
   // Reset to page 1 when filters actually change (not just on re-render)
   useEffect(() => {
@@ -345,12 +385,11 @@ function DocumentsContent() {
   }
 
   return (
-    <div className="container mx-auto py-8 px-4">
+    <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="mb-8">
+      <div className="shrink-0">
         <AppHeader
-          title="Synapse"
-          subtitle="Your local-first markdown notes"
+          showLogo
           actions={
             <>
               <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
@@ -365,28 +404,58 @@ function DocumentsContent() {
       </div>
 
       {/* Folder Tabs */}
-      <FolderTabs
-        selectedFolder={selectedFolder}
-        onFolderChange={handleFolderChange}
-        className="mb-6"
-      />
+      <div className="shrink-0 px-4 pt-2 bg-background">
+        <FolderTabs
+          selectedFolder={selectedFolder}
+          onFolderChange={handleFolderChange}
+        />
+      </div>
+
+      {/* Main Content */}
+      <main className="flex-1 container mx-auto py-6 px-4">
 
       {/* Search and Actions */}
       <div className="mb-6 flex gap-4">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400 z-10 pointer-events-none" />
+          {/* Search Mode Toggle */}
+          <div className="absolute left-2 top-1/2 -translate-y-1/2 flex z-10">
+            <button
+              onClick={() => setSearchMode("title")}
+              className={cn(
+                "p-1.5 rounded-l border-r transition-colors",
+                searchMode === "title"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+              title="제목 검색"
+            >
+              <Type className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => setSearchMode("content")}
+              className={cn(
+                "p-1.5 rounded-r transition-colors",
+                searchMode === "content"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+              title="내용 검색"
+            >
+              <FileText className="w-4 h-4" />
+            </button>
+          </div>
           <Input
             type="text"
-            placeholder="노트 검색..."
+            placeholder={searchMode === "title" ? "제목으로 검색..." : "내용으로 검색..."}
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
               setSelectedSearchIndex(0);
             }}
-            onFocus={() => setShowSearchSuggestions(true)}
+            onFocus={() => searchMode === "title" && setShowSearchSuggestions(true)}
             onBlur={() => setTimeout(() => setShowSearchSuggestions(false), 200)}
             onKeyDown={(e) => {
-              if (!showSearchSuggestions || searchSuggestions.length === 0) return;
+              if (searchMode !== "title" || !showSearchSuggestions || searchSuggestions.length === 0) return;
 
               if (e.key === "ArrowDown") {
                 e.preventDefault();
@@ -404,12 +473,12 @@ function DocumentsContent() {
                 setShowSearchSuggestions(false);
               }
             }}
-            className="pl-10 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="pl-20 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           />
 
-          {/* Search Suggestions Dropdown */}
-          {showSearchSuggestions && searchSuggestions.length > 0 && (
-            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg shadow-lg max-h-[200px] overflow-y-auto z-10">
+          {/* Search Suggestions Dropdown (title mode only) */}
+          {searchMode === "title" && showSearchSuggestions && searchSuggestions.length > 0 && (
+            <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded-lg max-h-[200px] overflow-y-auto z-10">
               {searchSuggestions.map((title, index) => (
                 <button
                   key={title}
@@ -473,7 +542,22 @@ function DocumentsContent() {
 
       {/* Stats */}
       <div className="mb-6 text-sm text-muted-foreground">
-        {filteredDocuments.length > 0 ? (
+        {searchMode === "content" && searchQuery ? (
+          isSearching ? (
+            "검색 중..."
+          ) : (() => {
+            const filteredResults = contentSearchResults.filter((result) => {
+              const matchesIncludeTags =
+                selectedTags.length === 0 || selectedTags.every((tag) => result.tags?.includes(tag));
+              const matchesExcludeTags =
+                excludedTags.length === 0 || !excludedTags.some((tag) => result.tags?.includes(tag));
+              return matchesIncludeTags && matchesExcludeTags;
+            });
+            return filteredResults.length > 0
+              ? `${filteredResults.length}개의 검색 결과${selectedTags.length > 0 || excludedTags.length > 0 ? ' (필터 적용됨)' : ''}`
+              : "검색 결과 없음";
+          })()
+        ) : filteredDocuments.length > 0 ? (
           <>
             Showing {startIndex + 1}-{Math.min(endIndex, filteredDocuments.length)} of {filteredDocuments.length} {filteredDocuments.length === 1 ? "note" : "notes"}
             {searchQuery && ` matching "${searchQuery}"`}
@@ -485,53 +569,65 @@ function DocumentsContent() {
         )}
       </div>
 
-      {/* Pagination - Top */}
-      {totalPages > 1 && (
+      {/* Pagination - Top (only for title search mode) */}
+      {searchMode === "title" && totalPages > 1 && (
         <div className="mb-6">
           <PaginationControls />
         </div>
       )}
 
-      {/* Documents List */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-        {paginatedDocuments.map((doc) => (
-          <Card
-            key={doc.title}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => router.push(`/note/${encodeURIComponent(doc.title)}`)}
-          >
-            <CardHeader>
-              <CardTitle className="text-lg">
-                {doc.title}
-                {/* Show folder badge when viewing All tab */}
-                {selectedFolder === null && doc.folder && (
-                  <Badge
-                    variant="outline"
-                    className="ml-2 text-xs font-normal bg-muted/50 text-muted-foreground border-border/50"
-                  >
-                    <Folder className="w-3 h-3 mr-1" />
-                    {doc.folder}
-                  </Badge>
-                )}
-              </CardTitle>
-              <CardDescription>
-                <div className="flex flex-col gap-1 text-xs">
-                  <span>Updated: {new Date(doc.updatedAt).toLocaleDateString()}</span>
-                  {doc.links.length > 0 && (
-                    <span>{doc.links.length} links</span>
+      {/* Content Search Results */}
+      {searchMode === "content" && searchQuery && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {contentSearchResults
+            .filter((result) => {
+              // Apply tag filters
+              const matchesIncludeTags =
+                selectedTags.length === 0
+                  ? true
+                  : selectedTags.every((tag) => result.tags?.includes(tag));
+              const matchesExcludeTags =
+                excludedTags.length === 0
+                  ? true
+                  : !excludedTags.some((tag) => result.tags?.includes(tag));
+              return matchesIncludeTags && matchesExcludeTags;
+            })
+            .map((result, index) => (
+            <Card
+              key={`${result.folder}-${result.title}-${index}`}
+              className="cursor-pointer hover:bg-accent transition-colors"
+              onClick={() => router.push(`/note/${encodeURIComponent(result.title)}`)}
+            >
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  {result.title}
+                  {selectedFolder === null && result.folder && (
+                    <Badge
+                      variant="outline"
+                      className="ml-2 text-xs font-normal bg-muted/50 text-muted-foreground border-border/50"
+                    >
+                      <Folder className="w-3 h-3 mr-1" />
+                      {result.folder}
+                    </Badge>
                   )}
-                  {doc.backlinks.length > 0 && (
-                    <span>{doc.backlinks.length} backlinks</span>
-                  )}
-                  {doc.frontmatter.tags && doc.frontmatter.tags.length > 0 && (
-                    <div className="flex gap-1 flex-wrap mt-2">
-                      {doc.frontmatter.tags.map((tag) => (
+                </CardTitle>
+                <CardDescription>
+                  <div className="text-sm leading-relaxed mt-2">
+                    <span>{result.snippet.slice(0, result.matchStart)}</span>
+                    <span className="bg-primary/20 text-primary font-medium px-0.5 rounded">
+                      {result.snippet.slice(result.matchStart, result.matchEnd)}
+                    </span>
+                    <span>{result.snippet.slice(result.matchEnd)}</span>
+                  </div>
+                  {result.tags && result.tags.length > 0 && (
+                    <div className="flex gap-1 flex-wrap mt-3">
+                      {result.tags.map((tag) => (
                         <Badge
                           key={tag}
                           className={`cursor-pointer text-xs transition-colors ${
                             selectedTags.includes(tag)
-                              ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
-                              : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                              ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/20"
+                              : "bg-muted text-muted-foreground border-border hover:bg-accent"
                           }`}
                           onClick={(e) => handleTagClick(tag, e)}
                         >
@@ -540,22 +636,79 @@ function DocumentsContent() {
                       ))}
                     </div>
                   )}
-                </div>
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      )}
 
-      {/* Pagination - Bottom */}
-      {totalPages > 1 && (
+      {/* Documents List (title search mode) */}
+      {searchMode === "title" && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {paginatedDocuments.map((doc) => (
+            <Card
+              key={doc.title}
+              className="cursor-pointer hover:bg-accent transition-colors"
+              onClick={() => router.push(`/note/${encodeURIComponent(doc.title)}`)}
+            >
+              <CardHeader>
+                <CardTitle className="text-lg">
+                  {doc.title}
+                  {/* Show folder badge when viewing All tab */}
+                  {selectedFolder === null && doc.folder && (
+                    <Badge
+                      variant="outline"
+                      className="ml-2 text-xs font-normal bg-muted/50 text-muted-foreground border-border/50"
+                    >
+                      <Folder className="w-3 h-3 mr-1" />
+                      {doc.folder}
+                    </Badge>
+                  )}
+                </CardTitle>
+                <CardDescription>
+                  <div className="flex flex-col gap-1 text-xs">
+                    <span>Updated: {new Date(doc.updatedAt).toLocaleDateString()}</span>
+                    {doc.links.length > 0 && (
+                      <span>{doc.links.length} links</span>
+                    )}
+                    {doc.backlinks.length > 0 && (
+                      <span>{doc.backlinks.length} backlinks</span>
+                    )}
+                    {doc.frontmatter.tags && doc.frontmatter.tags.length > 0 && (
+                      <div className="flex gap-1 flex-wrap mt-2">
+                        {doc.frontmatter.tags.map((tag) => (
+                          <Badge
+                            key={tag}
+                            className={`cursor-pointer text-xs transition-colors ${
+                              selectedTags.includes(tag)
+                                ? "bg-primary/10 text-primary border-primary/20 hover:bg-primary/15"
+                                : "bg-muted text-muted-foreground border-border hover:bg-muted/80"
+                            }`}
+                            onClick={(e) => handleTagClick(tag, e)}
+                          >
+                            {tag}
+                          </Badge>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </CardDescription>
+              </CardHeader>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      {/* Pagination - Bottom (only for title search mode) */}
+      {searchMode === "title" && totalPages > 1 && (
         <div className="mt-8">
           <PaginationControls />
         </div>
       )}
 
       {/* Empty State - No documents at all */}
-      {documents.length === 0 && (
+      {documents.length === 0 && searchMode === "title" && (
         <div className="text-center py-12">
           <p className="text-muted-foreground mb-4">
             {isPublishedMode()
@@ -568,13 +721,31 @@ function DocumentsContent() {
         </div>
       )}
 
-      {/* No Filter Results */}
-      {documents.length > 0 && filteredDocuments.length === 0 && (
+      {/* No Filter Results - Title mode */}
+      {searchMode === "title" && documents.length > 0 && filteredDocuments.length === 0 && (
         <div className="text-center py-12">
           <p className="font-medium mb-2">현재 조건에 해당하는 문서가 없습니다</p>
           <p className="text-sm text-muted-foreground">필터를 변경하거나 새 문서를 작성해보세요</p>
         </div>
       )}
+
+      {/* No Search Results - Content mode */}
+      {searchMode === "content" && searchQuery && !isSearching && contentSearchResults.length === 0 && (
+        <div className="text-center py-12">
+          <p className="font-medium mb-2">"{searchQuery}"에 대한 검색 결과가 없습니다</p>
+          <p className="text-sm text-muted-foreground">다른 키워드로 검색해보세요</p>
+        </div>
+      )}
+
+      {/* Content mode - No search query yet */}
+      {searchMode === "content" && !searchQuery && (
+        <div className="text-center py-12">
+          <Search className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
+          <p className="font-medium mb-2">내용 검색</p>
+          <p className="text-sm text-muted-foreground">검색어를 입력하면 문서 내용에서 검색합니다</p>
+        </div>
+      )}
+      </main>
     </div>
   );
 }

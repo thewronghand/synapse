@@ -305,7 +305,7 @@ export default function D3ForceGraph({
       />
 
       {/* Legend */}
-      <div className="absolute bottom-4 right-4 bg-white border rounded-lg shadow-lg p-3">
+      <div className="absolute bottom-4 right-4 bg-white border rounded-lg p-3">
         <h4 className="text-sm font-semibold mb-2">Legend</h4>
         <div className="space-y-1 text-xs">
           <div className="flex items-center gap-2">
