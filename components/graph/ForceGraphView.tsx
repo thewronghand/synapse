@@ -822,12 +822,12 @@ export default function ForceGraphView({
                     setShowSearchSuggestions(false);
                   }
                 }}
-                className="w-full pl-10 pr-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-10 pr-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary"
               />
 
               {/* Search Suggestions Dropdown */}
               {showSearchSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded max-h-40 overflow-y-auto z-10">
                   {searchSuggestions.map((title, index) => (
                     <button
                       key={title}
@@ -879,12 +879,12 @@ export default function ForceGraphView({
                     setShowTagSuggestions(false);
                   }
                 }}
-                className="w-full px-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary"
               />
 
               {/* Tag Suggestions Dropdown */}
               {showTagSuggestions && tagSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded max-h-40 overflow-y-auto z-10">
                   {tagSuggestions.map((tag, index) => (
                     <button
                       key={tag}
@@ -927,7 +927,7 @@ export default function ForceGraphView({
       <div className="absolute top-2 right-2 flex flex-col gap-1">
         <button
           onClick={handleZoomIn}
-          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Zoom In"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -936,7 +936,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomOut}
-          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Zoom Out"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -945,7 +945,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomReset}
-          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Reset View"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -955,7 +955,7 @@ export default function ForceGraphView({
       </div>
 
       {/* Collapsible Legend */}
-      <div className="absolute bottom-2 right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg shadow-sm text-xs">
+      <div className="absolute bottom-2 right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg text-xs">
         <button
           onClick={() => setIsLegendExpanded(!isLegendExpanded)}
           className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-accent rounded-lg transition-colors cursor-pointer"
