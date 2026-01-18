@@ -163,46 +163,7 @@ function createWindow() {
       shell.openExternal(url);
     }
   });
-
 }
-
-// Handle mouse button navigation via IPC from preload
-ipcMain.on('nav-back', () => {
-  if (mainWindow && mainWindow.webContents.canGoBack()) {
-    mainWindow.webContents.goBack();
-  }
-});
-
-ipcMain.on('nav-forward', () => {
-  if (mainWindow && mainWindow.webContents.canGoForward()) {
-    mainWindow.webContents.goForward();
-  }
-});
-
-// Handle find in page
-ipcMain.on('find-in-page', (event, text) => {
-  if (mainWindow && text) {
-    mainWindow.webContents.findInPage(text);
-  }
-});
-
-ipcMain.on('find-in-page-next', () => {
-  if (mainWindow) {
-    mainWindow.webContents.findInPage('', { findNext: true, forward: true });
-  }
-});
-
-ipcMain.on('find-in-page-prev', () => {
-  if (mainWindow) {
-    mainWindow.webContents.findInPage('', { findNext: true, forward: false });
-  }
-});
-
-ipcMain.on('stop-find-in-page', () => {
-  if (mainWindow) {
-    mainWindow.webContents.stopFindInPage('clearSelection');
-  }
-});
 
 function createMenu() {
   const isMac = process.platform === 'darwin';
@@ -297,6 +258,44 @@ function createMenu() {
   const menu = Menu.buildFromTemplate(template);
   Menu.setApplicationMenu(menu);
 }
+
+// Handle mouse button navigation via IPC from preload
+ipcMain.on('nav-back', () => {
+  if (mainWindow && mainWindow.webContents.canGoBack()) {
+    mainWindow.webContents.goBack();
+  }
+});
+
+ipcMain.on('nav-forward', () => {
+  if (mainWindow && mainWindow.webContents.canGoForward()) {
+    mainWindow.webContents.goForward();
+  }
+});
+
+// Handle find in page
+ipcMain.on('find-in-page', (event, text) => {
+  if (mainWindow && text) {
+    mainWindow.webContents.findInPage(text);
+  }
+});
+
+ipcMain.on('find-in-page-next', () => {
+  if (mainWindow) {
+    mainWindow.webContents.findInPage('', { findNext: true, forward: true });
+  }
+});
+
+ipcMain.on('find-in-page-prev', () => {
+  if (mainWindow) {
+    mainWindow.webContents.findInPage('', { findNext: true, forward: false });
+  }
+});
+
+ipcMain.on('stop-find-in-page', () => {
+  if (mainWindow) {
+    mainWindow.webContents.stopFindInPage('clearSelection');
+  }
+});
 
 function startNextServer() {
   return new Promise((resolve, reject) => {
