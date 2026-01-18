@@ -81,10 +81,12 @@ html {
 }
 
 /* Default border color for Tailwind v4 */
-*,
-*::before,
-*::after {
-  border-color: var(--border);
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border);
+  }
 }
 
 /* Dark mode prose typography */
