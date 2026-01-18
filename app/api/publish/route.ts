@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { VercelClient } from '@/lib/vercel-client';
 import { deleteVercelToken } from '@/lib/vercel-token';
+import { getExportDataDir } from '@/lib/data-path';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -81,6 +82,7 @@ export async function POST(request: NextRequest) {
     // Step 4: Read all project files
     console.log('[Publish] Reading project files...');
     const projectRoot = process.cwd();
+    console.log('[Publish] process.cwd():', projectRoot);
     const filesToPush: Array<{ path: string; content: string; encoding?: 'utf-8' | 'base64' }> = [];
 
     // Binary file extensions that should not be read as UTF-8
@@ -250,7 +252,46 @@ export async function POST(request: NextRequest) {
       encoding: 'utf-8',
     });
 
-    console.log(`[Publish] Found ${filesToPush.length} files to deploy`);
+    console.log(`[Publish] Found ${filesToPush.length} files to deploy (before export data)`);
+
+    // Step 4.5: Read export data files and add them as public/data/*
+    const exportDataDir = getExportDataDir();
+    console.log('[Publish] Export data dir:', exportDataDir);
+
+    try {
+      const exportDataExists = await fs.stat(exportDataDir).then(() => true).catch(() => false);
+
+      if (exportDataExists) {
+        // Helper function to read export data files recursively
+        async function readExportDataDirectory(dirPath: string, baseDir: string = '') {
+          const entries = await fs.readdir(dirPath, { withFileTypes: true });
+
+          for (const entry of entries) {
+            const fullPath = path.join(dirPath, entry.name);
+            const relativePath = path.join(baseDir, entry.name).replace(/\\/g, '/');
+
+            if (entry.isDirectory()) {
+              await readExportDataDirectory(fullPath, relativePath);
+            } else {
+              // Read as UTF-8 (all export data files are JSON)
+              const content = await fs.readFile(fullPath, 'utf-8');
+              filesToPush.push({
+                path: `public/data/${relativePath}`,
+                content,
+                encoding: 'utf-8',
+              });
+            }
+          }
+        }
+
+        await readExportDataDirectory(exportDataDir);
+        console.log(`[Publish] Added export data files, total files now: ${filesToPush.length}`);
+      } else {
+        console.warn('[Publish] Export data directory does not exist:', exportDataDir);
+      }
+    } catch (error) {
+      console.error('[Publish] Error reading export data:', error);
+    }
 
     // Debug: Check if public/data files are included
     const publicDataFiles = filesToPush.filter(f => f.path.startsWith('public/data'));

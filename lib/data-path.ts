@@ -35,3 +35,28 @@ export async function ensureUserDataDir(): Promise<void> {
     // Directory already exists or other error (will fail on file write)
   }
 }
+
+/**
+ * Get the export data directory path
+ * - In Electron: Uses USER_DATA_DIR/export-data
+ * - In development: Uses project's public/data
+ */
+export function getExportDataDir(): string {
+  if (process.env.USER_DATA_DIR) {
+    return path.join(process.env.USER_DATA_DIR, 'export-data');
+  }
+  // Development: use public/data for compatibility
+  return path.join(process.cwd(), 'public', 'data');
+}
+
+/**
+ * Ensure the export data directory exists
+ */
+export async function ensureExportDataDir(): Promise<void> {
+  const dir = getExportDataDir();
+  try {
+    await fs.mkdir(dir, { recursive: true });
+  } catch (error) {
+    // Directory already exists
+  }
+}

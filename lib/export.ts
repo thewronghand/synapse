@@ -5,6 +5,7 @@ import { Document } from '@/types';
 import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename, titlesMatch } from './document-parser';
 import { getNotesDir } from './notes-path';
 import { ensureDefaultFolder } from './folder-utils';
+import { getExportDataDir, ensureExportDataDir } from './data-path';
 
 const NOTES_DIR = getNotesDir();
 
@@ -258,11 +259,11 @@ function getNodeColor(tags: string[], backlinkCount: number): string {
  * @param excludedFolders - Array of folder names to exclude from export
  */
 export async function exportToJSON(excludedFolders: string[] = []) {
-  const exportDir = path.join(process.cwd(), 'public', 'data');
+  const exportDir = getExportDataDir();
 
-  if (!fss.existsSync(exportDir)) {
-    fss.mkdirSync(exportDir, { recursive: true });
-  }
+  console.log('[Export] exportDir:', exportDir);
+
+  await ensureExportDataDir();
 
   console.log('[Export] Starting data export...');
   if (excludedFolders.length > 0) {
