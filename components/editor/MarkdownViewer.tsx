@@ -118,7 +118,7 @@ function MarkdownViewer({
           </Tooltip.Trigger>
           <Tooltip.Portal>
             <Tooltip.Content
-              className="z-50 px-3 py-1.5 text-sm bg-card text-card-foreground border border-border rounded-md shadow-md"
+              className="z-50 px-3 py-1.5 text-sm bg-card text-card-foreground border border-border rounded-md"
               sideOffset={5}
             >
               {title}

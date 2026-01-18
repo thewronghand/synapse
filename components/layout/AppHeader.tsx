@@ -6,39 +6,52 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Settings } from "lucide-react";
 import { ReactNode } from "react";
 import { isPublishedMode } from "@/lib/env";
+import Logo from "@/components/ui/Logo";
 
 interface AppHeaderProps {
   title?: string | ReactNode;
   subtitle?: string | ReactNode;
   actions?: ReactNode;
   showSettings?: boolean;
+  showLogo?: boolean;
 }
+
+const DEFAULT_SUBTITLE = "Connect the dots.";
 
 export default function AppHeader({
   title,
   subtitle,
   actions,
   showSettings = true,
+  showLogo = false,
 }: AppHeaderProps) {
   const router = useRouter();
+
+  // Determine what to show for title
+  const displayTitle = showLogo ? <Logo width={160} height={45} /> : title;
+
+  // Determine what to show for subtitle
+  const displaySubtitle = showLogo
+    ? (subtitle ?? DEFAULT_SUBTITLE)
+    : subtitle;
 
   return (
     <header className="border-b bg-background p-4">
       <div className="container mx-auto flex items-start justify-between">
         {/* Left side: Title and subtitle */}
         <div>
-          {title && (
-            typeof title === 'string' ? (
-              <h1 className="text-4xl font-bold mb-2">{title}</h1>
+          {displayTitle && (
+            typeof displayTitle === 'string' ? (
+              <h1 className="text-4xl font-bold mb-2">{displayTitle}</h1>
             ) : (
-              title
+              displayTitle
             )
           )}
-          {subtitle && (
-            typeof subtitle === 'string' ? (
-              <p className="text-foreground/60">{subtitle}</p>
+          {displaySubtitle && (
+            typeof displaySubtitle === 'string' ? (
+              <p className="text-sm text-muted-foreground mt-1">{displaySubtitle}</p>
             ) : (
-              subtitle
+              displaySubtitle
             )
           )}
         </div>

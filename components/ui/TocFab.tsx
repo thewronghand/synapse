@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { List, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { TocItem } from "@/lib/toc";
@@ -12,6 +12,29 @@ interface TocFabProps {
 
 export function TocFab({ headings }: TocFabProps) {
   const [open, setOpen] = useState(false);
+  const [hasScrollableContent, setHasScrollableContent] = useState(false);
+
+  // Check if page has scrollable content
+  useEffect(() => {
+    function checkScrollable() {
+      const hasScroll = document.documentElement.scrollHeight > window.innerHeight + 50;
+      setHasScrollableContent(hasScroll);
+    }
+
+    checkScrollable();
+
+    // Re-check on resize
+    window.addEventListener("resize", checkScrollable);
+
+    // Re-check when DOM changes (images loading, etc.)
+    const observer = new ResizeObserver(checkScrollable);
+    observer.observe(document.body);
+
+    return () => {
+      window.removeEventListener("resize", checkScrollable);
+      observer.disconnect();
+    };
+  }, [headings]);
 
   function handleClick(id: string) {
     const element = document.getElementById(id);
@@ -40,8 +63,8 @@ export function TocFab({ headings }: TocFabProps) {
     }
   }
 
-  // Don't render if less than 2 headings
-  if (headings.length < 2) {
+  // Don't render if less than 2 headings or no scrollable content
+  if (headings.length < 2 || !hasScrollableContent) {
     return null;
   }
 
@@ -51,7 +74,7 @@ export function TocFab({ headings }: TocFabProps) {
         <button
           className={cn(
             "fixed right-4 top-24 z-40",
-            "w-10 h-10 rounded-full shadow-lg",
+            "w-10 h-10 rounded-full",
             "bg-primary text-primary-foreground",
             "flex items-center justify-center",
             "hover:bg-primary/90 transition-colors cursor-pointer",
@@ -70,7 +93,7 @@ export function TocFab({ headings }: TocFabProps) {
           sideOffset={8}
           className={cn(
             "z-50 w-64 max-h-[60vh] overflow-y-auto",
-            "bg-card border border-border rounded-lg shadow-lg p-4",
+            "bg-card border border-border rounded-lg p-4",
             "animate-in fade-in-0 zoom-in-95"
           )}
         >

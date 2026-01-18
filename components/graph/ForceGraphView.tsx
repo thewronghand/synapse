@@ -18,7 +18,14 @@ interface ForceGraphInstance {
   nodeCanvasObjectMode: (mode: () => string) => ForceGraphInstance;
   linkColor: (accessor: (link: GraphEdge) => string) => ForceGraphInstance;
   linkWidth: (accessor: (link: GraphEdge) => number) => ForceGraphInstance;
-  linkDirectionalArrowLength: (length: number) => ForceGraphInstance;
+  linkDirectionalArrowLength: (length: number | ((link: GraphEdge) => number)) => ForceGraphInstance;
+  linkDirectionalParticles: (count: number | ((link: GraphEdge) => number)) => ForceGraphInstance;
+  linkDirectionalParticleSpeed: (speed: number | ((link: GraphEdge) => number)) => ForceGraphInstance;
+  linkDirectionalParticleWidth: (width: number | ((link: GraphEdge) => number)) => ForceGraphInstance;
+  linkDirectionalParticleColor: (color: string | ((link: GraphEdge) => string)) => ForceGraphInstance;
+  linkCurvature: (curvature: number | ((link: GraphEdge) => number)) => ForceGraphInstance;
+  linkCanvasObject: (renderer: ((link: GraphEdge, ctx: CanvasRenderingContext2D, globalScale: number) => void) | null) => ForceGraphInstance;
+  linkCanvasObjectMode: (mode: string | ((link: GraphEdge) => string)) => ForceGraphInstance;
   autoPauseRedraw: (enabled: boolean) => ForceGraphInstance;
   onNodeClick: (handler: (node: DigitalGardenNode) => void) => ForceGraphInstance;
   onNodeHover: (handler: (node: DigitalGardenNode | null) => void) => ForceGraphInstance;
@@ -68,6 +75,10 @@ export default function ForceGraphView({
   const highlightNodesRef = useRef<Set<DigitalGardenNode>>(new Set());
   const highlightLinksRef = useRef<Set<GraphEdge>>(new Set());
   const [isLegendExpanded, setIsLegendExpanded] = useState(false);
+
+  // Particle animation state
+  const particleProgressRef = useRef<number>(0);
+  const animationFrameRef = useRef<number | null>(null);
 
   // Handle hydration mismatch
   useEffect(() => {
@@ -283,6 +294,25 @@ export default function ForceGraphView({
     const nodesArray = Object.values(filteredData.nodes);
     const linksArray = filteredData.links;
 
+    // Build bidirectional link map for particle effects
+    // Key: "sourceId-targetId", Value: true if reverse link exists
+    const bidirectionalLinks = new Set<string>();
+    const linkPairs = new Map<string, boolean>();
+
+    linksArray.forEach((link: GraphEdge) => {
+      const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
+      const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+      const forwardKey = `${sourceId}-${targetId}`;
+      const reverseKey = `${targetId}-${sourceId}`;
+
+      if (linkPairs.has(reverseKey)) {
+        // Found bidirectional link
+        bidirectionalLinks.add(forwardKey);
+        bidirectionalLinks.add(reverseKey);
+      }
+      linkPairs.set(forwardKey, true);
+    });
+
     // Dynamically import ForceGraph
     import("force-graph").then(({ default: ForceGraph }) => {
       // Clean up existing graph before creating new one
@@ -412,7 +442,7 @@ export default function ForceGraphView({
         // Highlight links connected to hovered node - theme aware
         if (!hoveredNodeRef.current) return isDark ? "#9CA3AF" : "#d3d3d3"; // gray-400 : lightgray
         return highlightLinksRef.current.has(link)
-          ? (isDark ? "#D1D5DB" : "#6b7280") // gray-300 : gray-500
+          ? (isDark ? "#D1D5DB" : "#d3d3d3") // gray-300 : gray-300 (lighter in light mode)
           : (isDark ? "#6B7280" : "#e5e7eb"); // gray-500 : gray-200
       })
       .linkWidth((link: GraphEdge) => {
@@ -421,6 +451,82 @@ export default function ForceGraphView({
         return highlightLinksRef.current.has(link) ? 1.5 : 0.5;
       })
       .linkDirectionalArrowLength(2)
+      // Custom particle rendering for bidirectional center-spread effect
+      .linkCanvasObjectMode(() => "after")
+      .linkCanvasObject((link: GraphEdge, ctx: CanvasRenderingContext2D) => {
+        // Only draw particles for highlighted links
+        if (!highlightLinksRef.current.has(link)) return;
+
+        const sourceNode = link.source as any;
+        const targetNode = link.target as any;
+
+        if (!sourceNode.x || !targetNode.x) return;
+
+        const sourceId = sourceNode.id;
+        const targetId = targetNode.id;
+        const linkKey = `${sourceId}-${targetId}`;
+        const isBidirectional = bidirectionalLinks.has(linkKey);
+
+        // Calculate link line
+        const dx = targetNode.x - sourceNode.x;
+        const dy = targetNode.y - sourceNode.y;
+        const distance = Math.sqrt(dx * dx + dy * dy);
+
+        if (distance === 0) return;
+
+        // Particle settings
+        const baseColor = isDark ? [95, 201, 195] : [0, 128, 128]; // RGB values
+        const particleRadius = 0.8;
+        const numParticles = 2;
+        const progress = particleProgressRef.current;
+
+        if (isBidirectional) {
+          // Bidirectional: particles spread from center to both ends
+          for (let i = 0; i < numParticles; i++) {
+            const baseOffset = i / numParticles;
+            const animatedProgress = (progress + baseOffset) % 1;
+
+            // Fade: full opacity at center (0), fade out towards edges (1)
+            const fadeAlpha = 1 - animatedProgress * 0.8;
+            ctx.fillStyle = `rgba(${baseColor[0]}, ${baseColor[1]}, ${baseColor[2]}, ${fadeAlpha})`;
+
+            // Particle going towards target (from center)
+            const t1 = 0.5 + animatedProgress * 0.5;
+            const x1 = sourceNode.x + dx * t1;
+            const y1 = sourceNode.y + dy * t1;
+
+            ctx.beginPath();
+            ctx.arc(x1, y1, particleRadius, 0, 2 * Math.PI);
+            ctx.fill();
+
+            // Particle going towards source (from center)
+            const t2 = 0.5 - animatedProgress * 0.5;
+            const x2 = sourceNode.x + dx * t2;
+            const y2 = sourceNode.y + dy * t2;
+
+            ctx.beginPath();
+            ctx.arc(x2, y2, particleRadius, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+        } else {
+          // Unidirectional: particles flow from source to target
+          for (let i = 0; i < numParticles; i++) {
+            const baseOffset = i / numParticles;
+            const t = (progress + baseOffset) % 1;
+
+            // Fade: full opacity at start, fade out towards end
+            const fadeAlpha = 1 - t * 0.7;
+            ctx.fillStyle = `rgba(${baseColor[0]}, ${baseColor[1]}, ${baseColor[2]}, ${fadeAlpha})`;
+
+            const x = sourceNode.x + dx * t;
+            const y = sourceNode.y + dy * t;
+
+            ctx.beginPath();
+            ctx.arc(x, y, particleRadius, 0, 2 * Math.PI);
+            ctx.fill();
+          }
+        }
+      })
       .autoPauseRedraw(false)
       .onNodeClick((node: DigitalGardenNode) => {
         if (onNodeClick) {
@@ -471,9 +577,36 @@ export default function ForceGraphView({
           highlightLinksRef.current = new Set();
         }
 
+        // Start/stop particle animation
+        if (node) {
+          // Start animation loop
+          const animate = () => {
+            particleProgressRef.current = (particleProgressRef.current + 0.005) % 1; // Even slower animation
+            // Force graph to re-render by triggering a redraw
+            if (graphRef.current && hoveredNodeRef.current) {
+              // Access internal method to force re-render
+              const g = graphRef.current as any;
+              if (g._ctx) {
+                // Direct canvas refresh
+                g.nodeColor(g.nodeColor());
+              }
+              animationFrameRef.current = requestAnimationFrame(animate);
+            }
+          };
+          animationFrameRef.current = requestAnimationFrame(animate);
+        } else {
+          // Stop animation
+          if (animationFrameRef.current) {
+            cancelAnimationFrame(animationFrameRef.current);
+            animationFrameRef.current = null;
+          }
+          particleProgressRef.current = 0;
+        }
+
         // Trigger re-render of the graph
         if (graphRef.current) {
-          (graphRef.current as any).nodeColor((graphRef.current as any).nodeColor());
+          const g = graphRef.current as any;
+          g.nodeColor(g.nodeColor());
         }
       })
       .width(containerWidth)
@@ -489,26 +622,71 @@ export default function ForceGraphView({
 
       // Dynamically adjust force simulation based on graph complexity
       const nodeCount = nodesArray.length;
-      const linkCount = linksArray.length;
-      const density = linkCount / Math.max(nodeCount, 1);
 
-      // Calculate optimal force parameters based on node count
-      // Reduced repulsion to keep disconnected components closer
-      const chargeStrength = Math.min(-20, -15 - (nodeCount / 20));
+      // Build connection count map for dynamic link distance
+      const connectionCounts = new Map<string, number>();
+      nodesArray.forEach((node: DigitalGardenNode) => {
+        connectionCounts.set(String(node.id), node.neighbors?.length || 0);
+      });
 
-      // Calculate link distance based on density
-      // Higher density = longer links to spread out
-      const linkDistance = density > 2 ? 35 : 25;
-
+      // Charge force (repulsion) - Coulomb's law
+      // Stronger repulsion to keep clusters well separated
       const chargeForce = graph.d3Force('charge');
       if (chargeForce) {
-        chargeForce.strength(chargeStrength);
-        // Limit the distance at which charge force applies
-        chargeForce.distanceMax(150);
+        // Stronger repulsion to prevent overlapping
+        const baseCharge = Math.min(-70, -50 - (nodeCount / 15));
+        chargeForce.strength(baseCharge);
+        chargeForce.distanceMax(300);
+        chargeForce.distanceMin(15);
       }
 
+      // Link force (spring) - Hooke's law
+      // Dynamic distance + dynamic strength (Obsidian-style strength)
       const linkForce = graph.d3Force('link');
-      if (linkForce) linkForce.distance(linkDistance);
+      if (linkForce) {
+        // Dynamic link distance: longer for hub nodes
+        linkForce.distance((link: any) => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+
+          const sourceConnections = connectionCounts.get(String(sourceId)) || 0;
+          const targetConnections = connectionCounts.get(String(targetId)) || 0;
+          const maxConnections = Math.max(sourceConnections, targetConnections);
+
+          // Base: 40, scales up to 100 for highly connected nodes
+          return 40 + Math.min(maxConnections * 6, 60);
+        });
+
+        // Link strength: weaker for highly connected nodes (Obsidian formula)
+        linkForce.strength((link: any) => {
+          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
+          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+
+          const sourceConnections = connectionCounts.get(String(sourceId)) || 1;
+          const targetConnections = connectionCounts.get(String(targetId)) || 1;
+
+          // Obsidian-style: weaker links for hub nodes
+          return 1 / Math.min(sourceConnections, targetConnections);
+        });
+      }
+
+      // Center force - gentle pull towards center (uses default)
+
+      // Initialize nodes in a circular layout to prevent "folded" initial state
+      // This helps the simulation start from an unfolded position
+      const radius = Math.max(100, nodeCount * 3);
+      nodesArray.forEach((node: any, i: number) => {
+        const angle = (2 * Math.PI * i) / nodeCount;
+        if (node.x === undefined) node.x = radius * Math.cos(angle);
+        if (node.y === undefined) node.y = radius * Math.sin(angle);
+      });
+
+      // Use forceRadial with radius 0 to pull nodes toward center point
+      // Combined with repulsion, this creates a tight but non-overlapping cluster
+      import('d3-force').then(d3Force => {
+        const radialForce = d3Force.forceRadial(0, 0, 0).strength(0.08);
+        graph.d3Force('radial', radialForce);
+      });
 
       // Auto zoom to fit all nodes after simulation stabilizes
       graph.onEngineStop(() => {
@@ -644,12 +822,12 @@ export default function ForceGraphView({
                     setShowSearchSuggestions(false);
                   }
                 }}
-                className="w-full pl-10 pr-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full pl-10 pr-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary"
               />
 
               {/* Search Suggestions Dropdown */}
               {showSearchSuggestions && searchSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded max-h-40 overflow-y-auto z-10">
                   {searchSuggestions.map((title, index) => (
                     <button
                       key={title}
@@ -701,12 +879,12 @@ export default function ForceGraphView({
                     setShowTagSuggestions(false);
                   }
                 }}
-                className="w-full px-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm focus:outline-none focus:ring-2 focus:ring-primary"
+                className="w-full px-3 py-1.5 text-sm bg-card/90 backdrop-blur-sm border border-border rounded focus:outline-none focus:ring-2 focus:ring-primary"
               />
 
               {/* Tag Suggestions Dropdown */}
               {showTagSuggestions && tagSuggestions.length > 0 && (
-                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded shadow-lg max-h-40 overflow-y-auto z-10">
+                <div className="absolute top-full left-0 right-0 mt-1 bg-card border border-border rounded max-h-40 overflow-y-auto z-10">
                   {tagSuggestions.map((tag, index) => (
                     <button
                       key={tag}
@@ -749,7 +927,7 @@ export default function ForceGraphView({
       <div className="absolute top-2 right-2 flex flex-col gap-1">
         <button
           onClick={handleZoomIn}
-          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Zoom In"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -758,7 +936,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomOut}
-          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Zoom Out"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -767,7 +945,7 @@ export default function ForceGraphView({
         </button>
         <button
           onClick={handleZoomReset}
-          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded shadow-sm hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
+          className="w-8 h-8 bg-card/90 backdrop-blur-sm border border-border rounded hover:bg-accent transition-colors flex items-center justify-center cursor-pointer text-foreground"
           title="Reset View"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -777,7 +955,7 @@ export default function ForceGraphView({
       </div>
 
       {/* Collapsible Legend */}
-      <div className="absolute bottom-2 right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg shadow-sm text-xs">
+      <div className="absolute bottom-2 right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg text-xs">
         <button
           onClick={() => setIsLegendExpanded(!isLegendExpanded)}
           className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-accent rounded-lg transition-colors cursor-pointer"

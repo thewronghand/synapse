@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, Menu } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -163,7 +163,100 @@ function createWindow() {
       shell.openExternal(url);
     }
   });
+}
 
+function createMenu() {
+  const isMac = process.platform === 'darwin';
+
+  const template = [
+    // App Menu (macOS only)
+    ...(isMac ? [{
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' }
+      ]
+    }] : []),
+    // File Menu
+    {
+      label: 'File',
+      submenu: [
+        isMac ? { role: 'close' } : { role: 'quit' }
+      ]
+    },
+    // Edit Menu
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        ...(isMac ? [
+          { role: 'pasteAndMatchStyle' },
+          { role: 'delete' },
+          { role: 'selectAll' },
+        ] : [
+          { role: 'delete' },
+          { type: 'separator' },
+          { role: 'selectAll' }
+        ]),
+        { type: 'separator' },
+        {
+          label: 'Find',
+          accelerator: 'CmdOrCtrl+F',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('toggle-find');
+            }
+          }
+        }
+      ]
+    },
+    // View Menu
+    {
+      label: 'View',
+      submenu: [
+        { role: 'reload' },
+        { role: 'forceReload' },
+        { role: 'toggleDevTools' },
+        { type: 'separator' },
+        { role: 'resetZoom' },
+        { role: 'zoomIn' },
+        { role: 'zoomOut' },
+        { type: 'separator' },
+        { role: 'togglefullscreen' }
+      ]
+    },
+    // Window Menu
+    {
+      label: 'Window',
+      submenu: [
+        { role: 'minimize' },
+        { role: 'zoom' },
+        ...(isMac ? [
+          { type: 'separator' },
+          { role: 'front' },
+          { type: 'separator' },
+          { role: 'window' }
+        ] : [
+          { role: 'close' }
+        ])
+      ]
+    }
+  ];
+
+  const menu = Menu.buildFromTemplate(template);
+  Menu.setApplicationMenu(menu);
 }
 
 // Handle mouse button navigation via IPC from preload
@@ -176,6 +269,31 @@ ipcMain.on('nav-back', () => {
 ipcMain.on('nav-forward', () => {
   if (mainWindow && mainWindow.webContents.canGoForward()) {
     mainWindow.webContents.goForward();
+  }
+});
+
+// Handle find in page
+ipcMain.on('find-in-page', (event, text) => {
+  if (mainWindow && text) {
+    mainWindow.webContents.findInPage(text);
+  }
+});
+
+ipcMain.on('find-in-page-next', () => {
+  if (mainWindow) {
+    mainWindow.webContents.findInPage('', { findNext: true, forward: true });
+  }
+});
+
+ipcMain.on('find-in-page-prev', () => {
+  if (mainWindow) {
+    mainWindow.webContents.findInPage('', { findNext: true, forward: false });
+  }
+});
+
+ipcMain.on('stop-find-in-page', () => {
+  if (mainWindow) {
+    mainWindow.webContents.stopFindInPage('clearSelection');
   }
 });
 
@@ -279,6 +397,7 @@ app.whenReady().then(async () => {
     }
 
     await startNextServer();
+    createMenu();
     createWindow();
 
     app.on('activate', () => {
