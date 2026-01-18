@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import path from 'path';
+import { getDataFilePath, ensureUserDataDir } from './data-path';
 
 export interface VercelTokenInfo {
   accessToken: string;
@@ -9,13 +9,18 @@ export interface VercelTokenInfo {
   createdAt: string;
 }
 
-const TOKEN_FILE_PATH = path.join(process.cwd(), '.vercel-token.json');
+const TOKEN_FILENAME = '.vercel-token.json';
+
+function getTokenFilePath(): string {
+  return getDataFilePath(TOKEN_FILENAME);
+}
 
 /**
  * Save Vercel OAuth token to local storage
  */
 export async function saveVercelToken(tokenInfo: VercelTokenInfo): Promise<void> {
-  await fs.writeFile(TOKEN_FILE_PATH, JSON.stringify(tokenInfo, null, 2));
+  await ensureUserDataDir();
+  await fs.writeFile(getTokenFilePath(), JSON.stringify(tokenInfo, null, 2));
 }
 
 /**
@@ -23,7 +28,7 @@ export async function saveVercelToken(tokenInfo: VercelTokenInfo): Promise<void>
  */
 export async function loadVercelToken(): Promise<VercelTokenInfo | null> {
   try {
-    const data = await fs.readFile(TOKEN_FILE_PATH, 'utf-8');
+    const data = await fs.readFile(getTokenFilePath(), 'utf-8');
     return JSON.parse(data);
   } catch (error) {
     // File doesn't exist or is invalid
@@ -44,7 +49,7 @@ export async function hasVercelToken(): Promise<boolean> {
  */
 export async function deleteVercelToken(): Promise<void> {
   try {
-    await fs.unlink(TOKEN_FILE_PATH);
+    await fs.unlink(getTokenFilePath());
   } catch (error) {
     // File doesn't exist, ignore
   }

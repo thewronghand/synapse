@@ -335,6 +335,10 @@ function startNextServer() {
       const notesDir = setupNotesDirectory();
       console.log('Notes directory:', notesDir);
 
+      // Get user data directory for storing tokens and app data
+      const userDataDir = app.getPath('userData');
+      console.log('User data directory:', userDataDir);
+
       // Use fork to run Next.js server with Electron's built-in Node.js
       console.log('Starting Next.js server from:', serverPath);
       nextServer = fork(serverPath, [], {
@@ -345,6 +349,8 @@ function startNextServer() {
           HOSTNAME: 'localhost',
           // Pass notes directory to Next.js
           NOTES_DIR: notesDir,
+          // Pass user data directory for storing tokens and app data
+          USER_DATA_DIR: userDataDir,
         },
         stdio: 'pipe',
       });
