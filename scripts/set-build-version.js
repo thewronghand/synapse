@@ -4,6 +4,9 @@
  *
  * This script temporarily modifies package.json for the build,
  * and saves the original version to restore later.
+ *
+ * If a git tag (v*.*.*) is present, uses that version.
+ * Otherwise falls back to package.json version.
  */
 
 const fs = require('fs');
@@ -26,12 +29,21 @@ try {
   console.warn('Could not get git hash:', e.message);
 }
 
+// Try to get version from git tag first
+let baseVersion = originalVersion.split('-')[0];
+try {
+  const gitTag = execSync('git describe --tags --exact-match 2>/dev/null || true', { encoding: 'utf-8' }).trim();
+  if (gitTag && gitTag.startsWith('v')) {
+    baseVersion = gitTag.slice(1); // Remove 'v' prefix
+    console.log(`[set-build-version] Using version from git tag: ${gitTag}`);
+  }
+} catch (e) {
+  // No tag, use package.json version
+}
+
 // Get current date in YYYYMMDD format
 const now = new Date();
 const dateStr = now.toISOString().slice(0, 10).replace(/-/g, '');
-
-// Base version from package.json (strip any existing suffix)
-const baseVersion = originalVersion.split('-')[0];
 
 // Create new version
 const newVersion = `${baseVersion}-${gitHash}-${dateStr}`;
