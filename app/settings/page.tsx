@@ -69,6 +69,12 @@ function SettingsContent() {
   const [tokenSaving, setTokenSaving] = useState(false);
   const [tokenError, setTokenError] = useState<string | null>(null);
 
+  // Export state
+  const [isExporting, setIsExporting] = useState(false);
+  const [lastExportTime, setLastExportTime] = useState<string | null>(null);
+  const [hasExportData, setHasExportData] = useState(false);
+  const [exportDataLoading, setExportDataLoading] = useState(true);
+
   // Build logs state
   const [buildLogs, setBuildLogs] = useState<Array<{ timestamp: number; text: string; type: string }>>([]);
   const [showBuildLogs, setShowBuildLogs] = useState(false);
@@ -120,8 +126,29 @@ function SettingsContent() {
       }
     }
 
+    // Check export data status from server
+    checkExportStatus();
+
     fetchFolders();
   }, []);
+
+  async function checkExportStatus() {
+    try {
+      const response = await fetch('/api/export/status');
+      const result = await response.json();
+
+      if (result.success && result.data) {
+        setHasExportData(result.data.hasExportData);
+        if (result.data.lastExportTime) {
+          setLastExportTime(result.data.lastExportTime);
+        }
+      }
+    } catch (error) {
+      console.error('Error checking export status:', error);
+    } finally {
+      setExportDataLoading(false);
+    }
+  }
 
   function toggleFolderExclusion(folderName: string) {
     setExcludedFolders(prev => {
@@ -409,6 +436,34 @@ function SettingsContent() {
     } catch (error) {
       console.error('Error disconnecting Vercel:', error);
       toast.error('연동 해제 중 오류가 발생했습니다.');
+    }
+  }
+
+  async function handleExport() {
+    setIsExporting(true);
+
+    try {
+      const response = await fetch('/api/export', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ excludedFolders }),
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const exportTime = new Date().toISOString();
+        setLastExportTime(exportTime);
+        setHasExportData(true);
+        toast.success(`Export 완료! ${result.data.documentsCount}개 문서, ${result.data.foldersCount}개 폴더`);
+      } else {
+        toast.error(`Export 실패: ${result.error}`);
+      }
+    } catch (error) {
+      console.error('Export error:', error);
+      toast.error('Export 중 오류가 발생했습니다.');
+    } finally {
+      setIsExporting(false);
     }
   }
 
@@ -796,28 +851,58 @@ function SettingsContent() {
               </div>
             )}
 
-            {/* Publish Button */}
-            <div className="pt-4">
-              <Button
-                onClick={handlePublish}
-                disabled={isPublishing || !vercelConnected}
-                className="cursor-pointer w-full sm:w-auto"
-                size="lg"
-              >
-                {isPublishing ? (
-                  <span className="flex items-center gap-2">
-                    <Spinner size="sm" />
-                    Publishing...
-                  </span>
-                ) : "Publish to Vercel"}
-              </Button>
-              <p className="text-sm text-muted-foreground mt-2">
-                {!vercelConnected
-                  ? "Vercel 연동 후 publish할 수 있습니다"
-                  : excludedFolders.length > 0
-                    ? `${excludedFolders.length}개 폴더 제외하고 배포합니다`
-                    : "모든 폴더를 배포합니다"}
+            {/* Export & Publish Buttons */}
+            <div className="pt-4 space-y-4">
+              {/* Export Button */}
+              <div className="flex items-center gap-4">
+                <Button
+                  onClick={handleExport}
+                  disabled={isExporting}
+                  variant="outline"
+                  className="cursor-pointer"
+                >
+                  {isExporting ? (
+                    <span className="flex items-center gap-2">
+                      <Spinner size="sm" />
+                      Exporting...
+                    </span>
+                  ) : "Export Data"}
+                </Button>
+                <span className="text-sm text-muted-foreground">
+                  {lastExportTime
+                    ? `마지막 Export: ${formatDate(lastExportTime)}`
+                    : "아직 export하지 않았습니다"}
+                </span>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                노트를 변경한 후 Publish 전에 먼저 Export를 실행하세요.
               </p>
+
+              {/* Publish Button */}
+              <div>
+                <Button
+                  onClick={handlePublish}
+                  disabled={isPublishing || !vercelConnected || !hasExportData || exportDataLoading}
+                  className="cursor-pointer w-full sm:w-auto"
+                  size="lg"
+                >
+                  {isPublishing ? (
+                    <span className="flex items-center gap-2">
+                      <Spinner size="sm" />
+                      Publishing...
+                    </span>
+                  ) : "Publish to Vercel"}
+                </Button>
+                <p className="text-sm text-muted-foreground mt-2">
+                  {!vercelConnected
+                    ? "Vercel 연동 후 publish할 수 있습니다"
+                    : !hasExportData
+                      ? "먼저 Export를 실행하세요"
+                      : excludedFolders.length > 0
+                        ? `${excludedFolders.length}개 폴더 제외하고 배포합니다`
+                        : "모든 폴더를 배포합니다"}
+                </p>
+              </div>
             </div>
           </div>
         </section>

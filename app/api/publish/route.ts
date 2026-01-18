@@ -41,32 +41,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Step 2: Run export first (pass excludedFolders)
-    console.log('[Publish] Running export...');
-    if (excludedFolders.length > 0) {
-      console.log('[Publish] Excluding folders:', excludedFolders.join(', '));
-    }
-    const exportResponse = await fetch('http://localhost:3000/api/export', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ excludedFolders }),
-    });
-
-    if (!exportResponse.ok) {
-      const result = await exportResponse.json();
-      return NextResponse.json(
-        {
-          success: false,
-          error: `Export failed: ${result.error || 'Unknown error'}`,
-        },
-        { status: 500 }
-      );
-    }
-
-    const exportResult = await exportResponse.json();
-    console.log('[Publish] Export completed:', exportResult.data);
-
-    // Step 3: Get user ID for unique naming
+    // Step 2: Get user ID for unique naming
     const userId = vercelClient.getUserId();
     if (!userId) {
       return NextResponse.json(
@@ -79,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
     const projectName = `synapse-published-${userId.substring(0, 8).toLowerCase()}`;
 
-    // Step 4: Read all project files
+    // Step 3: Read all project files
     console.log('[Publish] Reading project files...');
     const projectRoot = process.cwd();
     console.log('[Publish] process.cwd():', projectRoot);
@@ -254,7 +229,7 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Publish] Found ${filesToPush.length} files to deploy (before export data)`);
 
-    // Step 4.5: Read export data files and add them as public/data/*
+    // Step 4: Read export data files and add them as public/data/*
     const exportDataDir = getExportDataDir();
     console.log('[Publish] Export data dir:', exportDataDir);
 
@@ -298,7 +273,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Publish] public/data files: ${publicDataFiles.length}`);
     publicDataFiles.forEach(f => console.log(`  - ${f.path}`));
 
-    // Step 5: Create direct deployment to Vercel
+    // Step 5: Create direct deployment to Vercel (export data must exist from prior Export)
     console.log('[Publish] Creating Vercel deployment...');
     const deployment = await vercelClient.createDirectDeployment(
       projectName,
@@ -315,7 +290,7 @@ export async function POST(request: NextRequest) {
 
     console.log('[Publish] Deployment created:', deployment.id);
 
-    // Step 6: Make project public (remove all protection types)
+    // Step 6: Make project public
     console.log('[Publish] Making project public...');
     try {
       const project = await vercelClient.getProject(projectName);
