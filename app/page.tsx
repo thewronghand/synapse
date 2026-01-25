@@ -18,45 +18,60 @@ function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
 
   // Handle object-style nodes (DigitalGardenNode format)
   if (!Array.isArray(graph.nodes)) {
-    const filteredNodesObj: { [url: string]: DigitalGardenNode } = {};
-    const filteredNodeUrls = new Set<string>();
+    // First, build a map of original node IDs to their folder
+    const nodeIdToFolder = new Map<number, string>();
+    const nodeIdToUrl = new Map<number, string>();
 
-    // Filter nodes by folder
+    Object.entries(graph.nodes).forEach(([url, node]) => {
+      const dgNode = node as DigitalGardenNode;
+      nodeIdToFolder.set(dgNode.id, (dgNode as any).folder || '');
+      nodeIdToUrl.set(dgNode.id, url);
+    });
+
+    // Filter nodes by folder (deep clone to avoid mutation)
+    const filteredNodesObj: { [url: string]: DigitalGardenNode } = {};
+    const oldIdsInFolder = new Set<number>();
+
     Object.entries(graph.nodes).forEach(([url, node]) => {
       const dgNode = node as DigitalGardenNode;
       if ((dgNode as any).folder === folder) {
-        filteredNodesObj[url] = dgNode;
-        filteredNodeUrls.add(url);
+        // Deep clone the node to avoid mutating original
+        filteredNodesObj[url] = JSON.parse(JSON.stringify(dgNode));
+        oldIdsInFolder.add(dgNode.id);
       }
     });
 
-    // Create a mapping from old IDs to new IDs
+    // Filter links BEFORE remapping IDs (use original IDs)
+    const filteredLinks = (graph.links || []).filter((link) => {
+      const sourceId = typeof link.source === 'number' ? link.source : (link.source as any).id;
+      const targetId = typeof link.target === 'number' ? link.target : (link.target as any).id;
+
+      return oldIdsInFolder.has(sourceId) && oldIdsInFolder.has(targetId);
+    });
+
+    // Now create ID mapping and remap
     const nodeIdMapping = new Map<number, number>();
     let newId = 0;
     Object.values(filteredNodesObj).forEach((node) => {
-      nodeIdMapping.set(node.id, newId);
+      const oldId = node.id;
+      nodeIdMapping.set(oldId, newId);
       node.id = newId++;
     });
 
-    // Filter links (only keep links between filtered nodes)
-    const filteredLinks = (graph.links || []).filter((link) => {
-      const sourceNode = Object.values(graph.nodes as { [url: string]: DigitalGardenNode }).find(n => n.id === link.source);
-      const targetNode = Object.values(graph.nodes as { [url: string]: DigitalGardenNode }).find(n => n.id === link.target);
+    // Remap link IDs
+    const remappedLinks = filteredLinks.map((link) => {
+      const sourceId = typeof link.source === 'number' ? link.source : (link.source as any).id;
+      const targetId = typeof link.target === 'number' ? link.target : (link.target as any).id;
 
-      if (!sourceNode || !targetNode) return false;
-
-      const sourceUrl = sourceNode.url;
-      const targetUrl = targetNode.url;
-
-      return filteredNodeUrls.has(sourceUrl) && filteredNodeUrls.has(targetUrl);
-    }).map((link) => ({
-      source: nodeIdMapping.get(link.source as number) ?? link.source,
-      target: nodeIdMapping.get(link.target as number) ?? link.target,
-    }));
+      return {
+        source: nodeIdMapping.get(sourceId) ?? sourceId,
+        target: nodeIdMapping.get(targetId) ?? targetId,
+      };
+    });
 
     return {
       nodes: filteredNodesObj,
-      links: filteredLinks,
+      links: remappedLinks,
     };
   }
 

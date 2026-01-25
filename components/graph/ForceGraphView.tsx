@@ -641,23 +641,14 @@ export default function ForceGraphView({
       }
 
       // Link force (spring) - Hooke's law
-      // Dynamic distance + dynamic strength (Obsidian-style strength)
+      // Fixed distance + dynamic strength (D3/Obsidian default approach)
       const linkForce = graph.d3Force('link');
       if (linkForce) {
-        // Dynamic link distance: longer for hub nodes
-        linkForce.distance((link: any) => {
-          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        // Fixed link distance (D3 default is 30, we use slightly larger for readability)
+        linkForce.distance(50);
 
-          const sourceConnections = connectionCounts.get(String(sourceId)) || 0;
-          const targetConnections = connectionCounts.get(String(targetId)) || 0;
-          const maxConnections = Math.max(sourceConnections, targetConnections);
-
-          // Base: 40, scales up to 100 for highly connected nodes
-          return 40 + Math.min(maxConnections * 6, 60);
-        });
-
-        // Link strength: weaker for highly connected nodes (Obsidian formula)
+        // Link strength: weaker for highly connected nodes (D3/Obsidian formula)
+        // This creates natural clustering - hub nodes don't pull too hard
         linkForce.strength((link: any) => {
           const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
           const targetId = typeof link.target === 'object' ? link.target.id : link.target;
@@ -665,7 +656,7 @@ export default function ForceGraphView({
           const sourceConnections = connectionCounts.get(String(sourceId)) || 1;
           const targetConnections = connectionCounts.get(String(targetId)) || 1;
 
-          // Obsidian-style: weaker links for hub nodes
+          // D3/Obsidian formula: 1 / min(source_degree, target_degree)
           return 1 / Math.min(sourceConnections, targetConnections);
         });
       }
@@ -954,8 +945,8 @@ export default function ForceGraphView({
         </button>
       </div>
 
-      {/* Collapsible Legend */}
-      <div className="absolute bottom-2 right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg text-xs">
+      {/* Collapsible Legend - positioned higher on global graph to avoid footer */}
+      <div className={`absolute right-2 bg-card/90 backdrop-blur-sm border border-border rounded-lg text-xs ${showSearchFilter ? 'bottom-14' : 'bottom-2'}`}>
         <button
           onClick={() => setIsLegendExpanded(!isLegendExpanded)}
           className="flex items-center gap-2 w-full px-2 py-1.5 hover:bg-accent rounded-lg transition-colors cursor-pointer"
