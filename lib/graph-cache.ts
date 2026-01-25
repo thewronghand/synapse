@@ -228,7 +228,8 @@ class GraphCache {
         const targetDoc = titleFolderToDoc.get(targetKey);
 
         if (targetDoc) {
-          const targetUrl = `/${encodeURIComponent(linkedTitle)}`;
+          // Use targetDoc.title to ensure correct URL matching
+          const targetUrl = `/${encodeURIComponent(targetDoc.title)}`;
           const targetNode = nodesObject[targetUrl];
 
           if (sourceNode && targetNode) {

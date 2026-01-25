@@ -21,12 +21,16 @@ contextBridge.exposeInMainWorld('electron', {
 });
 
 // Listen for mouse back/forward buttons (button 3 = back, button 4 = forward)
-window.addEventListener('mousedown', (e) => {
-  if (e.button === 3) {
-    e.preventDefault();
-    ipcRenderer.send('nav-back');
-  } else if (e.button === 4) {
-    e.preventDefault();
-    ipcRenderer.send('nav-forward');
-  }
+// Wait for DOM to be ready before adding event listener
+window.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('mouseup', (e) => {
+    // Mouse button 3 = back, button 4 = forward (standard for multi-button mice)
+    if (e.button === 3) {
+      e.preventDefault();
+      ipcRenderer.send('nav-back');
+    } else if (e.button === 4) {
+      e.preventDefault();
+      ipcRenderer.send('nav-forward');
+    }
+  });
 });

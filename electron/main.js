@@ -273,26 +273,30 @@ ipcMain.on('nav-forward', () => {
 });
 
 // Handle find in page
+let currentSearchText = '';
+
 ipcMain.on('find-in-page', (event, text) => {
   if (mainWindow && text) {
+    currentSearchText = text;
     mainWindow.webContents.findInPage(text);
   }
 });
 
 ipcMain.on('find-in-page-next', () => {
-  if (mainWindow) {
-    mainWindow.webContents.findInPage('', { findNext: true, forward: true });
+  if (mainWindow && currentSearchText) {
+    mainWindow.webContents.findInPage(currentSearchText, { findNext: true, forward: true });
   }
 });
 
 ipcMain.on('find-in-page-prev', () => {
-  if (mainWindow) {
-    mainWindow.webContents.findInPage('', { findNext: true, forward: false });
+  if (mainWindow && currentSearchText) {
+    mainWindow.webContents.findInPage(currentSearchText, { findNext: true, forward: false });
   }
 });
 
 ipcMain.on('stop-find-in-page', () => {
   if (mainWindow) {
+    currentSearchText = '';
     mainWindow.webContents.stopFindInPage('clearSelection');
   }
 });

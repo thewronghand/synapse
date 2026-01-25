@@ -28,15 +28,30 @@ export function FindInPage() {
   const handleClose = useCallback(() => {
     setIsOpen(false);
     setSearchText("");
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
     if (isElectron) {
       window.electron?.stopFind();
     }
   }, [isElectron]);
 
+  // Debounce search to prevent input field from being highlighted while typing
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   const handleSearch = useCallback((text: string) => {
     setSearchText(text);
+
+    // Clear previous timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
     if (isElectron && text) {
-      window.electron?.findInPage(text);
+      // Debounce the actual search to avoid highlighting the input field
+      searchTimeoutRef.current = setTimeout(() => {
+        window.electron?.findInPage(text);
+      }, 300);
     } else if (isElectron && !text) {
       window.electron?.stopFind();
     }
