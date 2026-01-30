@@ -9,11 +9,13 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
-import { Search, Folder, FileText, Type } from "lucide-react";
+import { Search, Folder, FileText, Type, Tag, Network, Plus } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
+import { MobileMenuItem } from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
+import { Pagination } from "@/components/ui/Pagination";
 
 interface SearchResult {
   title: string;
@@ -293,93 +295,6 @@ function DocumentsContent() {
   const endIndex = startIndex + itemsPerPage;
   const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
 
-  // Calculate page numbers to display (max 9 pages)
-  const maxPageButtons = 9;
-  let startPage = Math.max(1, currentPage - Math.floor(maxPageButtons / 2));
-  let endPage = Math.min(totalPages, startPage + maxPageButtons - 1);
-
-  // Adjust if we're near the end
-  if (endPage - startPage + 1 < maxPageButtons) {
-    startPage = Math.max(1, endPage - maxPageButtons + 1);
-  }
-
-  const pageNumbers = Array.from(
-    { length: endPage - startPage + 1 },
-    (_, i) => startPage + i
-  );
-
-  // Pagination component
-  const PaginationControls = () => (
-    <div className="flex items-center justify-center gap-2">
-      {/* First page */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handlePageChange(1)}
-        disabled={currentPage === 1}
-        title="First page"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
-      >
-        «
-      </Button>
-
-      {/* Previous 5 pages */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handlePageChange(Math.max(1, currentPage - 5))}
-        disabled={currentPage === 1}
-        title="Previous 5 pages"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
-      >
-        ‹
-      </Button>
-
-      {/* Page numbers */}
-      <div className="flex gap-1">
-        {pageNumbers.map((page) => (
-          <Button
-            key={page}
-            variant="outline"
-            size="sm"
-            onClick={() => handlePageChange(page)}
-            className={`min-w-[32px] font-mono cursor-pointer transition-colors ${
-              currentPage === page
-                ? "bg-primary/10 text-primary border-primary/20 font-bold hover:bg-primary/15"
-                : "hover:bg-accent hover:border-border"
-            }`}
-          >
-            {page}
-          </Button>
-        ))}
-      </div>
-
-      {/* Next 5 pages */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handlePageChange(Math.min(totalPages, currentPage + 5))}
-        disabled={currentPage === totalPages}
-        title="Next 5 pages"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
-      >
-        ›
-      </Button>
-
-      {/* Last page */}
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={() => handlePageChange(totalPages)}
-        disabled={currentPage === totalPages}
-        title="Last page"
-        className="min-w-[32px] font-mono cursor-pointer hover:bg-accent hover:border-border transition-colors disabled:cursor-not-allowed disabled:hover:bg-transparent"
-      >
-        »
-      </Button>
-    </div>
-  );
-
   if (isLoading) {
     return <LoadingScreen message="문서 로딩 중..." />;
   }
@@ -387,11 +302,16 @@ function DocumentsContent() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="shrink-0">
+      <div className="shrink-0 sticky top-0 z-10">
         <AppHeader
           showLogo
           actions={
             <>
+              {!isPublishedMode() && (
+                <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
+                  + 새 노트
+                </Button>
+              )}
               <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
                 태그 관리
               </Button>
@@ -400,6 +320,23 @@ function DocumentsContent() {
               </Button>
             </>
           }
+          mobileMenuItems={[
+            ...(!isPublishedMode() ? [{
+              label: "새 노트",
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
+            }] : []),
+            {
+              label: "태그 관리",
+              icon: <Tag className="h-4 w-4" />,
+              onClick: () => router.push("/tags"),
+            },
+            {
+              label: "그래프 뷰",
+              icon: <Network className="h-4 w-4" />,
+              onClick: () => router.push("/"),
+            },
+          ] as MobileMenuItem[]}
         />
       </div>
 
@@ -498,11 +435,6 @@ function DocumentsContent() {
             </div>
           )}
         </div>
-        {!isPublishedMode() && (
-          <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
-            + 새 노트
-          </Button>
-        )}
       </div>
 
       {/* Tag Filter Inputs */}
@@ -572,7 +504,7 @@ function DocumentsContent() {
       {/* Pagination - Top (only for title search mode) */}
       {searchMode === "title" && totalPages > 1 && (
         <div className="mb-6">
-          <PaginationControls />
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
         </div>
       )}
 
@@ -703,7 +635,7 @@ function DocumentsContent() {
       {/* Pagination - Bottom (only for title search mode) */}
       {searchMode === "title" && totalPages > 1 && (
         <div className="mt-8">
-          <PaginationControls />
+          <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={handlePageChange} />
         </div>
       )}
 

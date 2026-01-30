@@ -367,18 +367,6 @@ export default function ForceGraphView({
           decodedNodeUrl === decodedCurrentUrl
         ));
 
-        // Debug log for first node only
-        if (title && !nodeWithPos._logged) {
-          console.log('[ForceGraphView] Node URL comparison:', {
-            nodeUrl: url,
-            decodedNodeUrl,
-            currentNodeUrl,
-            decodedCurrentUrl,
-            isCurrent
-          });
-          nodeWithPos._logged = true;
-        }
-
         const isHighlighted = !hoveredNodeRef.current || highlightNodesRef.current.has(node);
 
         // Calculate connection count for color

@@ -14,6 +14,22 @@ import { useConfirm } from "@/components/ui/confirm-provider";
 import { TableOfContents } from "@/components/ui/TableOfContents";
 import { TocFab } from "@/components/ui/TocFab";
 import { extractHeadings, generateUniqueIds } from "@/lib/toc";
+import {
+  ArrowLeft,
+  EllipsisVertical,
+  Pencil,
+  Trash2,
+  Sun,
+  Moon,
+} from "lucide-react";
+import { useTheme } from "next-themes";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Filter graph to only include nodes and links from the same folder
 function filterGraphByFolder(graph: Graph, folder: string): Graph {
@@ -33,13 +49,19 @@ function filterGraphByFolder(graph: Graph, folder: string): Graph {
 
   // Filter links to only include connections between valid nodes
   const filteredLinks = (graph.links || []).filter(
-    (link) => validNodeIds.has(link.source as number) && validNodeIds.has(link.target as number)
+    (link) =>
+      validNodeIds.has(link.source as number) &&
+      validNodeIds.has(link.target as number),
   );
 
   // Update neighbors and backLinks to only include same-folder nodes
   Object.values(filteredNodes).forEach((node) => {
-    node.neighbors = node.neighbors.filter((neighborUrl) => filteredNodes[neighborUrl]);
-    node.backLinks = node.backLinks.filter((backLinkUrl) => filteredNodes[backLinkUrl]);
+    node.neighbors = node.neighbors.filter(
+      (neighborUrl) => filteredNodes[neighborUrl],
+    );
+    node.backLinks = node.backLinks.filter(
+      (backLinkUrl) => filteredNodes[backLinkUrl],
+    );
   });
 
   return { nodes: filteredNodes, links: filteredLinks };
@@ -48,6 +70,7 @@ function filterGraphByFolder(graph: Graph, folder: string): Graph {
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
+  const { theme, setTheme } = useTheme();
   // Decode URL-encoded title (slug is now the title)
   const slug = params.slug as string;
   const title = decodeURIComponent(slug);
@@ -64,24 +87,29 @@ export default function NotePage() {
   // Extract headings for Table of Contents
   const headings = useMemo(() => {
     if (!document) return [];
-    return generateUniqueIds(extractHeadings(document.contentWithoutFrontmatter));
+    return generateUniqueIds(
+      extractHeadings(document.contentWithoutFrontmatter),
+    );
   }, [document]);
 
   // Calculate responsive graph height
   useEffect(() => {
     const calculateHeight = () => {
-      if (typeof window !== 'undefined') {
+      if (typeof window !== "undefined") {
         const vh = window.innerHeight;
         const minHeight = 280;
         const maxHeight = 500;
-        const calculatedHeight = Math.max(minHeight, Math.min(maxHeight, vh * 0.4));
+        const calculatedHeight = Math.max(
+          minHeight,
+          Math.min(maxHeight, vh * 0.4),
+        );
         setGraphHeight(calculatedHeight);
       }
     };
 
     calculateHeight();
-    window.addEventListener('resize', calculateHeight);
-    return () => window.removeEventListener('resize', calculateHeight);
+    window.addEventListener("resize", calculateHeight);
+    return () => window.removeEventListener("resize", calculateHeight);
   }, []);
 
   useEffect(() => {
@@ -103,7 +131,9 @@ export default function NotePage() {
 
           // Fetch folder-scoped titles for wiki link validation
           const folder = doc.folder || "default";
-          const titlesRes = await fetch(`/api/documents/titles?folder=${encodeURIComponent(folder)}`);
+          const titlesRes = await fetch(
+            `/api/documents/titles?folder=${encodeURIComponent(folder)}`,
+          );
           const titlesData = await titlesRes.json();
           if (titlesData.success) {
             setFolderTitles(titlesData.data.titles || []);
@@ -114,8 +144,13 @@ export default function NotePage() {
 
         if (graphData.success) {
           // Filter graph to only show same-folder nodes and links
-          const currentFolder = docData.success ? (docData.data.document.folder || "default") : "default";
-          const filteredGraph = filterGraphByFolder(graphData.data, currentFolder);
+          const currentFolder = docData.success
+            ? docData.data.document.folder || "default"
+            : "default";
+          const filteredGraph = filterGraphByFolder(
+            graphData.data,
+            currentFolder,
+          );
           setGraph(filteredGraph);
         }
       } catch (err) {
@@ -141,8 +176,8 @@ export default function NotePage() {
       description: (
         <>
           <strong>&quot;{document.title}&quot;</strong> 문서를 삭제합니다.
-          <br /><br />
-          이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?
+          <br />
+          <br />이 작업은 되돌릴 수 없습니다. 계속하시겠습니까?
         </>
       ),
       confirmLabel: "삭제",
@@ -152,9 +187,12 @@ export default function NotePage() {
     if (!confirmed) return;
 
     try {
-      const res = await fetch(`/api/documents/${encodeURIComponent(document.title)}`, {
-        method: "DELETE",
-      });
+      const res = await fetch(
+        `/api/documents/${encodeURIComponent(document.title)}`,
+        {
+          method: "DELETE",
+        },
+      );
 
       if (res.ok) {
         toast.success("문서가 삭제되었습니다");
@@ -180,13 +218,26 @@ export default function NotePage() {
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">"{displayTitle}"</h1>
-          <p className="text-lg text-muted-foreground mb-6">문서가 존재하지 않습니다</p>
+          <p className="text-lg text-muted-foreground mb-6">
+            문서가 존재하지 않습니다
+          </p>
           <div className="flex gap-3 justify-center">
-            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
+            <Button
+              variant="outline"
+              onClick={() => router.push("/")}
+              className="cursor-pointer"
+            >
               홈으로
             </Button>
             {!isPublishedMode() && (
-              <Button onClick={() => router.push(`/editor/new?title=${encodeURIComponent(displayTitle)}`)} className="cursor-pointer">
+              <Button
+                onClick={() =>
+                  router.push(
+                    `/editor/new?title=${encodeURIComponent(displayTitle)}`,
+                  )
+                }
+                className="cursor-pointer"
+              >
                 "{displayTitle}" 문서 만들기
               </Button>
             )}
@@ -203,40 +254,113 @@ export default function NotePage() {
 
       {/* Header */}
       <header className="border-b bg-background p-4 sticky top-0 z-10">
-        <div className="container mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
-              ← 뒤로
+        <div className="container mx-auto flex items-center justify-between gap-2">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => router.push("/")}
+              className="cursor-pointer shrink-0"
+              title="뒤로"
+            >
+              <ArrowLeft className="h-4 w-4" />
             </Button>
-            <div>
-              <h1 className="text-xl font-bold">{document.title}</h1>
-              {document.frontmatter.tags && document.frontmatter.tags.length > 0 && (
-                <div className="flex flex-wrap gap-1 mt-1">
-                  {document.frontmatter.tags.map((tag) => (
-                    <button
-                      key={tag}
-                      onClick={() => router.push(`/documents?tags=${encodeURIComponent(tag)}`)}
-                      className="text-xs px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 rounded cursor-pointer transition-colors"
-                    >
-                      {tag}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold truncate">{document.title}</h1>
+              {document.frontmatter.tags &&
+                document.frontmatter.tags.length > 0 && (
+                  <div className="flex gap-1 mt-1 overflow-x-auto scrollbar-hide">
+                    {document.frontmatter.tags.map((tag) => (
+                      <button
+                        key={tag}
+                        onClick={() =>
+                          router.push(
+                            `/documents?tags=${encodeURIComponent(tag)}`,
+                          )
+                        }
+                        className="text-xs px-2 py-0.5 bg-primary/10 text-primary hover:bg-primary/20 rounded cursor-pointer transition-colors shrink-0"
+                      >
+                        {tag}
+                      </button>
+                    ))}
+                  </div>
+                )}
             </div>
           </div>
-          <div className="flex items-center gap-2">
+
+          {/* 데스크톱: 버튼 직접 노출 */}
+          <div className="hidden md:flex items-center gap-2">
             <ThemeToggle />
             {!isPublishedMode() && (
               <>
-                <Button onClick={() => router.push(`/editor/${encodeURIComponent(document.title)}`)} className="cursor-pointer">
+                <Button
+                  onClick={() =>
+                    router.push(`/editor/${encodeURIComponent(document.title)}`)
+                  }
+                  className="cursor-pointer"
+                >
                   편집
                 </Button>
-                <Button variant="destructive" onClick={handleDelete} className="cursor-pointer">
+                <Button
+                  variant="destructive"
+                  onClick={handleDelete}
+                  className="cursor-pointer"
+                >
                   삭제
                 </Button>
               </>
             )}
+          </div>
+
+          {/* 모바일: 드롭다운 메뉴 */}
+          <div className="md:hidden">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="cursor-pointer shrink-0"
+                >
+                  <EllipsisVertical className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="cursor-pointer"
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                >
+                  {theme === "dark" ? (
+                    <Sun className="h-4 w-4" />
+                  ) : (
+                    <Moon className="h-4 w-4" />
+                  )}
+                  {theme === "dark" ? "라이트 모드" : "다크 모드"}
+                </DropdownMenuItem>
+                {!isPublishedMode() && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      className="cursor-pointer"
+                      onClick={() =>
+                        router.push(
+                          `/editor/${encodeURIComponent(document.title)}`,
+                        )
+                      }
+                    >
+                      <Pencil className="h-4 w-4" />
+                      편집
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      className="cursor-pointer text-destructive focus:text-destructive"
+                      onClick={handleDelete}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      삭제
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -257,50 +381,56 @@ export default function NotePage() {
 
           {/* Sidebar: Local Graph + TOC */}
           {(graph && graph.nodes && graph.links) || headings.length >= 2 ? (
-            <div className="lg:col-span-1">
-              <div className="sticky top-20 space-y-4">
-                {/* Local Graph */}
-                {graph && graph.nodes && graph.links && (
-                  <div className="bg-card border rounded-lg p-4 overflow-hidden">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-sm font-semibold">로컬 그래프</h3>
+            <div className="lg:col-span-1 sticky top-[117px] self-start space-y-4">
+              {/* Local Graph */}
+              {graph && graph.nodes && graph.links && (
+                <div className="bg-card border rounded-lg p-4 overflow-hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-semibold">로컬 그래프</h3>
 
-                      {/* Compact Depth Slider */}
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs font-medium text-muted-foreground">깊이:</span>
-                        <div className="flex items-center gap-2">
-                          {[1, 2, 3].map((level) => (
-                            <button
-                              key={level}
-                              onClick={() => setDepth(level)}
-                              className={`
-                                w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer
-                                ${depth === level
-                                  ? 'bg-primary text-primary-foreground scale-110'
-                                  : 'bg-muted text-muted-foreground hover:bg-accent'
-                                }
-                              `}
-                            >
-                              {level}
-                            </button>
-                          ))}
-                        </div>
+                    {/* Compact Depth Slider */}
+                    <div className="flex items-center gap-3">
+                      <span className="text-xs font-medium text-muted-foreground">
+                        깊이:
+                      </span>
+                      <div className="flex items-center gap-2">
+                        {[1, 2, 3].map((level) => (
+                          <button
+                            key={level}
+                            onClick={() => setDepth(level)}
+                            className={`
+                              w-7 h-7 rounded-full text-xs font-semibold transition-all duration-200 cursor-pointer
+                              ${
+                                depth === level
+                                  ? "bg-primary text-primary-foreground scale-110"
+                                  : "bg-muted text-muted-foreground hover:bg-accent"
+                              }
+                            `}
+                          >
+                            {level}
+                          </button>
+                        ))}
                       </div>
                     </div>
-
-                    {/* Graph - use encoded title for URL */}
-                    <ForceGraphView
-                      graphData={graph as { nodes: { [url: string]: DigitalGardenNode }; links: GraphEdge[] }}
-                      currentNodeUrl={`/${encodeURIComponent(document.title)}`}
-                      depth={depth}
-                      height={graphHeight}
-                    />
                   </div>
-                )}
 
-                {/* Table of Contents - shown below graph on large screens */}
-                <TableOfContents headings={headings} />
-              </div>
+                  {/* Graph - use encoded title for URL */}
+                  <ForceGraphView
+                    graphData={
+                      graph as {
+                        nodes: { [url: string]: DigitalGardenNode };
+                        links: GraphEdge[];
+                      }
+                    }
+                    currentNodeUrl={`/${encodeURIComponent(document.title)}`}
+                    depth={depth}
+                    height={graphHeight}
+                  />
+                </div>
+              )}
+
+              {/* Table of Contents - shown below graph on large screens */}
+              <TableOfContents headings={headings} />
             </div>
           ) : null}
         </div>
@@ -329,16 +459,20 @@ export default function NotePage() {
               <div className="flex gap-2 flex-wrap">
                 {document.links.map((link) => {
                   const linkExists = folderTitles.some(
-                    t => t.normalize('NFC').toLowerCase() === link.normalize('NFC').toLowerCase()
+                    (t) =>
+                      t.normalize("NFC").toLowerCase() ===
+                      link.normalize("NFC").toLowerCase(),
                   );
                   return (
                     <button
                       key={link}
-                      onClick={() => router.push(`/note/${encodeURIComponent(link)}`)}
+                      onClick={() =>
+                        router.push(`/note/${encodeURIComponent(link)}`)
+                      }
                       className={`text-sm px-3 py-1 rounded-full cursor-pointer ${
                         linkExists
-                          ? 'bg-primary/10 text-primary hover:bg-primary/20'
-                          : 'bg-muted text-muted-foreground hover:bg-muted/80'
+                          ? "bg-primary/10 text-primary hover:bg-primary/20"
+                          : "bg-muted text-muted-foreground hover:bg-muted/80"
                       }`}
                     >
                       {link}
@@ -359,7 +493,9 @@ export default function NotePage() {
                 {document.backlinks.map((backlink) => (
                   <button
                     key={backlink}
-                    onClick={() => router.push(`/note/${encodeURIComponent(backlink)}`)}
+                    onClick={() =>
+                      router.push(`/note/${encodeURIComponent(backlink)}`)
+                    }
                     className="text-sm px-3 py-1 bg-secondary/10 text-secondary rounded-full hover:bg-secondary/20 cursor-pointer"
                   >
                     {backlink}
@@ -370,7 +506,6 @@ export default function NotePage() {
           )}
         </div>
       </footer>
-
     </div>
   );
 }
