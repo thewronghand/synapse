@@ -146,6 +146,8 @@ function createWindow() {
     mainWindow = null;
   });
 
+
+
   // Open external links in system browser instead of Electron window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     // Check if URL is external (not localhost)
@@ -272,34 +274,8 @@ ipcMain.on('nav-forward', () => {
   }
 });
 
-// Handle find in page
-let currentSearchText = '';
-
-ipcMain.on('find-in-page', (event, text) => {
-  if (mainWindow && text) {
-    currentSearchText = text;
-    mainWindow.webContents.findInPage(text);
-  }
-});
-
-ipcMain.on('find-in-page-next', () => {
-  if (mainWindow && currentSearchText) {
-    mainWindow.webContents.findInPage(currentSearchText, { findNext: true, forward: true });
-  }
-});
-
-ipcMain.on('find-in-page-prev', () => {
-  if (mainWindow && currentSearchText) {
-    mainWindow.webContents.findInPage(currentSearchText, { findNext: true, forward: false });
-  }
-});
-
-ipcMain.on('stop-find-in-page', () => {
-  if (mainWindow) {
-    currentSearchText = '';
-    mainWindow.webContents.stopFindInPage('clearSelection');
-  }
-});
+// Find in page: 검색 자체는 프론트엔드 CSS Highlight API로 처리
+// 메인 프로세스는 Cmd+F 메뉴 단축키 → toggle-find 이벤트 전송만 담당
 
 function startNextServer() {
   return new Promise((resolve, reject) => {

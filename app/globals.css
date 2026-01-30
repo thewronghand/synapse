@@ -21,6 +21,10 @@
   --destructive: #D94652;
   --destructive-foreground: #ffffff;
   --destructive-muted: #FEE2E2;
+  --find-match-bg: #B2E4E1;
+  --find-match-fg: #134E4A;
+  --find-current-bg: #008080;
+  --find-current-fg: #FFFFFF;
 }
 
 .dark {
@@ -43,6 +47,10 @@
   --destructive: #D94652;
   --destructive-foreground: #1F2937;
   --destructive-muted: #FEE2E2;
+  --find-match-bg: rgba(95, 201, 195, 0.3);
+  --find-match-fg: inherit;
+  --find-current-bg: #5FC9C3;
+  --find-current-fg: #134E4A;
 }
 
 @theme inline {
@@ -337,4 +345,5 @@ html, body {
 .dark .hljs-punctuation {
   color: #C9D1D9;
 }
+
 
