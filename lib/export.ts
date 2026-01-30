@@ -305,7 +305,6 @@ export async function exportToJSON(excludedFolders: string[] = []) {
     path.join(exportDir, 'graph.json'),
     JSON.stringify(graph, null, 2)
   );
-  console.log('[Export] Exported graph data');
 
   // 4. Export tags
   const tagsSet = new Set<string>();
