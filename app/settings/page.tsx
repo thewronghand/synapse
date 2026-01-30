@@ -17,6 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useConfirm } from "@/components/ui/confirm-provider";
+import { ArrowLeft } from "lucide-react";
 
 interface MigrationResult {
   oldFilename: string;
@@ -596,13 +597,13 @@ function SettingsContent() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="shrink-0">
+      <div className="shrink-0 sticky top-0 z-10">
         <AppHeader
           showLogo
           subtitle="앱 설정 및 publish 관리"
           actions={
-            <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
-              ← 뒤로
+            <Button variant="outline" size="icon" onClick={() => router.push("/")} className="cursor-pointer" title="뒤로">
+              <ArrowLeft className="h-4 w-4" />
             </Button>
           }
           showSettings={false}
@@ -659,8 +660,8 @@ function SettingsContent() {
                   ) : (
                     <Button
                       onClick={handleDisconnectVercel}
-                      variant="outline"
-                      className="cursor-pointer text-red-600 border-red-300 hover:bg-red-50"
+                      variant="destructive"
+                      className="cursor-pointer"
                     >
                       연동 해제
                     </Button>

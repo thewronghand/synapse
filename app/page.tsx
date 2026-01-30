@@ -9,6 +9,8 @@ import { FolderTabs } from "@/components/ui/FolderTabs";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
+import { List, Plus } from "lucide-react";
+import { MobileMenuItem } from "@/components/layout/AppHeader";
 
 // Filter graph nodes and links by folder
 function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
@@ -179,6 +181,13 @@ function HomeContent() {
                 </Button>
               ) : undefined
             }
+            mobileMenuItems={[
+              ...(!isPublishedMode() ? [{
+                label: "새 노트",
+                icon: <Plus className="h-4 w-4" />,
+                onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
+              }] : []),
+            ] as MobileMenuItem[]}
           />
         </div>
 
@@ -248,6 +257,18 @@ function HomeContent() {
               )}
             </>
           }
+          mobileMenuItems={[
+            {
+              label: "목록 보기",
+              icon: <List className="h-4 w-4" />,
+              onClick: () => router.push("/documents"),
+            },
+            ...(!isPublishedMode() ? [{
+              label: "새 노트",
+              icon: <Plus className="h-4 w-4" />,
+              onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
+            }] : []),
+          ] as MobileMenuItem[]}
         />
       </div>
 

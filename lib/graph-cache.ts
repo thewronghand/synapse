@@ -66,14 +66,10 @@ class GraphCache {
   private async _doInitialize(): Promise<void> {
     // Skip in published mode - read from JSON instead
     if (isPublishedMode()) {
-      console.log('[GraphCache] Skipping initialization in published mode');
       this.isInitialized = true;
       this.isDirty = false;
       return;
     }
-
-    console.log('[GraphCache] Initializing graph cache...');
-    const startTime = Date.now();
 
     try {
       const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
@@ -137,10 +133,6 @@ class GraphCache {
       this.isInitialized = true;
       this.isDirty = false;
 
-      const duration = Date.now() - startTime;
-      console.log(
-        `[GraphCache] Initialized with ${this.documents.size} documents in ${duration}ms`
-      );
     } catch (error) {
       console.error('[GraphCache] Failed to initialize:', error);
     }
@@ -297,11 +289,6 @@ class GraphCache {
    * Invalidate cache for a specific document or entire cache
    */
   invalidate(title?: string): void {
-    if (title) {
-      console.log(`[GraphCache] Invalidating document: ${title}`);
-    } else {
-      console.log('[GraphCache] Invalidating entire cache');
-    }
     this.isDirty = true;
     this.graph = null;
   }
@@ -324,7 +311,6 @@ class GraphCache {
     });
 
     this.isDirty = true;
-    console.log(`[GraphCache] Updated document: ${extractedTitle}`);
   }
 
   /**
@@ -334,7 +320,6 @@ class GraphCache {
     const key = this.normalizeKey(title);
     this.documents.delete(key);
     this.isDirty = true;
-    console.log(`[GraphCache] Removed document: ${title}`);
   }
 
   /**
@@ -360,7 +345,6 @@ class GraphCache {
     });
 
     this.isDirty = true;
-    console.log(`[GraphCache] Renamed document: ${oldTitle} -> ${newTitle}`);
   }
 
   /**

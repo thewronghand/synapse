@@ -6,6 +6,8 @@ import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/layout/AppHeader";
+import { MobileMenuItem } from "@/components/layout/AppHeader";
+import { List, Network } from "lucide-react";
 import { FolderTabs } from "@/components/ui/FolderTabs";
 import { LoadingScreen } from "@/components/ui/spinner";
 
@@ -93,7 +95,7 @@ function TagsContent() {
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header */}
-      <div className="shrink-0">
+      <div className="shrink-0 sticky top-0 z-10">
         <AppHeader
           showLogo
           subtitle={
@@ -111,6 +113,18 @@ function TagsContent() {
               </Button>
             </>
           }
+          mobileMenuItems={[
+            {
+              label: "문서 목록",
+              icon: <List className="h-4 w-4" />,
+              onClick: () => router.push("/documents"),
+            },
+            {
+              label: "그래프 뷰",
+              icon: <Network className="h-4 w-4" />,
+              onClick: () => router.push("/"),
+            },
+          ] as MobileMenuItem[]}
         />
       </div>
 

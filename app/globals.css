@@ -12,6 +12,8 @@
   --muted-foreground: #6B7280;
   --card: #FFFFFF;
   --card-foreground: #1F2937;
+  --popover: #FFFFFF;
+  --popover-foreground: #1F2937;
   --border: #D1D5DB;
   --input: #E5E7EB;
   --accent: #E5E7EB;
@@ -21,6 +23,10 @@
   --destructive: #D94652;
   --destructive-foreground: #ffffff;
   --destructive-muted: #FEE2E2;
+  --find-match-bg: #B2E4E1;
+  --find-match-fg: #134E4A;
+  --find-current-bg: #008080;
+  --find-current-fg: #FFFFFF;
 }
 
 .dark {
@@ -34,6 +40,8 @@
   --muted-foreground: #9CA3AF;
   --card: #3D4A5C;
   --card-foreground: #F3F4F6;
+  --popover: #3D4A5C;
+  --popover-foreground: #F3F4F6;
   --border: #6B7280;
   --input: #6B7280;
   --accent: #4A5568;
@@ -43,6 +51,10 @@
   --destructive: #D94652;
   --destructive-foreground: #1F2937;
   --destructive-muted: #FEE2E2;
+  --find-match-bg: rgba(95, 201, 195, 0.3);
+  --find-match-fg: inherit;
+  --find-current-bg: #5FC9C3;
+  --find-current-fg: #134E4A;
 }
 
 @theme inline {
@@ -56,6 +68,8 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-card: var(--card);
   --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-accent: var(--accent);
@@ -76,12 +90,18 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Ensure full width and overlay scrollbars */
 html, body {
-  width: 100%;
   margin: 0;
   padding: 0;
-  overflow-x: hidden;
+}
+
+/* 스크롤바 숨기기 유틸리티 */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
 }
 
 /* Default border color for Tailwind v4 */
@@ -337,4 +357,5 @@ html, body {
 .dark .hljs-punctuation {
   color: #C9D1D9;
 }
+
 
