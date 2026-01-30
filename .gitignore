@@ -55,6 +55,9 @@ firebase-debug.log
 # Claude Code
 .claude/
 
+# Serena
+.serena/
+
 # OS
 .DS_Store
 Thumbs.db
