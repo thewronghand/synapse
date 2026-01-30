@@ -146,7 +146,14 @@ function createWindow() {
     mainWindow = null;
   });
 
-
+  // macOS 스와이프 제스처 감지 (로지텍 등 마우스 사이드 버튼 → Logi Options+가 스와이프로 변환)
+  mainWindow.on('swipe', (event, direction) => {
+    if (direction === 'left') {
+      mainWindow.webContents.send('nav-back');
+    } else if (direction === 'right') {
+      mainWindow.webContents.send('nav-forward');
+    }
+  });
 
   // Open external links in system browser instead of Electron window
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
@@ -224,6 +231,30 @@ function createMenu() {
         }
       ]
     },
+    // Navigation (Cmd+[ / Cmd+] — 로지텍 등 마우스 사이드 버튼이 키보드 단축키로 매핑됨)
+    {
+      label: 'Navigation',
+      submenu: [
+        {
+          label: 'Back',
+          accelerator: 'CmdOrCtrl+[',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('nav-back');
+            }
+          }
+        },
+        {
+          label: 'Forward',
+          accelerator: 'CmdOrCtrl+]',
+          click: () => {
+            if (mainWindow) {
+              mainWindow.webContents.send('nav-forward');
+            }
+          }
+        }
+      ]
+    },
     // View Menu
     {
       label: 'View',
@@ -261,18 +292,8 @@ function createMenu() {
   Menu.setApplicationMenu(menu);
 }
 
-// Handle mouse button navigation via IPC from preload
-ipcMain.on('nav-back', () => {
-  if (mainWindow && mainWindow.webContents.canGoBack()) {
-    mainWindow.webContents.goBack();
-  }
-});
-
-ipcMain.on('nav-forward', () => {
-  if (mainWindow && mainWindow.webContents.canGoForward()) {
-    mainWindow.webContents.goForward();
-  }
-});
+// 네비게이션: Cmd+[/] 메뉴 단축키 → renderer에 nav-back/nav-forward 전송
+// renderer에서 Next.js router.back()/forward()로 처리
 
 // Find in page: 검색 자체는 프론트엔드 CSS Highlight API로 처리
 // 메인 프로세스는 Cmd+F 메뉴 단축키 → toggle-find 이벤트 전송만 담당

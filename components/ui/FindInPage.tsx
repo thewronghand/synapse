@@ -8,8 +8,9 @@ declare global {
   interface Window {
     electron?: {
       platform: string;
-      goBack: () => void;
-      goForward: () => void;
+      onNavBack: (callback: () => void) => void;
+      onNavForward: (callback: () => void) => void;
+      removeNavListeners: () => void;
       onToggleFind: (callback: () => void) => void;
       removeToggleFind: () => void;
     };
