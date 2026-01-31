@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
-import { Search, Folder, FileText, Type, Tag, Network, Plus } from "lucide-react";
+import { Search, Folder, FileText, Type, Tag, Network, Plus, Mic } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { MobileMenuItem } from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
@@ -308,9 +308,15 @@ function DocumentsContent() {
           actions={
             <>
               {!isPublishedMode() && (
-                <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
-                  + 새 노트
-                </Button>
+                <>
+                  <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
+                    + 새 노트
+                  </Button>
+                  <Button variant="outline" onClick={() => router.push("/voice-memos")} className="cursor-pointer">
+                    <Mic className="h-4 w-4 mr-1" />
+                    음성 메모
+                  </Button>
+                </>
               )}
               <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
                 태그 관리
@@ -321,11 +327,18 @@ function DocumentsContent() {
             </>
           }
           mobileMenuItems={[
-            ...(!isPublishedMode() ? [{
-              label: "새 노트",
-              icon: <Plus className="h-4 w-4" />,
-              onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
-            }] : []),
+            ...(!isPublishedMode() ? [
+              {
+                label: "새 노트",
+                icon: <Plus className="h-4 w-4" />,
+                onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
+              },
+              {
+                label: "음성 메모",
+                icon: <Mic className="h-4 w-4" />,
+                onClick: () => router.push("/voice-memos"),
+              },
+            ] : []),
             {
               label: "태그 관리",
               icon: <Tag className="h-4 w-4" />,
