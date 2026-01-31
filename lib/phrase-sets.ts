@@ -1,11 +1,9 @@
 import fs from "fs/promises";
-import { getDataFilePath, ensureUserDataDir } from "@/lib/data-path";
+import { getConfigFilePath, getConfigDir } from "@/lib/notes-path";
 import type { PhraseSet, PhraseSetStore } from "@/types";
 
-const PHRASE_SETS_FILENAME = "phrase-sets.json";
-
 function getFilePath(): string {
-  return getDataFilePath(PHRASE_SETS_FILENAME);
+  return getConfigFilePath("phrase-sets", "phrase-sets.json");
 }
 
 function getDefaultStore(): PhraseSetStore {
@@ -24,7 +22,7 @@ export async function loadPhraseSetStore(): Promise<PhraseSetStore> {
 
 // 전체 스토어 저장
 async function savePhraseSetStore(store: PhraseSetStore): Promise<void> {
-  await ensureUserDataDir();
+  await fs.mkdir(getConfigDir("phrase-sets"), { recursive: true });
   await fs.writeFile(getFilePath(), JSON.stringify(store, null, 2));
 }
 

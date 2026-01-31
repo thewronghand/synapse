@@ -16,6 +16,32 @@ export function getNotesDir(): string {
 }
 
 /**
+ * Get the Synapse root directory (parent of notes)
+ * - Electron: ~/Documents/Synapse
+ * - Development: NOTES_DIR의 부모 또는 프로젝트 루트
+ */
+export function getSynapseRootDir(): string {
+  return path.dirname(getNotesDir());
+}
+
+/**
+ * Get the config directory path for a specific config type
+ * @param subdir - 하위 디렉토리 이름 (e.g., 'vertex-service-account', 'gcs-bucket', 'phrase-sets')
+ */
+export function getConfigDir(subdir: string): string {
+  return path.join(getSynapseRootDir(), 'config', subdir);
+}
+
+/**
+ * Get a config file path
+ * @param subdir - config 하위 디렉토리 (e.g., 'vertex-service-account')
+ * @param filename - 파일명 (e.g., 'service-account.json')
+ */
+export function getConfigFilePath(subdir: string, filename: string): string {
+  return path.join(getConfigDir(subdir), filename);
+}
+
+/**
  * Get the images directory path for a specific folder
  * @param folder - The folder name (e.g., 'default', 'my-notes')
  */

@@ -1,5 +1,5 @@
 import fs from "fs/promises";
-import { getDataFilePath, ensureUserDataDir } from "@/lib/data-path";
+import { getConfigFilePath, getConfigDir } from "@/lib/notes-path";
 
 export interface GcpServiceAccountInfo {
   type: string;
@@ -23,15 +23,16 @@ export interface GcpServiceAccountStatus {
   clientEmail?: string;
 }
 
-const SA_FILENAME = ".gcp-service-account.json";
-const GCS_BUCKET_FILENAME = ".gcs-bucket.json";
-
 function getGcsBucketFilePath(): string {
-  return getDataFilePath(GCS_BUCKET_FILENAME);
+  return getConfigFilePath("gcs-bucket", "bucket.json");
 }
 
 function getSAFilePath(): string {
-  return getDataFilePath(SA_FILENAME);
+  return getConfigFilePath("vertex-service-account", "service-account.json");
+}
+
+async function ensureConfigDir(subdir: string): Promise<void> {
+  await fs.mkdir(getConfigDir(subdir), { recursive: true });
 }
 
 // SA JSON의 필수 필드 검증
@@ -49,7 +50,7 @@ export function validateServiceAccount(
 export async function saveGcpServiceAccount(
   sa: GcpServiceAccountInfo
 ): Promise<void> {
-  await ensureUserDataDir();
+  await ensureConfigDir("vertex-service-account");
   await fs.writeFile(getSAFilePath(), JSON.stringify(sa, null, 2));
 }
 
@@ -88,7 +89,7 @@ export async function getGcpServiceAccountStatus(): Promise<GcpServiceAccountSta
 }
 
 export async function saveGcsBucketName(bucketName: string): Promise<void> {
-  await ensureUserDataDir();
+  await ensureConfigDir("gcs-bucket");
   await fs.writeFile(
     getGcsBucketFilePath(),
     JSON.stringify({ bucketName }, null, 2)
