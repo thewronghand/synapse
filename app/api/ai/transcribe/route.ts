@@ -6,7 +6,8 @@ import {
 import { getSelectedPhrases } from "@/lib/phrase-sets";
 import { v2 } from "@google-cloud/speech";
 
-const LOCATION = "asia-northeast1";
+// chirp_3는 "us" 멀티 리전에서 모든 피처(화자 분리 포함) 지원이 확인됨
+const LOCATION = "us";
 
 interface WordInfo {
   word?: string | null;
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
       private_key: sa.private_key,
     };
 
-    // V2 SpeechClient (지역 엔드포인트 사용)
+    // V2 SpeechClient (멀티 리전 엔드포인트 사용)
     const speechClient = new v2.SpeechClient({
       credentials,
       projectId: sa.project_id,
@@ -94,7 +95,8 @@ export async function POST(request: NextRequest) {
 
     const recognizer = `projects/${sa.project_id}/locations/${LOCATION}/recognizers/_`;
 
-    // V2 인식 설정 (Chirp 3 + 인코딩 자동 감지 + 인라인 구문 세트)
+    // V2 인식 설정 (Chirp 3 + 인코딩 자동 감지)
+    // chirp_3 화자 분리는 빈 diarizationConfig 사용 (자동 화자 수 감지)
     const phrases = await getSelectedPhrases();
     const config: Record<string, unknown> = {
       autoDecodingConfig: {},
@@ -102,10 +104,7 @@ export async function POST(request: NextRequest) {
       model: "chirp_3",
       features: {
         ...(enableDiarization && {
-          diarizationConfig: {
-            minSpeakerCount: 2,
-            maxSpeakerCount: 6,
-          },
+          diarizationConfig: {},
         }),
       },
     };
@@ -166,16 +165,51 @@ export async function POST(request: NextRequest) {
           },
         });
 
-        const [response] = await operation.promise();
+        if (!operation.name) {
+          throw new Error("BatchRecognize operation 생성 실패: operation name이 없습니다");
+        }
+
+        console.log(`[Transcribe] BatchRecognize operation: ${operation.name}`);
+
+        // operation.promise() 대신 수동 폴링 (Node.js V2 클라이언트의 hang 방지)
+        const POLL_INTERVAL_MS = 5_000;
+        const MAX_POLL_MS = 600_000; // 10분 타임아웃
+        const startTime = Date.now();
+        let pollResult = await speechClient.checkBatchRecognizeProgress(operation.name);
+
+        while (!pollResult.done) {
+          if (Date.now() - startTime > MAX_POLL_MS) {
+            throw new Error("BatchRecognize 타임아웃 (10분 초과). 오디오 파일이 너무 크거나 서비스가 지연되고 있습니다.");
+          }
+          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+          pollResult = await speechClient.checkBatchRecognizeProgress(operation.name!);
+        }
+
+        // pollResult.result의 타입이 {}로 추론되므로 타입 단언 필요
+        // (google-gax LROperation의 result 프로퍼티 타입 정의 한계)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = pollResult.result as any;
 
         // batchRecognize 응답: results 맵에서 transcript 추출
-        const inlineResults = response.results;
+        const inlineResults = response?.results;
         if (inlineResults) {
+          // 파일별 에러 체크
+          for (const [uri, fileResult] of Object.entries(inlineResults)) {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fr = fileResult as any;
+            if (fr.error?.message) {
+              console.error(`[Transcribe] 파일 에러 (${uri}): ${fr.error.message}`);
+              throw new Error(fr.error.message);
+            }
+          }
+
           if (enableDiarization) {
             // 화자 분리: 모든 결과에서 words를 모아서 화자별로 조합
             const allWords: WordInfo[] = [];
             for (const [, fileResult] of Object.entries(inlineResults)) {
-              for (const result of fileResult.transcript?.results ?? []) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const fr = fileResult as any;
+              for (const result of fr.transcript?.results ?? []) {
                 const words = result.alternatives?.[0]?.words;
                 if (words) {
                   allWords.push(...(words as WordInfo[]));
@@ -188,8 +222,11 @@ export async function POST(request: NextRequest) {
           } else {
             const transcripts: string[] = [];
             for (const [, fileResult] of Object.entries(inlineResults)) {
-              const resultTranscript = fileResult.transcript?.results
-                ?.map((result) => result.alternatives?.[0]?.transcript)
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const fr = fileResult as any;
+              const resultTranscript = fr.transcript?.results
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                ?.map((result: any) => result.alternatives?.[0]?.transcript)
                 .filter(Boolean)
                 .join("\n");
               if (resultTranscript) {
