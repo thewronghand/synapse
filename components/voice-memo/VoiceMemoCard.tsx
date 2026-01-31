@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2, FileText, Sparkles, Trash2, Play, Pause, RefreshCw } from "lucide-react";
+import { Loader2, FileText, Sparkles, Trash2, Play, Pause, RefreshCw, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { useConfirm } from "@/components/ui/confirm-provider";
@@ -52,6 +52,7 @@ export function VoiceMemoCard({
   const [isTranscribing, setIsTranscribing] = useState(false);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [enableDiarization, setEnableDiarization] = useState(false);
 
   const audioSrc = `/api/audio/${encodeURIComponent(memo.folder)}/${encodeURIComponent(memo.filename)}`;
   const statusInfo = STATUS_MAP[memo.status];
@@ -82,6 +83,9 @@ export function VoiceMemoCard({
 
       const formData = new FormData();
       formData.append("audio", file);
+      if (enableDiarization) {
+        formData.append("enableDiarization", "true");
+      }
 
       const transcribeRes = await fetch("/api/ai/transcribe", {
         method: "POST",
@@ -282,6 +286,19 @@ export function VoiceMemoCard({
             재전사
           </Button>
         )}
+
+        {/* 화자 구분 */}
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none">
+          <input
+            type="checkbox"
+            checked={enableDiarization}
+            onChange={(e) => setEnableDiarization(e.target.checked)}
+            disabled={isTranscribing}
+            className="accent-primary"
+          />
+          <Users className="h-3 w-3" />
+          화자 구분
+        </label>
 
         {/* 요약하기 / 재요약 */}
         {memo.status === "transcribed" && (

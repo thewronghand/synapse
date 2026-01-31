@@ -189,6 +189,7 @@ function VoiceMemosContent() {
         memo={detailMemo}
         open={detailMemo !== null}
         onClose={() => setDetailMemo(null)}
+        onUpdated={handleUpdated}
       />
 
       {/* 구문 세트 관리 다이얼로그 */}
