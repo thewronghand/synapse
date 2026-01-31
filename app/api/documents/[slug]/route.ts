@@ -19,6 +19,7 @@ import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
 import { ensureDefaultFolder } from '@/lib/folder-utils';
 import { moveImagesFromTemp } from '@/lib/image-utils';
+import { moveAudioFromTemp } from '@/lib/audio-utils';
 
 const NOTES_DIR = getNotesDir();
 
@@ -153,8 +154,9 @@ export async function PUT(
       ? path.join(NOTES_DIR, folder, oldFilename)
       : path.join(NOTES_DIR, oldFilename);
 
-    // Move temp images to permanent location
-    const processedContent = await moveImagesFromTemp(content, folder || 'default');
+    // Move temp images and audio to permanent location
+    let processedContent = await moveImagesFromTemp(content, folder || 'default');
+    processedContent = await moveAudioFromTemp(processedContent, folder || 'default');
 
     // Parse the new content
     const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(processedContent);

@@ -98,6 +98,7 @@ export async function POST(request: NextRequest) {
           '.env.local',
           '.env',
           'oauth-proxy',
+          'audio',
         ];
 
         if (skipPatterns.some(pattern => entry.name === pattern || entry.name.startsWith('.'))) {

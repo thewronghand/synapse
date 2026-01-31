@@ -80,6 +80,33 @@ export interface AppSettings {
   graphLayout: 'force' | 'tree';
 }
 
+// Voice Memo types
+
+export interface VoiceMemoMeta {
+  id: string; // 파일명에서 확장자 제외 (예: "2026-01-31-a1b2c3d4e5f6")
+  filename: string; // 오디오 파일명 (예: "2026-01-31-a1b2c3d4e5f6.webm")
+  folder: string; // 저장 폴더 (예: "default")
+  status: "recorded" | "transcribed" | "summarized";
+  duration: number; // 녹음 길이 (초)
+  transcript: string | null;
+  summary: string | null;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+}
+
+export interface PhraseSet {
+  id: string;
+  name: string;
+  phrases: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PhraseSetStore {
+  phraseSets: PhraseSet[];
+  selectedId: string | null;
+}
+
 // Publish types (추후 구현)
 
 export interface PublishConfig {

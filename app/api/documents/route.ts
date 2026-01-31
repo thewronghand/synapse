@@ -16,6 +16,7 @@ import { tagCache } from '@/lib/tag-cache';
 import { documentCache } from '@/lib/document-cache';
 import { graphCache } from '@/lib/graph-cache';
 import { moveImagesFromTemp } from '@/lib/image-utils';
+import { moveAudioFromTemp } from '@/lib/audio-utils';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
 import { ensureDefaultFolder, DEFAULT_FOLDER_NAME } from '@/lib/folder-utils';
@@ -112,8 +113,9 @@ export async function POST(request: NextRequest) {
       // File doesn't exist, continue
     }
 
-    // Move temp images and write file
-    const updatedContent = await moveImagesFromTemp(content, folder);
+    // Move temp images and audio, then write file
+    let updatedContent = await moveImagesFromTemp(content, folder);
+    updatedContent = await moveAudioFromTemp(updatedContent, folder);
     await fs.writeFile(filePath, updatedContent, 'utf-8');
 
     // Update tag cache
