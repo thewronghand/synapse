@@ -6,6 +6,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { ConfirmProvider } from "@/components/ui/confirm-provider";
 import { FindInPage } from "@/components/ui/FindInPage";
 import { NavigationHandler } from "@/components/ui/NavigationHandler";
+import { RecordingProvider } from "@/components/voice-memo/RecordingProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -56,10 +57,12 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <ConfirmProvider>
-            <FindInPage />
-            <NavigationHandler />
-            {children}
-            <Toaster />
+            <RecordingProvider>
+              <FindInPage />
+              <NavigationHandler />
+              {children}
+              <Toaster />
+            </RecordingProvider>
           </ConfirmProvider>
         </ThemeProvider>
       </body>

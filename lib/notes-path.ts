@@ -32,6 +32,22 @@ export function getFolderTempImagesDir(folder: string): string {
 }
 
 /**
+ * Get the audio directory path for a specific folder
+ * @param folder - The folder name (e.g., 'default', 'my-notes')
+ */
+export function getFolderAudioDir(folder: string): string {
+  return path.join(getNotesDir(), folder, 'audio');
+}
+
+/**
+ * Get the temp audio directory path for a specific folder
+ * @param folder - The folder name (e.g., 'default', 'my-notes')
+ */
+export function getFolderTempAudioDir(folder: string): string {
+  return path.join(getNotesDir(), folder, 'audio', 'temp');
+}
+
+/**
  * @deprecated Use getFolderImagesDir instead
  * Get the images directory path (legacy - central images folder)
  */

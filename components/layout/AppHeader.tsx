@@ -7,6 +7,7 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Settings, EllipsisVertical, Sun, Moon } from "lucide-react";
 import { ReactNode } from "react";
 import { isPublishedMode } from "@/lib/env";
+import { RecordingButton } from "@/components/voice-memo/RecordingButton";
 import { useTheme } from "next-themes";
 import Logo from "@/components/ui/Logo";
 import {
@@ -94,6 +95,7 @@ export default function AppHeader({
             {/* 데스크톱: 버튼 직접 노출 */}
             <div className="hidden md:flex gap-2">
               {actions}
+              {!isPublishedMode() && <RecordingButton />}
               <ThemeToggle />
               {showSettings && !isPublishedMode() && (
                 <Button
@@ -109,7 +111,8 @@ export default function AppHeader({
             </div>
 
             {/* 모바일: 드롭다운 메뉴 */}
-            <div className="md:hidden">
+            <div className="md:hidden flex gap-2">
+              {!isPublishedMode() && <RecordingButton />}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon" className="cursor-pointer">
@@ -152,6 +155,7 @@ export default function AppHeader({
           /* 기존 동작: mobileMenuItems 미전달 시 */
           <div className="flex gap-2">
             {actions}
+            {!isPublishedMode() && <RecordingButton />}
             <ThemeToggle />
             {showSettings && !isPublishedMode() && (
               <Button

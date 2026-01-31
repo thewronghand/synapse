@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, memo } from "react";
+import React, { useState, memo } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import remarkWikiLink from "remark-wiki-link";
 import remarkMath from "remark-math";
 import remarkEmoji from "remark-emoji";
+import remarkAudio from "@/lib/remark-audio";
+import remarkTranscript from "@/lib/remark-transcript";
+import remarkSummary from "@/lib/remark-summary";
 import rehypeRaw from "rehype-raw";
 import rehypeKatex from "rehype-katex";
 import rehypeHighlight from "rehype-highlight";
 import * as Tooltip from "@radix-ui/react-tooltip";
-import { ImageOff } from "lucide-react";
+import { ImageOff, FileText, Sparkles, ChevronRight } from "lucide-react";
+import { AudioPlayer } from "@/components/ui/AudioPlayer";
+import { isPublishedMode } from "@/lib/env";
 import "katex/dist/katex.min.css";
 import "highlight.js/styles/github.css";
 
@@ -49,6 +54,56 @@ function ImageWithFallback({ src, alt, ...props }: React.ImgHTMLAttributes<HTMLI
         setHasError(true);
       }}
     />
+  );
+}
+
+// 녹취록 접이식 블록 컴포넌트
+function TranscriptBlock({ label, children, defaultOpen = false }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="my-4 border border-border rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-2 px-4 py-3 bg-muted/50 hover:bg-muted transition-colors text-left cursor-pointer"
+      >
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+        />
+        <FileText className="h-4 w-4 shrink-0 text-primary" />
+        <span className="text-sm font-medium">{label}</span>
+      </button>
+      {isOpen && (
+        <div className="px-4 py-3 text-sm leading-relaxed border-t border-border bg-muted/20 prose prose-sm dark:prose-invert max-w-none">
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// 요약 접이식 블록 컴포넌트
+function SummaryBlock({ label, children, defaultOpen = false }: { label: string; children: React.ReactNode; defaultOpen?: boolean }) {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
+
+  return (
+    <div className="my-4 border border-border rounded-lg overflow-hidden">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full flex items-center gap-2 px-4 py-3 bg-muted/50 hover:bg-muted transition-colors text-left cursor-pointer"
+      >
+        <ChevronRight
+          className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform duration-200 ${isOpen ? "rotate-90" : ""}`}
+        />
+        <Sparkles className="h-4 w-4 shrink-0 text-primary" />
+        <span className="text-sm font-medium">{label}</span>
+      </button>
+      {isOpen && (
+        <div className="px-4 py-3 text-sm leading-relaxed border-t border-border bg-muted/20 prose prose-sm dark:prose-invert max-w-none">
+          {children}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -158,6 +213,9 @@ function MarkdownViewer({
       <ReactMarkdown
         remarkPlugins={[
           remarkGfm,
+          remarkAudio,
+          remarkTranscript,
+          remarkSummary,
           remarkBreaks,
           remarkMath,
           remarkEmoji,
@@ -204,9 +262,34 @@ function MarkdownViewer({
             const id = text.toLowerCase().normalize('NFC').replace(/[^\w\s가-힣-]/g, '').replace(/\s+/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '');
             return <h6 id={id} {...props}>{children}</h6>;
           },
+          // 녹취록/요약 블록 커스텀 렌더링
+          div: ({ node, children, ...props }: React.ComponentPropsWithoutRef<"div"> & { node?: unknown; "data-transcript"?: string; "data-summary"?: string; "data-open"?: string }) => {
+            const isOpen = props["data-open"] === "true";
+            const transcriptLabel = props["data-transcript"];
+            if (transcriptLabel !== undefined) {
+              // 퍼블리시 모드에서는 녹취록 블록 숨김
+              if (isPublishedMode()) return null;
+              return <TranscriptBlock label={transcriptLabel || "녹취록"} defaultOpen={isOpen}>{children}</TranscriptBlock>;
+            }
+            const summaryLabel = props["data-summary"];
+            if (summaryLabel !== undefined) {
+              // 퍼블리시 모드에서는 요약 블록 숨김
+              if (isPublishedMode()) return null;
+              return <SummaryBlock label={summaryLabel || "요약"} defaultOpen={isOpen}>{children}</SummaryBlock>;
+            }
+            return <div {...props}>{children}</div>;
+          },
           img: ({ src, alt, ...props }) => (
             <ImageWithFallback src={src} alt={alt} {...props} />
           ),
+          // 오디오 플레이어 커스텀 렌더링 (퍼블리시 모드에서는 숨김)
+          audio: ({ src, ...props }: React.ComponentPropsWithoutRef<"audio"> & { "data-title"?: string }) => {
+            if (isPublishedMode()) return null;
+            const audioSrc = typeof src === "string" ? src : "";
+            const audioTitle = props["data-title"];
+            if (!audioSrc) return null;
+            return <AudioPlayer src={audioSrc} title={audioTitle} />;
+          },
           a: ({ node, href, children, title, ...props }) => {
             // Wiki link 처리
             if (props.className?.includes("wiki-link")) {

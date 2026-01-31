@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useConfirm } from "@/components/ui/confirm-provider";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Bot } from "lucide-react";
 
 interface MigrationResult {
   oldFilename: string;
@@ -89,6 +89,20 @@ function SettingsContent() {
   // Error detail dialog state
   const [errorDetail, setErrorDetail] = useState<{ error: string; stack?: string } | null>(null);
 
+  // GCP Service Account states
+  const [gcpConnected, setGcpConnected] = useState(false);
+  const [gcpLoading, setGcpLoading] = useState(true);
+  const [gcpProjectId, setGcpProjectId] = useState<string | null>(null);
+  const [gcpClientEmail, setGcpClientEmail] = useState<string | null>(null);
+  const [gcpUploading, setGcpUploading] = useState(false);
+  const [showGcpDisconnect, setShowGcpDisconnect] = useState(false);
+  const gcpFileInputRef = useRef<HTMLInputElement>(null);
+
+  // GCS Bucket states
+  const [gcsBucketName, setGcsBucketName] = useState("");
+  const [gcsBucketSaved, setGcsBucketSaved] = useState<string | null>(null);
+  const [gcsBucketSaving, setGcsBucketSaving] = useState(false);
+
   // Folder exclusion states for publish
   const [allFolders, setAllFolders] = useState<{ name: string; noteCount: number }[]>([]);
   const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
@@ -130,6 +144,10 @@ function SettingsContent() {
     // Check export data status from server
     checkExportStatus();
 
+    // Check GCP connection status
+    checkGcpConnection();
+    checkGcsBucket();
+
     fetchFolders();
   }, []);
 
@@ -148,6 +166,131 @@ function SettingsContent() {
       console.error('Error checking export status:', error);
     } finally {
       setExportDataLoading(false);
+    }
+  }
+
+  // GCP SA 관련 함수들
+  async function checkGcpConnection() {
+    try {
+      const response = await fetch("/api/settings/gcp");
+      const result = await response.json();
+      if (result.success && result.data.connected) {
+        setGcpConnected(true);
+        setGcpProjectId(result.data.projectId);
+        setGcpClientEmail(result.data.clientEmail);
+      } else {
+        setGcpConnected(false);
+        setGcpProjectId(null);
+        setGcpClientEmail(null);
+      }
+    } catch (error) {
+      console.error("GCP 연결 상태 확인 실패:", error);
+      setGcpConnected(false);
+    } finally {
+      setGcpLoading(false);
+    }
+  }
+
+  async function checkGcsBucket() {
+    try {
+      const response = await fetch("/api/settings/gcs-bucket");
+      const result = await response.json();
+      if (result.success && result.data.bucketName) {
+        setGcsBucketName(result.data.bucketName);
+        setGcsBucketSaved(result.data.bucketName);
+      }
+    } catch (error) {
+      console.error("GCS 버킷 설정 확인 실패:", error);
+    }
+  }
+
+  async function handleSaveGcsBucket(skipValidation = false) {
+    if (!gcsBucketName.trim()) return;
+
+    setGcsBucketSaving(true);
+    try {
+      const response = await fetch("/api/settings/gcs-bucket", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          bucketName: gcsBucketName.trim(),
+          skipValidation,
+        }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setGcsBucketSaved(result.data.bucketName);
+        toast.success("GCS 버킷이 설정되었습니다");
+      } else {
+        toast.error(result.error || "저장에 실패했습니다");
+      }
+    } catch (error) {
+      console.error("GCS 버킷 저장 실패:", error);
+      toast.error("저장에 실패했습니다");
+    } finally {
+      setGcsBucketSaving(false);
+    }
+  }
+
+  async function handleDeleteGcsBucket() {
+    try {
+      await fetch("/api/settings/gcs-bucket", { method: "DELETE" });
+      setGcsBucketName("");
+      setGcsBucketSaved(null);
+      toast.success("GCS 버킷 설정이 해제되었습니다");
+    } catch (error) {
+      console.error("GCS 버킷 삭제 실패:", error);
+      toast.error("설정 해제에 실패했습니다");
+    }
+  }
+
+  async function handleGcpFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setGcpUploading(true);
+    try {
+      const text = await file.text();
+      const json = JSON.parse(text);
+
+      const response = await fetch("/api/settings/gcp", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(json),
+      });
+
+      const result = await response.json();
+      if (result.success) {
+        toast.success("GCP 서비스 어카운트가 연동되었습니다");
+        checkGcpConnection();
+      } else {
+        toast.error(result.error || "서비스 어카운트 저장 실패");
+      }
+    } catch {
+      toast.error("유효하지 않은 JSON 파일입니다");
+    } finally {
+      setGcpUploading(false);
+      // 같은 파일을 다시 선택할 수 있도록 input 초기화
+      if (gcpFileInputRef.current) {
+        gcpFileInputRef.current.value = "";
+      }
+    }
+  }
+
+  async function executeGcpDisconnect() {
+    setShowGcpDisconnect(false);
+    try {
+      const response = await fetch("/api/settings/gcp", { method: "DELETE" });
+      const result = await response.json();
+      if (result.success) {
+        toast.success("GCP 연동이 해제되었습니다");
+        checkGcpConnection();
+      } else {
+        toast.error("연동 해제 실패");
+      }
+    } catch (error) {
+      console.error("GCP 연동 해제 실패:", error);
+      toast.error("연동 해제 중 오류가 발생했습니다");
     }
   }
 
@@ -1074,7 +1217,182 @@ function SettingsContent() {
             )}
           </div>
         </section>
+        {/* AI Settings Section */}
+        <section className="border rounded-lg p-6 bg-card">
+          <div className="flex items-center gap-2 mb-4">
+            <Bot className="h-6 w-6" />
+            <h2 className="text-2xl font-semibold">AI 설정</h2>
+          </div>
+          <p className="text-muted-foreground mb-6">
+            AI 기능(회의록 전사, 요약 등)을 사용하려면 GCP 서비스 어카운트를 연동하세요.
+            Google Cloud Speech-to-Text와 Vertex AI(Gemini)를 사용합니다.
+          </p>
+
+          <div className="space-y-4">
+            <div className="bg-muted rounded-lg p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <h3 className="font-semibold">GCP 서비스 어카운트</h3>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {gcpLoading
+                      ? "확인 중..."
+                      : gcpConnected
+                        ? "서비스 어카운트가 연동되었습니다"
+                        : "서비스 어카운트 JSON 파일을 업로드하세요"}
+                  </p>
+                  {gcpConnected && gcpProjectId && (
+                    <div className="text-xs text-muted-foreground mt-2 space-y-0.5">
+                      <p>프로젝트: <span className="font-mono">{gcpProjectId}</span></p>
+                      <p>계정: <span className="font-mono">{gcpClientEmail}</span></p>
+                    </div>
+                  )}
+                </div>
+                <div className={`px-3 py-1 rounded-full text-sm font-medium ${
+                  gcpConnected
+                    ? "bg-success/10 text-success"
+                    : "bg-muted text-muted-foreground"
+                }`}>
+                  {gcpConnected ? "연동됨" : "미연동"}
+                </div>
+              </div>
+              {!gcpLoading && (
+                <div className="mt-4 flex gap-2">
+                  {!gcpConnected ? (
+                    <>
+                      <input
+                        ref={gcpFileInputRef}
+                        type="file"
+                        accept=".json"
+                        onChange={handleGcpFileUpload}
+                        className="hidden"
+                      />
+                      <Button
+                        onClick={() => gcpFileInputRef.current?.click()}
+                        variant="outline"
+                        className="cursor-pointer"
+                        disabled={gcpUploading}
+                      >
+                        {gcpUploading ? (
+                          <span className="flex items-center gap-2">
+                            <Spinner size="sm" />
+                            업로드 중...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-2">
+                            <Upload className="h-4 w-4" />
+                            JSON 파일 업로드
+                          </span>
+                        )}
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      onClick={() => setShowGcpDisconnect(true)}
+                      variant="destructive"
+                      className="cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        <Trash2 className="h-4 w-4" />
+                        연동 해제
+                      </span>
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {!gcpConnected && (
+              <div className="text-sm text-muted-foreground space-y-2">
+                <p className="font-medium">서비스 어카운트 설정 방법:</p>
+                <ol className="list-decimal list-inside space-y-1 text-xs">
+                  <li>Google Cloud Console에서 프로젝트를 생성하거나 선택합니다</li>
+                  <li>Cloud Speech-to-Text API와 Vertex AI API를 활성화합니다</li>
+                  <li>IAM에서 서비스 어카운트를 생성하고 필요한 역할을 부여합니다</li>
+                  <li>서비스 어카운트의 JSON 키 파일을 다운로드합니다</li>
+                  <li>위 버튼으로 JSON 파일을 업로드합니다</li>
+                </ol>
+              </div>
+            )}
+
+            {/* GCS 버킷 설정 - GCP 연동 시에만 표시 */}
+            {gcpConnected && (
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="font-semibold">GCS 버킷 (선택사항)</h3>
+                <p className="text-sm text-muted-foreground mt-1">
+                  1분 이상의 긴 음성 메모를 전사하려면 Google Cloud Storage 버킷이 필요합니다.
+                  오디오는 임시 업로드 후 전사 완료 시 자동 삭제됩니다.
+                </p>
+                {!gcsBucketSaved && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    GCP Console에서 버킷을 직접 만든 후 이름만 입력하거나,
+                    서비스 어카운트에 <span className="font-mono">Storage Admin</span> 역할을 부여하면 자동 생성도 가능합니다.
+                  </p>
+                )}
+                <div className="mt-3 flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={gcsBucketName}
+                    onChange={(e) => setGcsBucketName(e.target.value)}
+                    placeholder="my-bucket-name"
+                    className="flex-1 h-9 px-3 text-sm rounded-md border border-input bg-background"
+                    disabled={gcsBucketSaving}
+                  />
+                  {gcsBucketSaved ? (
+                    <Button
+                      onClick={handleDeleteGcsBucket}
+                      variant="outline"
+                      className="cursor-pointer shrink-0"
+                    >
+                      해제
+                    </Button>
+                  ) : null}
+                  {!gcsBucketSaved && (
+                    <Button
+                      onClick={() => handleSaveGcsBucket(true)}
+                      variant="outline"
+                      className="cursor-pointer shrink-0"
+                      disabled={gcsBucketSaving || !gcsBucketName.trim()}
+                    >
+                      {gcsBucketSaving ? "저장 중..." : "이름만 저장"}
+                    </Button>
+                  )}
+                  <Button
+                    onClick={() => handleSaveGcsBucket(false)}
+                    variant="outline"
+                    className="cursor-pointer shrink-0"
+                    disabled={gcsBucketSaving || !gcsBucketName.trim() || gcsBucketName.trim() === gcsBucketSaved}
+                  >
+                    {gcsBucketSaving ? "설정 중..." : gcsBucketSaved ? "저장" : "생성 및 저장"}
+                  </Button>
+                </div>
+                {gcsBucketSaved && (
+                  <p className="text-xs text-success mt-2">
+                    버킷 설정됨: <span className="font-mono">{gcsBucketSaved}</span>
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </section>
       </div>
+
+      {/* GCP Disconnect Confirm Dialog */}
+      <AlertDialog open={showGcpDisconnect} onOpenChange={setShowGcpDisconnect}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>GCP 연동 해제</AlertDialogTitle>
+            <AlertDialogDescription>
+              GCP 서비스 어카운트 연동을 해제하시겠습니까? AI 기능(회의록 전사, 요약)을 사용하려면 다시 연동해야 합니다.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>취소</AlertDialogCancel>
+            <AlertDialogAction onClick={executeGcpDisconnect} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+              연동 해제
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Migration Confirm Dialog */}
       <AlertDialog open={showMigrationConfirm} onOpenChange={setShowMigrationConfirm}>

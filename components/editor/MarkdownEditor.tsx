@@ -37,6 +37,7 @@ import {
   Smile,
   ChevronsUpDown,
   Keyboard,
+  Mic,
 } from 'lucide-react';
 import {
   Tooltip,
@@ -44,6 +45,8 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { VoiceMemoPickerDialog } from '@/components/voice-memo/VoiceMemoPickerDialog';
+import type { VoiceMemoMeta } from '@/types';
 
 interface MarkdownEditorProps {
   value: string;
@@ -93,6 +96,7 @@ export default function MarkdownEditor({
   const editorViewRef = useRef<EditorView | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [mounted, setMounted] = useState(false);
+  const [voiceMemoPickerOpen, setVoiceMemoPickerOpen] = useState(false);
 
   // Wait for theme to be resolved (avoid hydration mismatch)
   useEffect(() => {
@@ -272,6 +276,42 @@ export default function MarkdownEditor({
       onChange(value + '\n' + markdown);
     }
   };
+
+  const insertVoiceMemo = (
+    memo: VoiceMemoMeta,
+    options: { audio: boolean; transcript: boolean; summary: boolean; expanded: boolean }
+  ) => {
+    const parts: string[] = [];
+    const openFlag = options.expanded ? " open" : "";
+
+    if (options.audio) {
+      parts.push(
+        `!audio[${memo.filename}](/api/audio/${encodeURIComponent(memo.folder)}/${encodeURIComponent(memo.filename)})`
+      );
+    }
+    if (options.transcript && memo.transcript) {
+      parts.push(`:::transcript${openFlag} 녹취록\n${memo.transcript}\n\n:::`);
+    }
+    if (options.summary && memo.summary) {
+      parts.push(`:::summary${openFlag} 요약\n${memo.summary}\n\n:::`);
+    }
+
+    if (parts.length === 0) return;
+
+    const markdownText = '\n\n' + parts.join('\n\n') + '\n';
+
+    if (editorViewRef.current) {
+      const view = editorViewRef.current;
+      const pos = view.state.selection.main.head;
+      view.dispatch({
+        changes: { from: pos, insert: markdownText },
+        selection: { anchor: pos + markdownText.length },
+      });
+      view.focus();
+    } else {
+      onChange(value + markdownText);
+    }
+  };;;;
 
   const handlePaste = async (event: React.ClipboardEvent) => {
     const items = event.clipboardData?.items;
@@ -652,6 +692,26 @@ export default function MarkdownEditor({
             </TooltipContent>
           </Tooltip>
 
+          {/* Voice Memo */}
+          {folder && (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setVoiceMemoPickerOpen(true)}
+                  className="cursor-pointer hover:bg-accent"
+                >
+                  <Mic className="h-4 w-4" />
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent className="bg-black/80 text-white border-none">
+                <p>음성 메모 삽입</p>
+              </TooltipContent>
+            </Tooltip>
+          )}
+
           {/* Wiki Link */}
           <Tooltip>
             <TooltipTrigger asChild>
@@ -838,6 +898,14 @@ export default function MarkdownEditor({
           />
         </div>
       </div>
+      {folder && (
+        <VoiceMemoPickerDialog
+          open={voiceMemoPickerOpen}
+          folder={folder}
+          onOpenChange={setVoiceMemoPickerOpen}
+          onInsert={insertVoiceMemo}
+        />
+      )}
     </TooltipProvider>
   );
 }
