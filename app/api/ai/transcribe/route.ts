@@ -6,12 +6,46 @@ import {
 import { getSelectedPhrases } from "@/lib/phrase-sets";
 import { v2 } from "@google-cloud/speech";
 
-const LOCATION = "us-central1";
+const LOCATION = "asia-northeast1";
+
+interface WordInfo {
+  word?: string | null;
+  speakerLabel?: string | null;
+}
+
+/**
+ * 화자 분리된 단어 목록을 "화자 N: 텍스트" 형식으로 조합
+ */
+function formatDiarizedTranscript(words: WordInfo[]): string {
+  const lines: string[] = [];
+  let currentSpeaker = "";
+  let currentText = "";
+
+  for (const w of words) {
+    const speaker = w.speakerLabel || "";
+    const word = w.word || "";
+    if (!word) continue;
+
+    if (speaker !== currentSpeaker) {
+      if (currentText) {
+        lines.push(`화자 ${currentSpeaker}: ${currentText.trim()}`);
+      }
+      currentSpeaker = speaker;
+      currentText = word;
+    } else {
+      currentText += " " + word;
+    }
+  }
+  if (currentText) {
+    lines.push(`화자 ${currentSpeaker}: ${currentText.trim()}`);
+  }
+  return lines.join("\n");
+}
 
 /**
  * POST /api/ai/transcribe
- * 오디오 파일을 텍스트로 전사 (Speech-to-Text V2 + Chirp 2)
- * FormData: audio (File)
+ * 오디오 파일을 텍스트로 전사 (Speech-to-Text V2 + Chirp 3)
+ * FormData: audio (File), enableDiarization ("true" | "false")
  */
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +63,7 @@ export async function POST(request: NextRequest) {
 
     const formData = await request.formData();
     const audioFile = formData.get("audio") as File;
+    const enableDiarization = formData.get("enableDiarization") === "true";
 
     if (!audioFile) {
       return NextResponse.json(
@@ -38,7 +73,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log(
-      `[Transcribe] 파일: ${audioFile.name}, 타입: ${audioFile.type}, 크기: ${Math.round(audioFile.size / 1024)}KB`
+      `[Transcribe] 파일: ${audioFile.name}, 타입: ${audioFile.type}, 크기: ${Math.round(audioFile.size / 1024)}KB, 화자분리: ${enableDiarization}`
     );
 
     const credentials = {
@@ -59,12 +94,20 @@ export async function POST(request: NextRequest) {
 
     const recognizer = `projects/${sa.project_id}/locations/${LOCATION}/recognizers/_`;
 
-    // V2 인식 설정 (Chirp 2 + 인코딩 자동 감지 + 인라인 구문 세트)
+    // V2 인식 설정 (Chirp 3 + 인코딩 자동 감지 + 인라인 구문 세트)
     const phrases = await getSelectedPhrases();
     const config: Record<string, unknown> = {
       autoDecodingConfig: {},
       languageCodes: ["ko-KR"],
-      model: "chirp_2",
+      model: "chirp_3",
+      features: {
+        ...(enableDiarization && {
+          diarizationConfig: {
+            minSpeakerCount: 2,
+            maxSpeakerCount: 6,
+          },
+        }),
+      },
     };
 
     // 선택된 구문 세트가 있으면 인라인 adaptation 추가
@@ -128,17 +171,33 @@ export async function POST(request: NextRequest) {
         // batchRecognize 응답: results 맵에서 transcript 추출
         const inlineResults = response.results;
         if (inlineResults) {
-          const transcripts: string[] = [];
-          for (const [, fileResult] of Object.entries(inlineResults)) {
-            const resultTranscript = fileResult.transcript?.results
-              ?.map((result) => result.alternatives?.[0]?.transcript)
-              .filter(Boolean)
-              .join("\n");
-            if (resultTranscript) {
-              transcripts.push(resultTranscript);
+          if (enableDiarization) {
+            // 화자 분리: 모든 결과에서 words를 모아서 화자별로 조합
+            const allWords: WordInfo[] = [];
+            for (const [, fileResult] of Object.entries(inlineResults)) {
+              for (const result of fileResult.transcript?.results ?? []) {
+                const words = result.alternatives?.[0]?.words;
+                if (words) {
+                  allWords.push(...(words as WordInfo[]));
+                }
+              }
             }
+            transcript = allWords.length > 0
+              ? formatDiarizedTranscript(allWords)
+              : undefined;
+          } else {
+            const transcripts: string[] = [];
+            for (const [, fileResult] of Object.entries(inlineResults)) {
+              const resultTranscript = fileResult.transcript?.results
+                ?.map((result) => result.alternatives?.[0]?.transcript)
+                .filter(Boolean)
+                .join("\n");
+              if (resultTranscript) {
+                transcripts.push(resultTranscript);
+              }
+            }
+            transcript = transcripts.join("\n");
           }
-          transcript = transcripts.join("\n");
         }
 
         console.log(
@@ -165,10 +224,24 @@ export async function POST(request: NextRequest) {
         content: buffer,
       });
 
-      transcript = response.results
-        ?.map((result) => result.alternatives?.[0]?.transcript)
-        .filter(Boolean)
-        .join("\n");
+      if (enableDiarization) {
+        // 화자 분리: words에서 speakerLabel 추출
+        const allWords: WordInfo[] = [];
+        for (const result of response.results ?? []) {
+          const words = result.alternatives?.[0]?.words;
+          if (words) {
+            allWords.push(...(words as WordInfo[]));
+          }
+        }
+        transcript = allWords.length > 0
+          ? formatDiarizedTranscript(allWords)
+          : undefined;
+      } else {
+        transcript = response.results
+          ?.map((result) => result.alternatives?.[0]?.transcript)
+          .filter(Boolean)
+          .join("\n");
+      }
 
       console.log(
         `[Transcribe] Recognize 완료: ${transcript?.length ?? 0}자`
