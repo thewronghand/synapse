@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { useChat } from "@ai-sdk/react";
-import { DefaultChatTransport } from "ai";
+import { DefaultChatTransport, type UIMessage } from "ai";
 import { toast } from "sonner";
 import { Ghost, X, Plus, Maximize2, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -30,7 +30,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
   const [aiModelId, setAiModelId] = useState<string>("");
   const [aiModels, setAiModels] = useState<{ id: string; label: string; description: string }[]>([]);
   const pendingMessageRef = useRef<string | null>(null);
-  const pendingRestoreRef = useRef<unknown[] | null>(null);
+  const pendingRestoreRef = useRef<UIMessage[] | null>(null);
 
   // activeSessionId가 바뀔 때마다 transport를 재생성
   const transport = useMemo(
@@ -146,9 +146,8 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
         pendingRestoreRef.current = data.data.messages.map((m: ChatMessage) => ({
           id: m.id,
           role: m.role,
-          parts: [{ type: "text", text: m.content }],
-          createdAt: new Date(m.createdAt),
-        }));
+          parts: [{ type: "text" as const, text: m.content }],
+        }) satisfies UIMessage);
         // activeSessionId 변경 → useChat 인스턴스 재생성 → useEffect에서 복원
         setActiveSessionId(sessionId);
       }
