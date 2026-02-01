@@ -7,6 +7,7 @@ import { ConfirmProvider } from "@/components/ui/confirm-provider";
 import { FindInPage } from "@/components/ui/FindInPage";
 import { NavigationHandler } from "@/components/ui/NavigationHandler";
 import { RecordingProvider } from "@/components/voice-memo/RecordingProvider";
+import { ChatOverlayProvider } from "@/components/chat/ChatOverlayProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,10 +59,12 @@ export default function RootLayout({
         <ThemeProvider>
           <ConfirmProvider>
             <RecordingProvider>
-              <FindInPage />
-              <NavigationHandler />
-              {children}
-              <Toaster />
+              <ChatOverlayProvider>
+                <FindInPage />
+                <NavigationHandler />
+                {children}
+                <Toaster />
+              </ChatOverlayProvider>
             </RecordingProvider>
           </ConfirmProvider>
         </ThemeProvider>

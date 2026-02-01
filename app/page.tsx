@@ -9,7 +9,7 @@ import { FolderTabs } from "@/components/ui/FolderTabs";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
-import { List, Plus } from "lucide-react";
+import { List, Plus, Ghost } from "lucide-react";
 import { MobileMenuItem } from "@/components/layout/AppHeader";
 
 // Filter graph nodes and links by folder
@@ -251,9 +251,15 @@ function HomeContent() {
                 목록 보기
               </Button>
               {!isPublishedMode() && (
-                <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
-                  + 새 노트
-                </Button>
+                <>
+                  <Button variant="outline" onClick={() => router.push("/chat")} className="cursor-pointer">
+                    <Ghost className="h-4 w-4 mr-1" />
+                    Neuro
+                  </Button>
+                  <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
+                    + 새 노트
+                  </Button>
+                </>
               )}
             </>
           }
@@ -263,11 +269,18 @@ function HomeContent() {
               icon: <List className="h-4 w-4" />,
               onClick: () => router.push("/documents"),
             },
-            ...(!isPublishedMode() ? [{
-              label: "새 노트",
-              icon: <Plus className="h-4 w-4" />,
-              onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
-            }] : []),
+            ...(!isPublishedMode() ? [
+              {
+                label: "Neuro",
+                icon: <Ghost className="h-4 w-4" />,
+                onClick: () => router.push("/chat"),
+              },
+              {
+                label: "새 노트",
+                icon: <Plus className="h-4 w-4" />,
+                onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
+              },
+            ] : []),
           ] as MobileMenuItem[]}
         />
       </div>
