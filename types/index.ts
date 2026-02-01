@@ -107,6 +107,35 @@ export interface PhraseSetStore {
   selectedId: string | null;
 }
 
+// Chat types
+
+export interface ChatMessage {
+  id: string;
+  role: "user" | "assistant" | "system";
+  content: string;
+  createdAt: string; // ISO 8601
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: string; // ISO 8601
+  updatedAt: string; // ISO 8601
+  messages: ChatMessage[];
+}
+
+export interface ChatSessionMeta {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  messageCount: number;
+}
+
+export interface ChatSessionIndex {
+  sessions: ChatSessionMeta[];
+}
+
 // Publish types (추후 구현)
 
 export interface PublishConfig {
