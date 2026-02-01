@@ -17,7 +17,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useConfirm } from "@/components/ui/confirm-provider";
-import { ArrowLeft, Upload, Trash2, Bot } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Ghost } from "lucide-react";
 
 interface MigrationResult {
   oldFilename: string;
@@ -103,6 +103,11 @@ function SettingsContent() {
   const [gcsBucketSaved, setGcsBucketSaved] = useState<string | null>(null);
   const [gcsBucketSaving, setGcsBucketSaving] = useState(false);
 
+  // AI Model states
+  const [aiModelId, setAiModelId] = useState<string>("gemini-3.0-flash");
+  const [aiModels, setAiModels] = useState<{ id: string; label: string; description: string }[]>([]);
+  const [aiModelSaving, setAiModelSaving] = useState(false);
+
   // Folder exclusion states for publish
   const [allFolders, setAllFolders] = useState<{ name: string; noteCount: number }[]>([]);
   const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
@@ -147,6 +152,7 @@ function SettingsContent() {
     // Check GCP connection status
     checkGcpConnection();
     checkGcsBucket();
+    checkAiModelSettings();
 
     fetchFolders();
   }, []);
@@ -201,6 +207,42 @@ function SettingsContent() {
       }
     } catch (error) {
       console.error("GCS 버킷 설정 확인 실패:", error);
+    }
+  }
+
+  async function checkAiModelSettings() {
+    try {
+      const response = await fetch("/api/settings/ai-model");
+      const result = await response.json();
+      if (result.success) {
+        setAiModelId(result.data.modelId);
+        setAiModels(result.data.models);
+      }
+    } catch (error) {
+      console.error("AI 모델 설정 확인 실패:", error);
+    }
+  }
+
+  async function handleSaveAiModel(modelId: string) {
+    setAiModelSaving(true);
+    try {
+      const response = await fetch("/api/settings/ai-model", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ modelId }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setAiModelId(result.data.modelId);
+        toast.success("AI 모델이 변경되었습니다");
+      } else {
+        toast.error(result.error || "모델 변경 실패");
+      }
+    } catch (error) {
+      console.error("AI 모델 저장 실패:", error);
+      toast.error("모델 변경에 실패했습니다");
+    } finally {
+      setAiModelSaving(false);
     }
   }
 
@@ -1220,7 +1262,7 @@ function SettingsContent() {
         {/* AI Settings Section */}
         <section className="border rounded-lg p-6 bg-card">
           <div className="flex items-center gap-2 mb-4">
-            <Bot className="h-6 w-6" />
+            <Ghost className="h-6 w-6" />
             <h2 className="text-2xl font-semibold">AI 설정</h2>
           </div>
           <p className="text-muted-foreground mb-6">
@@ -1370,6 +1412,44 @@ function SettingsContent() {
                     버킷 설정됨: <span className="font-mono">{gcsBucketSaved}</span>
                   </p>
                 )}
+              </div>
+            )}
+
+            {/* AI 챗봇 모델 선택 - GCP 연동 시에만 표시 */}
+            {gcpConnected && aiModels.length > 0 && (
+              <div className="bg-muted rounded-lg p-4">
+                <h3 className="font-semibold">AI 챗봇 모델</h3>
+                <p className="text-sm text-muted-foreground mt-1 mb-3">
+                  채팅에 사용할 AI 모델을 선택합니다.
+                </p>
+                <div className="space-y-2">
+                  {aiModels.map((model) => (
+                    <button
+                      key={model.id}
+                      onClick={() => handleSaveAiModel(model.id)}
+                      disabled={aiModelSaving}
+                      className={`w-full text-left px-4 py-3 rounded-lg border transition-colors cursor-pointer ${
+                        aiModelId === model.id
+                          ? "border-primary bg-primary/5"
+                          : "border-border bg-background hover:bg-accent"
+                      } ${aiModelSaving ? "opacity-50 cursor-not-allowed" : ""}`}
+                    >
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-medium text-sm">{model.label}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {model.description}
+                          </p>
+                        </div>
+                        {aiModelId === model.id && (
+                          <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            사용 중
+                          </div>
+                        )}
+                      </div>
+                    </button>
+                  ))}
+                </div>
               </div>
             )}
           </div>

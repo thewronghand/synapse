@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
-import { Search, Folder, FileText, Type, Tag, Network, Plus, Mic } from "lucide-react";
+import { Search, Folder, FileText, Type, Tag, Network, Plus, Mic, Ghost } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { MobileMenuItem } from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
@@ -316,6 +316,10 @@ function DocumentsContent() {
                     <Mic className="h-4 w-4 mr-1" />
                     음성 메모
                   </Button>
+                  <Button variant="outline" onClick={() => router.push("/chat")} className="cursor-pointer">
+                    <Ghost className="h-4 w-4 mr-1" />
+                    Neuro
+                  </Button>
                 </>
               )}
               <Button variant="outline" onClick={() => router.push("/tags")} className="cursor-pointer">
@@ -337,6 +341,11 @@ function DocumentsContent() {
                 label: "음성 메모",
                 icon: <Mic className="h-4 w-4" />,
                 onClick: () => router.push("/voice-memos"),
+              },
+              {
+                label: "Neuro",
+                icon: <Ghost className="h-4 w-4" />,
+                onClick: () => router.push("/chat"),
               },
             ] : []),
             {

@@ -1,60 +1,65 @@
 @import "tailwindcss";
+@import "tw-animate-css";
 @plugin "@tailwindcss/typography";
 
 :root {
-  --background: #F9FAFB;
-  --foreground: #1F2937;
+  --background: #f9fafb;
+  --foreground: #1f2937;
   --primary: #008080;
   --primary-foreground: #ffffff;
-  --secondary: #6C5B7B;
+  --secondary: #6c5b7b;
   --secondary-foreground: #ffffff;
-  --muted: #F9FAFB;
-  --muted-foreground: #6B7280;
-  --card: #FFFFFF;
-  --card-foreground: #1F2937;
-  --popover: #FFFFFF;
-  --popover-foreground: #1F2937;
-  --border: #D1D5DB;
-  --input: #E5E7EB;
-  --accent: #E5E7EB;
-  --accent-foreground: #1F2937;
-  --success: #2E9E6B;
-  --warning: #E6A23C;
-  --destructive: #D94652;
+  --muted: #f9fafb;
+  --muted-foreground: #6b7280;
+  --card: #ffffff;
+  --card-foreground: #1f2937;
+  --popover: #ffffff;
+  --popover-foreground: #1f2937;
+  --border: #d1d5db;
+  --input: #e5e7eb;
+  --accent: #e5e7eb;
+  --accent-foreground: #1f2937;
+  --success: #2e9e6b;
+  --warning: #e6a23c;
+  --destructive: #d94652;
   --destructive-foreground: #ffffff;
-  --destructive-muted: #FEE2E2;
-  --find-match-bg: #B2E4E1;
-  --find-match-fg: #134E4A;
+  --destructive-muted: #fee2e2;
+  --find-match-bg: #b2e4e1;
+  --find-match-fg: #134e4a;
   --find-current-bg: #008080;
-  --find-current-fg: #FFFFFF;
+  --find-current-fg: #ffffff;
+  --primary-bg: #e0f2f1;
+  --secondary-bg: #ede7f3;
 }
 
 .dark {
-  --background: #2D3748;
-  --foreground: #F3F4F6;
-  --primary: #5FC9C3;
-  --primary-foreground: #134E4A;
-  --secondary: #9F8AB8;
-  --secondary-foreground: #F3F4F6;
-  --muted: #3D4A5C;
-  --muted-foreground: #9CA3AF;
-  --card: #3D4A5C;
-  --card-foreground: #F3F4F6;
-  --popover: #3D4A5C;
-  --popover-foreground: #F3F4F6;
-  --border: #6B7280;
-  --input: #6B7280;
-  --accent: #4A5568;
-  --accent-foreground: #F3F4F6;
-  --success: #4ABA87;
-  --warning: #F0B856;
-  --destructive: #D94652;
-  --destructive-foreground: #1F2937;
-  --destructive-muted: #FEE2E2;
+  --background: #2d3748;
+  --foreground: #f3f4f6;
+  --primary: #5fc9c3;
+  --primary-foreground: #134e4a;
+  --secondary: #9f8ab8;
+  --secondary-foreground: #f3f4f6;
+  --muted: #3d4a5c;
+  --muted-foreground: #9ca3af;
+  --card: #3d4a5c;
+  --card-foreground: #f3f4f6;
+  --popover: #3d4a5c;
+  --popover-foreground: #f3f4f6;
+  --border: #6b7280;
+  --input: #6b7280;
+  --accent: #4a5568;
+  --accent-foreground: #f3f4f6;
+  --success: #4aba87;
+  --warning: #f0b856;
+  --destructive: #d94652;
+  --destructive-foreground: #1f2937;
+  --destructive-muted: #fee2e2;
   --find-match-bg: rgba(95, 201, 195, 0.3);
   --find-match-fg: inherit;
-  --find-current-bg: #5FC9C3;
-  --find-current-fg: #134E4A;
+  --find-current-bg: #5fc9c3;
+  --find-current-fg: #134e4a;
+  --primary-bg: #2e404c;
+  --secondary-bg: #343a4b;
 }
 
 @theme inline {
@@ -79,9 +84,14 @@
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-destructive-muted: var(--destructive-muted);
+  --color-primary-bg: var(--primary-bg);
+  --color-secondary-bg: var(--secondary-bg);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
   --default-border-color: var(--border);
+  --animate-neuro-tilt: neuro-tilt 2.5s ease-in-out infinite;
+  --animate-neuro-bounce: neuro-bounce 0.5s ease-out;
+  --animate-neuro-hop: neuro-hop 5s ease-in-out infinite;
 }
 
 body {
@@ -90,7 +100,8 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
-html, body {
+html,
+body {
   margin: 0;
   padding: 0;
 }
@@ -115,33 +126,33 @@ html, body {
 
 /* Dark mode prose typography */
 .dark .prose {
-  --tw-prose-body: #E5E7EB;
-  --tw-prose-headings: #FFFFFF;
-  --tw-prose-bold: #FFFFFF;
-  --tw-prose-code: #F3F4F6;
-  --tw-prose-quotes: #E5E7EB;
-  --tw-prose-quote-borders: #5FC9C3;
-  --tw-prose-counters: #9CA3AF;
+  --tw-prose-body: #e5e7eb;
+  --tw-prose-headings: #ffffff;
+  --tw-prose-bold: #ffffff;
+  --tw-prose-code: #f3f4f6;
+  --tw-prose-quotes: #e5e7eb;
+  --tw-prose-quote-borders: #5fc9c3;
+  --tw-prose-counters: #9ca3af;
 }
 
 .dark .prose h1 {
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 .dark .prose h2 {
-  color: #F3F4F6;
+  color: #f3f4f6;
 }
 
 .dark .prose h3,
 .dark .prose h4,
 .dark .prose h5,
 .dark .prose h6 {
-  color: #E5E7EB;
+  color: #e5e7eb;
 }
 
 /* Inline code styling */
 .prose code:not(pre code) {
-  background-color: #E5E7EB;
+  background-color: #e5e7eb;
   padding: 0.2em 0.4em;
   border-radius: 0.25rem;
   font-size: 0.875em;
@@ -154,13 +165,13 @@ html, body {
 }
 
 .dark .prose code:not(pre code) {
-  background-color: #4A5568;
-  color: #F3F4F6;
+  background-color: #4a5568;
+  color: #f3f4f6;
 }
 
 .dark .prose pre code {
   background-color: transparent;
-  color: #FFFFFF;
+  color: #ffffff;
 }
 
 /* CodeMirror height fix - absolute positioning for scroller in flex containers */
@@ -180,21 +191,21 @@ html, body {
 
 /* Links in prose - secondary color for external links */
 .prose a:not(.wiki-link):not([href^="#"]) {
-  color: #8B6FC0;
+  color: #8b6fc0;
   text-decoration: none;
 }
 
 .dark .prose a:not(.wiki-link):not([href^="#"]) {
-  color: #9F8AB8;
+  color: #9f8ab8;
 }
 
 /* Wiki links - higher saturation primary color */
 .prose a.wiki-link {
-  color: #00A3A3;
+  color: #00a3a3;
 }
 
 .dark .prose a.wiki-link {
-  color: #6EE7E7;
+  color: #6ee7e7;
 }
 
 /* Non-existent wiki links - muted/gray color */
@@ -212,28 +223,28 @@ html, body {
 }
 
 .dark .prose a[href^="#"] {
-  color: #5FC9C3;
+  color: #5fc9c3;
 }
 
 /* Dark mode blockquote text */
 .dark .prose blockquote {
-  color: #E5E7EB;
-  border-left-color: #5FC9C3;
+  color: #e5e7eb;
+  border-left-color: #5fc9c3;
 }
 
 .dark .prose blockquote p {
-  color: #E5E7EB;
+  color: #e5e7eb;
 }
 
 /* Dark mode image alt text (figcaption) */
 .dark .prose figcaption {
-  color: #9CA3AF;
+  color: #9ca3af;
 }
 
 /* Keyboard tag styling */
 .prose kbd {
-  background-color: #E5E7EB;
-  border: 1px solid #D1D5DB;
+  background-color: #e5e7eb;
+  border: 1px solid #d1d5db;
   border-radius: 0.25rem;
   padding: 0.125rem 0.375rem;
   font-size: 0.875em;
@@ -242,24 +253,23 @@ html, body {
 }
 
 .dark .prose kbd {
-  background-color: #4A5568;
-  border-color: #6B7280;
-  color: #F3F4F6;
+  background-color: #4a5568;
+  border-color: #6b7280;
+  color: #f3f4f6;
   box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
 /* Highlight/mark styling - unified teal color */
 .prose mark {
-  background-color: #B2E4E1;
-  color: #134E4A;
+  background-color: #b2e4e1;
+  color: #134e4a;
   padding: 0.125rem 0.25rem;
   border-radius: 0.125rem;
 }
 
-
 /* Footnote section text */
 .dark .prose .footnotes {
-  color: #E5E7EB;
+  color: #e5e7eb;
 }
 
 /* Details/summary (collapsible sections) */
@@ -269,8 +279,8 @@ html, body {
 
 /* Code block styling - light mode */
 .prose pre {
-  background-color: #F3F4F6;
-  border: 1px solid #E5E7EB;
+  background-color: #f3f4f6;
+  border: 1px solid #e5e7eb;
   border-radius: 0.5rem;
 }
 
@@ -281,81 +291,142 @@ html, body {
 
 /* Code block styling - dark mode (github-dark theme override) */
 .dark .prose pre {
-  background-color: #1E293B;
+  background-color: #1e293b;
   border-color: #334155;
 }
 
 .dark .prose pre code {
-  color: #E2E8F0;
+  color: #e2e8f0;
 }
 
 /* Dark mode syntax highlighting colors */
 .dark .hljs-comment,
 .dark .hljs-quote {
-  color: #8B949E;
+  color: #8b949e;
 }
 
 .dark .hljs-keyword,
 .dark .hljs-selector-tag,
 .dark .hljs-type {
-  color: #FF7B72;
+  color: #ff7b72;
 }
 
 .dark .hljs-string,
 .dark .hljs-attr,
 .dark .hljs-addition {
-  color: #A5D6FF;
+  color: #a5d6ff;
 }
 
 .dark .hljs-number,
 .dark .hljs-literal {
-  color: #79C0FF;
+  color: #79c0ff;
 }
 
 .dark .hljs-title,
 .dark .hljs-section,
 .dark .hljs-name {
-  color: #D2A8FF;
+  color: #d2a8ff;
 }
 
 .dark .hljs-function,
 .dark .hljs-title.function_ {
-  color: #D2A8FF;
+  color: #d2a8ff;
 }
 
 .dark .hljs-variable,
 .dark .hljs-template-variable {
-  color: #FFA657;
+  color: #ffa657;
 }
 
 .dark .hljs-built_in {
-  color: #FFA657;
+  color: #ffa657;
 }
 
 .dark .hljs-deletion {
-  color: #FFDCD7;
-  background-color: #67060C;
+  color: #ffdcd7;
+  background-color: #67060c;
 }
 
 .dark .hljs-meta {
-  color: #79C0FF;
+  color: #79c0ff;
 }
 
 .dark .hljs-selector-class,
 .dark .hljs-class {
-  color: #7EE787;
+  color: #7ee787;
 }
 
 .dark .hljs-property {
-  color: #79C0FF;
+  color: #79c0ff;
 }
 
 .dark .hljs-params {
-  color: #E2E8F0;
+  color: #e2e8f0;
 }
 
 .dark .hljs-punctuation {
-  color: #C9D1D9;
+  color: #c9d1d9;
 }
 
+/* 타이프라이터 커서 깜빡임 애니메이션 */
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
 
+.animate-blink {
+  animation: blink 0.8s step-end infinite;
+}
+
+/* Neuro FAB 갸우뚱 애니메이션 (느린 기울기 변화) */
+@keyframes neuro-tilt {
+  0%,
+  100% {
+    transform: rotate(-10deg);
+  }
+  50% {
+    transform: rotate(-18deg);
+  }
+}
+
+/* Neuro 폴짝 뛰는 애니메이션 (빈 채팅 상태, 5초마다) */
+@keyframes neuro-hop {
+  0%,
+  10%,
+  100% {
+    transform: translateY(0);
+  }
+  3% {
+    transform: translateY(-6px);
+  }
+  6% {
+    transform: translateY(0);
+  }
+  7% {
+    transform: translateY(-3px);
+  }
+}
+
+/* Neuro FAB 폴짝 애니메이션 (호버 시 튀어나올 때) */
+@keyframes neuro-bounce {
+  0% {
+    transform: translateY(0);
+  }
+  30% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  70% {
+    transform: translateY(-3px);
+  }
+  100% {
+    transform: translateY(0);
+  }
+}
