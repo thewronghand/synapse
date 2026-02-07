@@ -12,6 +12,7 @@ import {
 import { toast } from "sonner";
 import { RecordingOverlay } from "@/components/voice-memo/RecordingOverlay";
 import { FolderSelectDialog } from "@/components/voice-memo/FolderSelectDialog";
+import { useBeforeUnload } from "@/hooks/useBeforeUnload";
 
 // --- Context 타입 ---
 
@@ -56,6 +57,9 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
   });
 
   const [showFolderDialog, setShowFolderDialog] = useState(false);
+
+  // 녹음 중일 때 페이지 이탈 경고
+  useBeforeUnload(state.isRecording);
 
   // MediaRecorder 관련 refs
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);

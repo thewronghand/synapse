@@ -74,6 +74,15 @@ export function getFolderTempAudioDir(folder: string): string {
 }
 
 /**
+ * Get the drafts directory path for auto-saving editor content
+ * - Electron: ~/Documents/Synapse/.drafts
+ * - Development: {NOTES_DIR}/../.drafts
+ */
+export function getDraftsDir(): string {
+  return path.join(getSynapseRootDir(), '.drafts');
+}
+
+/**
  * @deprecated Use getFolderImagesDir instead
  * Get the images directory path (legacy - central images folder)
  */

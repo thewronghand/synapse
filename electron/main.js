@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, Menu } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, Menu, dialog } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -172,6 +172,24 @@ function createWindow() {
     if (!url.startsWith('http://localhost')) {
       event.preventDefault();
       shell.openExternal(url);
+    }
+  });
+
+  // Handle beforeunload event (unsaved changes warning)
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    const choice = dialog.showMessageBoxSync(mainWindow, {
+      type: 'warning',
+      buttons: ['페이지 나가기', '머무르기'],
+      defaultId: 1,
+      cancelId: 1,
+      title: '변경사항이 저장되지 않았습니다',
+      message: '저장되지 않은 변경사항이 있습니다. 페이지를 나가시겠습니까?',
+      detail: '페이지를 나가면 작업 중인 내용이 손실될 수 있습니다.',
+    });
+
+    // 0 = "페이지 나가기" -> 언로드 허용
+    if (choice === 0) {
+      event.preventDefault();
     }
   });
 }
