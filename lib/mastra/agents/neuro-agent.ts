@@ -2,6 +2,7 @@ import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { createVertex } from "@ai-sdk/google-vertex";
 import { getMemory } from "@/lib/mastra/memory";
+import { neuroTools } from "@/lib/mastra/tools";
 import {
   loadGcpServiceAccount,
   type GcpServiceAccountInfo,
@@ -66,8 +67,8 @@ async function createNeuroAgentInternal(): Promise<Agent> {
     // TokenLimiter: 컨텍스트 윈도우 초과 시 오래된 메시지 필터링
     // Gemini 2.0 Flash: 1M 토큰, 80% = 800,000 토큰
     inputProcessors: [new TokenLimiterProcessor(800000)],
-    // Tools는 Phase 2에서 추가 예정
-    // tools: { ... },
+    // 문서 CRUD Tools
+    tools: neuroTools,
   });
   console.log("[Neuro] Agent 생성 완료");
   return agent;
