@@ -37,6 +37,15 @@ export function ChatPage() {
   const pendingMessageRef = useRef<string | null>(null);
   const [aiModelId, setAiModelId] = useState<string>("");
   const [aiModels, setAiModels] = useState<{ id: string; label: string; description: string }[]>([]);
+  const [isPendingResponse, setIsPendingResponse] = useState(false);
+  const pollingRef = useRef<NodeJS.Timeout | null>(null);
+  // 폴링으로 새로 도착한 메시지 ID (타이프라이터 효과용)
+  const [newlyArrivedMessageId, setNewlyArrivedMessageId] = useState<string | null>(null);
+  // 페이지네이션 상태
+  const [hasMoreMessages, setHasMoreMessages] = useState(false);
+  const [nextBefore, setNextBefore] = useState<number | null>(null);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const MESSAGE_PAGE_SIZE = 15;
 
   // activeSessionId가 바뀔 때마다 transport를 재생성
   const transport = useMemo(
@@ -58,9 +67,30 @@ export function ChatPage() {
   } = useChat({
     id: activeSessionId ?? undefined,
     transport,
-    onFinish: () => {
-      // 제목 변경 반영을 위해 세션 목록 새로고침
-      fetchSessions();
+    onFinish: async () => {
+      // 스트리밍 완료 후 해당 세션 정보만 업데이트 (제목, 메시지 개수)
+      if (!activeSessionId) return;
+      try {
+        const res = await fetch(`/api/chat/sessions/${activeSessionId}`);
+        const data = await res.json();
+        if (data.success) {
+          const session = data.data;
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === activeSessionId
+                ? {
+                    ...s,
+                    title: session.title,
+                    messageCount: session.messages.length,
+                    updatedAt: session.updatedAt,
+                  }
+                : s
+            )
+          );
+        }
+      } catch {
+        // 무시
+      }
     },
   });
 
@@ -71,8 +101,11 @@ export function ChatPage() {
     if (activeSessionId && pendingMessageRef.current) {
       const text = pendingMessageRef.current;
       pendingMessageRef.current = null;
+      // 사용자 메시지 즉시 저장
+      saveUserMessage(activeSessionId, text);
       sendMessage({ text });
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeSessionId, sendMessage]);
 
   // 에러 발생 시 토스트
@@ -143,37 +176,166 @@ export function ChatPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isSessionsLoading, sessions, searchParams]);
 
+  // 폴링 정리
+  useEffect(() => {
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+        pollingRef.current = null;
+      }
+    };
+  }, []);
+
+  // 응답 대기 중인 세션 폴링
+  async function pollForResponse(sessionId: string) {
+    try {
+      const res = await fetch(`/api/chat/sessions/${sessionId}`);
+      const data = await res.json();
+
+      if (data.success) {
+        const session = data.data;
+
+        // 제목이 변경되었으면 해당 세션만 업데이트 (전체 새로고침 없이)
+        setSessions((prev) => {
+          const existing = prev.find((s) => s.id === sessionId);
+          if (existing && existing.title !== session.title) {
+            return prev.map((s) =>
+              s.id === sessionId ? { ...s, title: session.title } : s
+            );
+          }
+          return prev;
+        });
+
+        // 응답이 완료되었으면 메시지 업데이트하고 폴링 중단
+        if (!session.pendingResponse) {
+          if (pollingRef.current) {
+            clearInterval(pollingRef.current);
+            pollingRef.current = null;
+          }
+          setIsPendingResponse(false);
+
+          // 새로 도착한 assistant 메시지 ID 추적 (타이프라이터 효과용)
+          const lastMsg = session.messages[session.messages.length - 1];
+          if (lastMsg?.role === "assistant") {
+            setNewlyArrivedMessageId(lastMsg.id);
+            // 타이프라이터 완료 후 리셋 (약 10초 후)
+            setTimeout(() => setNewlyArrivedMessageId(null), 10000);
+          }
+
+          // 메시지 업데이트
+          const loaded = session.messages.map((m: ChatMessage) => ({
+            id: m.id,
+            role: m.role,
+            parts: [{ type: "text" as const, text: m.content }],
+          }));
+          setMessages(loaded);
+
+          // 메시지 개수 업데이트
+          setSessions((prev) =>
+            prev.map((s) =>
+              s.id === sessionId
+                ? { ...s, messageCount: session.messages.length, updatedAt: session.updatedAt }
+                : s
+            )
+          );
+        }
+      }
+    } catch (err) {
+      console.error("[Chat] 폴링 실패:", err);
+    }
+  }
+
   // 세션 선택
   async function handleSelectSession(id: string) {
     if (id === activeSessionId) return;
 
-    // 스트리밍 중이면 중단
-    if (isSending) {
-      stop();
+    // 스트리밍 중이어도 서버는 계속 진행하므로 stop() 호출하지 않음
+    // 서버에서 응답 완료 후 자동 저장됨
+
+    // 기존 폴링 정리
+    if (pollingRef.current) {
+      clearInterval(pollingRef.current);
+      pollingRef.current = null;
     }
+    setIsPendingResponse(false);
 
     setActiveSessionId(id);
     setIsSessionLoading(true);
     setMobileSessionsOpen(false);
+    // 페이지네이션 초기화
+    setHasMoreMessages(false);
+    setNextBefore(null);
 
     try {
-      const res = await fetch(`/api/chat/sessions/${id}`);
+      // 최근 메시지만 먼저 로드 (페이지네이션)
+      const res = await fetch(`/api/chat/sessions/${id}?limit=${MESSAGE_PAGE_SIZE}`);
       const data = await res.json();
 
       if (data.success) {
+        const session = data.data;
         // ChatMessage → useChat UIMessage 형식으로 변환
-        const loaded = data.data.messages.map((m: ChatMessage) => ({
+        const loaded = session.messages.map((m: ChatMessage) => ({
           id: m.id,
           role: m.role,
           parts: [{ type: "text" as const, text: m.content }],
         }));
         setMessages(loaded);
+
+        // 페이지네이션 정보 저장
+        if (session.pagination) {
+          setHasMoreMessages(session.pagination.hasMore);
+          setNextBefore(session.pagination.nextBefore);
+        }
+
+        // 응답 대기 중이면 폴링 시작
+        if (session.pendingResponse) {
+          setIsPendingResponse(true);
+          pollingRef.current = setInterval(() => pollForResponse(id), 1500);
+        }
       }
     } catch (err) {
       console.error("[Chat] 세션 로드 실패:", err);
       toast.error("대화를 불러올 수 없습니다");
     } finally {
       setIsSessionLoading(false);
+    }
+  }
+
+  // 이전 메시지 더 로드 (위쪽 무한스크롤)
+  async function handleLoadMoreMessages() {
+    if (!activeSessionId || !hasMoreMessages || isLoadingMore || nextBefore === null) return;
+
+    setIsLoadingMore(true);
+    try {
+      const res = await fetch(
+        `/api/chat/sessions/${activeSessionId}?limit=${MESSAGE_PAGE_SIZE}&before=${nextBefore}`
+      );
+      const data = await res.json();
+
+      if (data.success) {
+        const session = data.data;
+        // 이전 메시지를 앞에 추가
+        const olderMessages = session.messages.map((m: ChatMessage) => ({
+          id: m.id,
+          role: m.role,
+          parts: [{ type: "text" as const, text: m.content }],
+        }));
+
+        setMessages((prev) => [...olderMessages, ...prev]);
+
+        // 페이지네이션 정보 업데이트
+        if (session.pagination) {
+          setHasMoreMessages(session.pagination.hasMore);
+          setNextBefore(session.pagination.nextBefore);
+        } else {
+          setHasMoreMessages(false);
+          setNextBefore(null);
+        }
+      }
+    } catch (err) {
+      console.error("[Chat] 이전 메시지 로드 실패:", err);
+    } finally {
+      setIsLoadingMore(false);
     }
   }
 
@@ -273,6 +435,108 @@ export function ChatPage() {
 
   const currentModelLabel = aiModels.find((m) => m.id === aiModelId)?.label ?? aiModelId;
 
+  // 사용자 메시지를 세션에 저장
+  async function saveUserMessage(sessionId: string, text: string) {
+    try {
+      const res = await fetch(`/api/chat/sessions/${sessionId}/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message: {
+            id: crypto.randomUUID(),
+            role: "user",
+            content: text,
+            createdAt: new Date().toISOString(),
+          },
+        }),
+      });
+      const data = await res.json();
+      // 제목이 변경되었으면 세션 목록 업데이트
+      if (data.success && data.data.title) {
+        setSessions((prev) =>
+          prev.map((s) =>
+            s.id === sessionId ? { ...s, title: data.data.title } : s
+          )
+        );
+      }
+    } catch (err) {
+      console.error("[Chat] 사용자 메시지 저장 실패:", err);
+    }
+  }
+
+  // 사용자 메시지 수정 (이후 메시지 삭제 후 재생성)
+  async function handleEditUserMessage(messageId: string, newContent: string) {
+    if (!activeSessionId || isSending) return;
+
+    try {
+      // 메시지 수정 API 호출 (이후 메시지 삭제됨)
+      const res = await fetch(`/api/chat/sessions/${activeSessionId}/messages`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messageId, content: newContent }),
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // 수정된 메시지 목록에서 마지막 사용자 메시지 제외 (sendMessage가 추가함)
+        const messagesWithoutLast = data.data.messages.slice(0, -1);
+        const loaded = messagesWithoutLast.map((m: ChatMessage) => ({
+          id: m.id,
+          role: m.role,
+          parts: [{ type: "text" as const, text: m.content }],
+        }));
+        setMessages(loaded);
+
+        // 새 응답 요청 (sendMessage가 사용자 메시지를 자동 추가)
+        sendMessage({ text: newContent });
+      } else {
+        toast.error("메시지 수정에 실패했습니다");
+      }
+    } catch (err) {
+      console.error("[Chat] 메시지 수정 실패:", err);
+      toast.error("메시지 수정에 실패했습니다");
+    }
+  }
+
+  // AI 응답 재생성
+  async function handleRegenerateResponse() {
+    if (!activeSessionId || isSending) return;
+
+    try {
+      // 마지막 assistant 메시지 삭제
+      const res = await fetch(`/api/chat/sessions/${activeSessionId}/messages`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+
+      if (data.success) {
+        // 마지막 사용자 메시지 찾기
+        const lastUserMessage = data.data.messages
+          .filter((m: ChatMessage) => m.role === "user")
+          .pop();
+
+        // 삭제 후 메시지 목록에서 마지막 사용자 메시지 제외 (sendMessage가 추가함)
+        const messagesWithoutLastUser = data.data.messages.slice(0, -1);
+        const loaded = messagesWithoutLastUser.map((m: ChatMessage) => ({
+          id: m.id,
+          role: m.role,
+          parts: [{ type: "text" as const, text: m.content }],
+        }));
+        setMessages(loaded);
+
+        // 마지막 사용자 메시지로 재생성 요청
+        if (lastUserMessage) {
+          sendMessage({ text: lastUserMessage.content });
+        }
+      } else {
+        toast.error("응답 재생성에 실패했습니다");
+      }
+    } catch (err) {
+      console.error("[Chat] 응답 재생성 실패:", err);
+      toast.error("응답 재생성에 실패했습니다");
+    }
+  }
+
   // 메시지 전송 (세션이 없으면 자동 생성)
   async function handleSendMessage(text: string) {
     if (!text.trim() || isSending) return;
@@ -313,6 +577,8 @@ export function ChatPage() {
       }
     }
 
+    // 사용자 메시지 즉시 저장
+    saveUserMessage(activeSessionId, text);
     sendMessage({ text });
   }
 
@@ -394,7 +660,17 @@ export function ChatPage() {
               </p>
             </div>
           ) : (
-            <ChatMessageList messages={chatMessages} isLoading={isSending} />
+            <ChatMessageList
+                messages={chatMessages}
+                isLoading={isSending || isPendingResponse}
+                newlyArrivedMessageId={newlyArrivedMessageId}
+                sessionId={activeSessionId}
+                hasMoreMessages={hasMoreMessages}
+                isLoadingMore={isLoadingMore}
+                onLoadMore={handleLoadMoreMessages}
+                onEditUserMessage={handleEditUserMessage}
+                onRegenerateResponse={handleRegenerateResponse}
+              />
           )}
           {/* 모델 선택 + 입력 */}
           <div className="shrink-0">
