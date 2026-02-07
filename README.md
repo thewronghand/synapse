@@ -10,8 +10,11 @@
 - 🕸️ **인터랙티브 그래프 뷰**: D3.js 기반의 시각적 지식 네트워크
 - 🔍 **실시간 검색**: 문서 제목 및 내용 검색
 - 🖼️ **이미지 지원**: 드래그 앤 드롭으로 간편한 이미지 첨부
+- 🎙️ **음성 메모**: 녹음/업로드 → STT 녹취록 → AI 요약, 화자 분리
+- 🤖 **Neuro AI 챗봇**: Function Calling으로 문서 CRUD 가능한 AI 어시스턴트
+- 💾 **자동 저장**: 드래프트 자동 저장 및 복구, 페이지 이탈 경고
 - 💻 **데스크톱 앱**: Electron 기반 크로스 플랫폼 지원 (macOS, Windows, Linux)
-- 💾 **로컬 저장**: 모든 데이터는 사용자 문서 폴더에 안전하게 저장
+- 🌐 **Publish 기능**: Vercel을 통한 읽기 전용 사이트 배포
 
 ## 설치 방법
 
@@ -83,15 +86,21 @@ tags: [개발, Next.js, 메모]
 - **Next.js 16** - React 프레임워크
 - **React 19** - UI 라이브러리
 - **TypeScript** - 타입 안전성
-- **Tailwind CSS** - 스타일링
-- **CodeMirror** - 마크다운 에디터
-- **D3.js** - 그래프 시각화
+- **Tailwind CSS 4** - 스타일링
+- **CodeMirror 6** - 마크다운 에디터
+- **D3.js 7** - 그래프 시각화
+
+### AI
+- **Mastra** - AI Agent 프레임워크
+- **Google Vertex AI / Gemini** - AI 모델
+- **Vercel AI SDK** - 채팅 스트리밍
 
 ### 데스크톱
-- **Electron** - 크로스 플랫폼 데스크톱 앱
+- **Electron 39** - 크로스 플랫폼 데스크톱 앱
 
 ### 데이터
 - **로컬 파일 시스템** - 마크다운 파일 저장
+- **LibSQL** - 채팅 히스토리 및 워킹 메모리
 - **gray-matter** - 프론트매터 파싱
 - **remark** - 마크다운 처리
 
@@ -103,12 +112,19 @@ tags: [개발, Next.js, 메모]
 synapse/
 ├── app/                  # Next.js App Router
 │   ├── api/             # API 라우트
+│   ├── chat/            # AI 챗봇 전체 페이지
 │   ├── documents/       # 문서 목록 페이지
 │   ├── editor/          # 에디터 페이지
 │   ├── note/            # 노트 상세 페이지
-│   └── tags/            # 태그 페이지
+│   ├── settings/        # 설정 페이지
+│   └── voice-memos/     # 음성 메모 페이지
 ├── components/          # React 컴포넌트
+│   ├── chat/            # AI 챗봇 (Neuro)
+│   ├── editor/          # 에디터 관련
+│   ├── graph/           # 그래프 시각화
+│   └── voice-memo/      # 음성 메모
 ├── lib/                 # 유틸리티 함수
+│   └── mastra/          # AI Agent (Tools, Memory)
 ├── electron/            # Electron 메인 프로세스
 ├── notes/               # 기본 노트 (개발용)
 ├── public/              # 정적 파일
