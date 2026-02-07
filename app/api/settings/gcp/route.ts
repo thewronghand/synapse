@@ -5,6 +5,7 @@ import {
   getGcpServiceAccountStatus,
   validateServiceAccount,
 } from "@/lib/gcp-service-account";
+import { clearNeuroCache } from "@/lib/mastra/agents/neuro-agent";
 
 // GCP 서비스 어카운트 연결 상태 확인
 export async function GET() {
@@ -45,6 +46,9 @@ export async function POST(request: NextRequest) {
 
     await saveGcpServiceAccount(body);
 
+    // SA 변경 시 Agent 캐시 초기화
+    clearNeuroCache();
+
     return NextResponse.json({
       success: true,
       data: {
@@ -65,6 +69,10 @@ export async function POST(request: NextRequest) {
 export async function DELETE() {
   try {
     await deleteGcpServiceAccount();
+
+    // SA 삭제 시 Agent 캐시 초기화
+    clearNeuroCache();
+
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("GCP SA 삭제 실패:", error);
