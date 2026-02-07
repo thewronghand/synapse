@@ -27,6 +27,10 @@ export const updateNoteTool = createTool({
     "기존 노트를 수정합니다. 내용을 변경하거나 제목을 바꿀 수 있습니다.",
   inputSchema: z.object({
     title: z.string().describe("수정할 노트의 현재 제목"),
+    folder: z
+      .string()
+      .optional()
+      .describe("노트가 있는 폴더명 (생략하면 전체 폴더에서 검색)"),
     content: z.string().optional().describe("새로운 내용 (마크다운 형식)"),
     newTitle: z.string().optional().describe("새로운 제목 (변경할 경우)"),
     appendContent: z
@@ -40,12 +44,12 @@ export const updateNoteTool = createTool({
     folder: z.string().optional(),
     message: z.string(),
   }),
-  execute: async ({ title, content, newTitle, appendContent }) => {
+  execute: async ({ title, folder: targetFolder, content, newTitle, appendContent }) => {
     try {
       const requestedTitle = title.normalize("NFC");
 
       // 노트 찾기
-      const found = await findNoteByTitle(requestedTitle);
+      const found = await findNoteByTitle(requestedTitle, targetFolder);
       if (!found) {
         return {
           success: false,
@@ -150,14 +154,47 @@ export const updateNoteTool = createTool({
 /**
  * 제목으로 노트 파일 찾기
  */
-async function findNoteByTitle(requestedTitle: string): Promise<{
+async function findNoteByTitle(
+  requestedTitle: string,
+  targetFolder?: string
+): Promise<{
   filePath: string;
   folder: string;
   filename: string;
   currentTitle: string;
   currentContent: string;
 } | null> {
-  // 캐시에서 먼저 찾기
+  // 특정 폴더가 지정된 경우 해당 폴더만 검색
+  if (targetFolder) {
+    const folderPath = path.join(NOTES_DIR, targetFolder);
+    if (!fss.existsSync(folderPath)) {
+      return null;
+    }
+
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith(".md"));
+
+    for (const file of markdownFiles) {
+      const filePath = path.join(folderPath, file);
+      const content = await fs.readFile(filePath, "utf-8");
+      const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+      const filenameTitle = getTitleFromFilename(file);
+      const docTitle = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+
+      if (titlesMatch(docTitle, requestedTitle)) {
+        return {
+          filePath,
+          folder: targetFolder,
+          filename: file,
+          currentTitle: docTitle,
+          currentContent: content,
+        };
+      }
+    }
+    return null;
+  }
+
+  // 폴더 미지정: 캐시에서 먼저 찾기
   const cached = documentCache.getByTitle(requestedTitle);
   if (cached && cached.folder) {
     const filePath = path.join(NOTES_DIR, cached.folder, cached.filename);
@@ -173,7 +210,7 @@ async function findNoteByTitle(requestedTitle: string): Promise<{
     }
   }
 
-  // 폴더 스캔
+  // 전체 폴더 스캔
   const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
   const folders = entries.filter((e) => e.isDirectory() && e.name !== ".trash");
 

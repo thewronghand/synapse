@@ -25,6 +25,10 @@ export const readNoteTool = createTool({
     "특정 노트의 내용을 읽습니다. 제목으로 노트를 찾아 전체 내용을 반환합니다.",
   inputSchema: z.object({
     title: z.string().describe("읽을 노트의 제목"),
+    folder: z
+      .string()
+      .optional()
+      .describe("노트가 있는 폴더명 (생략하면 전체 폴더에서 검색)"),
   }),
   outputSchema: z.object({
     found: z.boolean(),
@@ -36,11 +40,57 @@ export const readNoteTool = createTool({
     updatedAt: z.string().optional(),
     message: z.string(),
   }),
-  execute: async ({ title }) => {
+  execute: async ({ title, folder: targetFolder }) => {
     try {
       const requestedTitle = title.normalize("NFC");
 
-      // 캐시에서 먼저 찾기
+      // 특정 폴더가 지정된 경우 해당 폴더만 검색
+      if (targetFolder) {
+        const folderPath = path.join(NOTES_DIR, targetFolder);
+        if (!fss.existsSync(folderPath)) {
+          return {
+            found: false,
+            message: `"${targetFolder}" 폴더를 찾을 수 없습니다.`,
+          };
+        }
+
+        const files = await fs.readdir(folderPath);
+        const markdownFiles = files.filter((f) => f.endsWith(".md"));
+
+        for (const file of markdownFiles) {
+          const filePath = path.join(folderPath, file);
+          const content = await fs.readFile(filePath, "utf-8");
+          const { frontmatter, contentWithoutFrontmatter } =
+            parseFrontmatter(content);
+          const filenameTitle = getTitleFromFilename(file);
+          const docTitle =
+            extractTitle(contentWithoutFrontmatter, frontmatter) ||
+            filenameTitle;
+
+          if (titlesMatch(docTitle, requestedTitle)) {
+            const stats = await fs.stat(filePath);
+            const links = extractWikiLinks(content);
+
+            return {
+              found: true,
+              title: docTitle,
+              folder: targetFolder,
+              content: contentWithoutFrontmatter,
+              tags: frontmatter.tags || [],
+              links,
+              updatedAt: stats.mtime.toISOString(),
+              message: `"${docTitle}" 노트를 ${targetFolder} 폴더에서 찾았습니다.`,
+            };
+          }
+        }
+
+        return {
+          found: false,
+          message: `"${title}" 노트를 ${targetFolder} 폴더에서 찾을 수 없습니다.`,
+        };
+      }
+
+      // 폴더 미지정: 캐시에서 먼저 찾기
       const cached = documentCache.getByTitle(requestedTitle);
       if (cached && cached.folder) {
         const filePath = path.join(NOTES_DIR, cached.folder, cached.filename);
@@ -59,12 +109,12 @@ export const readNoteTool = createTool({
             tags: frontmatter.tags || [],
             links,
             updatedAt: stats.mtime.toISOString(),
-            message: `"${cached.title}" 노트를 찾았습니다.`,
+            message: `"${cached.title}" 노트를 찾았습니다 (${cached.folder} 폴더).`,
           };
         }
       }
 
-      // 캐시에 없으면 폴더 스캔
+      // 캐시에 없으면 전체 폴더 스캔
       const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
       const folders = entries.filter(
         (e) => e.isDirectory() && e.name !== ".trash"
@@ -97,7 +147,7 @@ export const readNoteTool = createTool({
               tags: frontmatter.tags || [],
               links,
               updatedAt: stats.mtime.toISOString(),
-              message: `"${docTitle}" 노트를 찾았습니다.`,
+              message: `"${docTitle}" 노트를 찾았습니다 (${folder.name} 폴더).`,
             };
           }
         }
