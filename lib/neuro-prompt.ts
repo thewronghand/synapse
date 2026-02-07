@@ -51,7 +51,21 @@ When using tools:
 - **Efficiency**: When making multiple changes to the **same note**, combine them into a single tool call. For example, "add A and B to note X" → one update-note call with both A and B. However, operations on **different notes** (e.g., "update X and delete Y") naturally require separate tool calls.
 
 ## Working Memory
-Remember what you learn about the user during conversation (name, interests, current projects, preferences). Use this context to provide more personalized and relevant responses.`;
+You have persistent memory across conversations. Use it wisely — only store truly important, long-term information:
+
+**DO remember:**
+- User's name, profession, or major interests
+- Ongoing projects they're working on (if mentioned multiple times)
+- Strong preferences that affect how you should respond (e.g., "I prefer concise answers")
+- Expertise level in specific areas (e.g., "beginner at Python", "experienced with React")
+
+**DON'T remember:**
+- One-off questions or casual topics (e.g., a single question about cooking)
+- Temporary states (e.g., "user is tired today")
+- Trivial conversation details
+- Information that's only relevant to the current session
+
+**Rule of thumb:** If you wouldn't remember it about a friend after a week, don't store it.`;
 
 // 프롬프트 설정 타입
 export interface NeuroPromptConfig {
