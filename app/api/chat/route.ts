@@ -69,8 +69,9 @@ export async function POST(req: NextRequest) {
     });
     console.log("[Chat] 스트리밍 응답 수신");
 
-    // Mastra textStream을 Vercel AI SDK v6 Data Stream Protocol 형식으로 변환
-    const textStream = mastraOutput.textStream;
+    // Mastra fullStream을 사용하여 tool 이벤트 포함 스트리밍
+    // fullStream: text, tool-call, tool-result 등 모든 청크 타입 포함
+    const fullStream = mastraOutput.fullStream;
     const messageId = crypto.randomUUID();
     const textId = crypto.randomUUID();
 
@@ -80,7 +81,7 @@ export async function POST(req: NextRequest) {
     const stream = new ReadableStream({
       async start(controller) {
         const encoder = new TextEncoder();
-        const reader = textStream.getReader();
+        const reader = fullStream.getReader();
 
         try {
           // 메시지 시작 신호 (필수 - 이게 있어야 로딩 UI가 표시됨)
@@ -97,16 +98,106 @@ export async function POST(req: NextRequest) {
             const { done, value } = await reader.read();
             if (done) break;
 
-            // 응답 텍스트 수집
-            fullResponse += value;
+            // Mastra fullStream 청크: { type, payload, ... }
+            const chunk = value as {
+              type: string;
+              payload?: {
+                text?: string;
+                toolCallId?: string;
+                toolName?: string;
+                args?: Record<string, unknown>;
+                result?: unknown;
+                [key: string]: unknown;
+              };
+              [key: string]: unknown;
+            };
 
-            // AI SDK v6 Data Stream Protocol: text-delta
-            const data = `data: ${JSON.stringify({
-              type: "text-delta",
-              id: textId,
-              delta: value,
-            })}\n\n`;
-            controller.enqueue(encoder.encode(data));
+            switch (chunk.type) {
+              case "text-delta": {
+                // Mastra 텍스트 청크: payload.text
+                const text = chunk.payload?.text ?? "";
+                if (text) {
+                  fullResponse += text;
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({
+                      type: "text-delta",
+                      id: textId,
+                      delta: text,
+                    })}\n\n`)
+                  );
+                }
+                break;
+              }
+
+              case "tool-call": {
+                // Mastra Tool 호출: payload.toolCallId, payload.toolName, payload.args
+                const payload = chunk.payload;
+                if (!payload) break;
+
+                const toolCallId = payload.toolCallId ?? "";
+                const toolName = payload.toolName ?? "";
+                const args = payload.args ?? {};
+
+                if (!toolCallId || !toolName) {
+                  console.warn(`[Chat] Invalid tool-call chunk:`, chunk);
+                  break;
+                }
+
+                console.log(`[Chat] Tool call: ${toolName}`, args);
+
+                // tool-input-start: Tool 호출 시작 신호
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: "tool-input-start",
+                    toolCallId,
+                    toolName,
+                  })}\n\n`)
+                );
+
+                // tool-input-available: Tool 입력 완료 (args 포함)
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: "tool-input-available",
+                    toolCallId,
+                    toolName,
+                    input: args,
+                  })}\n\n`)
+                );
+                break;
+              }
+
+              case "tool-result": {
+                // Mastra Tool 결과: payload.toolCallId, payload.result
+                const payload = chunk.payload;
+                if (!payload) break;
+
+                const toolCallId = payload.toolCallId ?? "";
+                const toolName = payload.toolName ?? "";
+                const result = payload.result;
+
+                if (!toolCallId) {
+                  console.warn(`[Chat] Invalid tool-result chunk:`, chunk);
+                  break;
+                }
+
+                console.log(`[Chat] Tool result: ${toolName}`, result);
+
+                // tool-output-available: Tool 결과 전송
+                controller.enqueue(
+                  encoder.encode(`data: ${JSON.stringify({
+                    type: "tool-output-available",
+                    toolCallId,
+                    output: result,
+                  })}\n\n`)
+                );
+                break;
+              }
+
+              // tool-call-input-streaming-start, tool-call-delta 등은 무시 (최종 tool-call만 처리)
+              default:
+                // 기타 청크는 무시
+                break;
+            }
           }
 
           // 텍스트 완료 신호

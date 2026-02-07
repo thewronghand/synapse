@@ -114,6 +114,25 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   createdAt: string; // ISO 8601
+  /** Tool 호출 정보 (assistant 메시지에서 사용) */
+  toolInvocations?: ToolInvocation[];
+}
+
+/** Tool 호출 상태 (AI SDK v6 Data Stream Protocol) */
+export type ToolInvocationState =
+  | "input-streaming"    // Tool 인자 생성 중
+  | "input-available"    // Tool 인자 완료, 실행 중
+  | "output-available"   // Tool 실행 완료
+  | "output-error";      // Tool 실행 에러
+
+/** Tool 호출 정보 */
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  state: ToolInvocationState;
+  input?: Record<string, unknown>;  // Tool 인자 (args)
+  output?: unknown;                  // Tool 결과
+  errorText?: string;                // 에러 메시지
 }
 
 export interface ChatSession {

@@ -5,10 +5,74 @@ import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
-import { Ghost, User, Pencil, RefreshCw, Check, X } from "lucide-react";
-import { useTypewriter } from "@/hooks/useTypewriter";
+import { Ghost, User, Pencil, RefreshCw, Check, X, Loader2, CheckCircle2, XCircle, FileText, FolderPlus, FolderMinus, FilePlus, FileEdit, Trash2, FolderInput } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ChatMessage } from "@/types";
+import type { ChatMessage, ToolInvocation } from "@/types";
+
+// Tool 이름을 한글로 매핑
+const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+  "list-notes": { label: "문서 목록 조회", icon: <FileText className="w-3.5 h-3.5" /> },
+  "read-note": { label: "문서 읽기", icon: <FileText className="w-3.5 h-3.5" /> },
+  "create-note": { label: "문서 생성", icon: <FilePlus className="w-3.5 h-3.5" /> },
+  "update-note": { label: "문서 수정", icon: <FileEdit className="w-3.5 h-3.5" /> },
+  "delete-note": { label: "문서 삭제", icon: <Trash2 className="w-3.5 h-3.5" /> },
+  "move-note": { label: "문서 이동", icon: <FolderInput className="w-3.5 h-3.5" /> },
+  "list-folders": { label: "폴더 목록 조회", icon: <FolderPlus className="w-3.5 h-3.5" /> },
+  "create-folder": { label: "폴더 생성", icon: <FolderPlus className="w-3.5 h-3.5" /> },
+  "delete-folder": { label: "폴더 삭제", icon: <FolderMinus className="w-3.5 h-3.5" /> },
+};
+
+// Tool 실행 상태 UI 컴포넌트
+function ToolInvocationItem({ invocation }: { invocation: ToolInvocation }) {
+  const toolInfo = TOOL_LABELS[invocation.toolName] ?? {
+    label: invocation.toolName,
+    icon: <FileText className="w-3.5 h-3.5" />,
+  };
+
+  const isRunning = invocation.state === "input-streaming" || invocation.state === "input-available";
+  const isComplete = invocation.state === "output-available";
+  const isError = invocation.state === "output-error";
+
+  // 실행 중일 때 표시할 상세 정보
+  const getRunningDetail = () => {
+    if (!invocation.input) return null;
+    const input = invocation.input;
+    if (input.title) return `"${input.title}"`;
+    if (input.folder) return `폴더: ${input.folder}`;
+    if (input.name) return `"${input.name}"`;
+    return null;
+  };
+
+  return (
+    <div className={cn(
+      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs",
+      isRunning && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+      isComplete && "bg-green-500/10 text-green-700 dark:text-green-400",
+      isError && "bg-red-500/10 text-red-700 dark:text-red-400"
+    )}>
+      {/* 상태 아이콘 */}
+      {isRunning && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+      {isComplete && <CheckCircle2 className="w-3.5 h-3.5" />}
+      {isError && <XCircle className="w-3.5 h-3.5" />}
+
+      {/* Tool 아이콘 */}
+      {toolInfo.icon}
+
+      {/* Tool 이름 및 상태 */}
+      <span className="font-medium">{toolInfo.label}</span>
+
+      {/* 실행 중 상세 정보 */}
+      {isRunning && getRunningDetail() && (
+        <span className="text-muted-foreground">{getRunningDetail()}</span>
+      )}
+
+      {/* 에러 메시지 */}
+      {isError && invocation.errorText && (
+        <span className="text-red-600 dark:text-red-400">{invocation.errorText}</span>
+      )}
+    </div>
+  );
+}
 
 interface ChatMessageItemProps {
   message: ChatMessage;
@@ -41,14 +105,8 @@ export function ChatMessageItem({
   const [editContent, setEditContent] = useState(message.content);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
-  // assistant 메시지에 타이프라이터 효과 적용 (단어 단위)
-  const { displayedText, isTyping } = useTypewriter(
-    isAssistant ? message.content : "",
-    { isStreaming, wordsPerSecond: 30 }
-  );
-
-  // 타이핑 중이거나 스트리밍 중이면 displayedText 사용
-  const renderedContent = isAssistant && (isStreaming || isTyping) ? displayedText : message.content;
+  // 메시지 내용 그대로 표시 (스트리밍이 자연스러운 타이핑 효과를 제공)
+  const renderedContent = message.content;
 
   // 편집 모드 진입 시 textarea 포커스 및 높이 조절
   useEffect(() => {
@@ -87,7 +145,7 @@ export function ChatMessageItem({
 
   // 수정/재생성 버튼 표시 조건
   const showEditButton = isUser && isLastUserMessage && onEditUserMessage && !isProcessing;
-  const showRegenerateButton = isAssistant && isLastAssistantMessage && onRegenerateResponse && !isProcessing && !isStreaming && !isTyping;
+  const showRegenerateButton = isAssistant && isLastAssistantMessage && onRegenerateResponse && !isProcessing && !isStreaming;
 
   return (
     <div
@@ -147,10 +205,33 @@ export function ChatMessageItem({
               <p className="whitespace-pre-wrap text-sm">{message.content}</p>
             )
           ) : (
-            <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-              <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                {renderedContent}
-              </ReactMarkdown>
+            <div className="flex flex-col gap-2">
+              {/* Tool 실행 상태 표시 */}
+              {message.toolInvocations && message.toolInvocations.length > 0 && (
+                <div className="flex flex-col gap-1.5 mb-1">
+                  {message.toolInvocations.map((invocation) => (
+                    <ToolInvocationItem key={invocation.toolCallId} invocation={invocation} />
+                  ))}
+                </div>
+              )}
+
+              {/* 텍스트 콘텐츠 */}
+              {renderedContent && (
+                <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
+                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
+                    {renderedContent}
+                  </ReactMarkdown>
+                </div>
+              )}
+
+              {/* 스트리밍 중이지만 아직 내용이 없을 때 스피너 표시 */}
+              {isStreaming && !renderedContent && (!message.toolInvocations || message.toolInvocations.length === 0) && (
+                <div className="flex items-center gap-1.5">
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce [animation-delay:0ms]" />
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce [animation-delay:150ms]" />
+                  <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce [animation-delay:300ms]" />
+                </div>
+              )}
             </div>
           )}
         </div>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { Ghost } from "lucide-react";
 import { ChatMessageItem } from "@/components/chat/ChatMessageItem";
 import { ChatEmptyState } from "@/components/chat/ChatEmptyState";
 import type { ChatMessage } from "@/types";
@@ -22,6 +23,8 @@ interface ChatMessageListProps {
   onEditUserMessage?: (messageId: string, newContent: string) => void;
   /** AI 응답 재생성 시 호출 */
   onRegenerateResponse?: () => void;
+  /** 현재 스트리밍 중인 메시지 ID (바운스 로더 대신 빈 메시지 렌더링용) */
+  streamingMessageId?: string | null;
 }
 
 export function ChatMessageList({
@@ -34,6 +37,7 @@ export function ChatMessageList({
   onLoadMore,
   onEditUserMessage,
   onRegenerateResponse,
+  streamingMessageId,
 }: ChatMessageListProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
@@ -112,9 +116,13 @@ export function ChatMessageList({
   const isLastAssistantStreaming =
     isLoading && lastMessage?.role === "assistant";
   // 전송 후 아직 assistant 메시지가 시작되지 않았거나, assistant 메시지가 비어있을 때 바운스 표시
+  // 단, tool invocation이 있거나, streamingMessageId가 설정되어 있으면 바운스 숨김
   const lastAssistantContent = lastMessage?.role === "assistant" ? lastMessage.content : "";
+  const lastAssistantHasTools = lastMessage?.role === "assistant" && lastMessage.toolInvocations && lastMessage.toolInvocations.length > 0;
+  // streamingMessageId가 있으면 스트리밍 중이므로 바운스 대신 메시지 렌더링
+  const isStreamingInProgress = !!streamingMessageId;
   const showBounceLoader =
-    isLoading && (!lastMessage || lastMessage.role !== "assistant" || !lastAssistantContent.trim());
+    isLoading && !isStreamingInProgress && (!lastMessage || lastMessage.role !== "assistant" || (!lastAssistantContent.trim() && !lastAssistantHasTools));
 
   return (
     <div
@@ -135,9 +143,13 @@ export function ChatMessageList({
 
       {messages.map((message, index) => {
         // 스트리밍 중 빈 assistant 메시지는 렌더링하지 않음 (bounce loader가 대신 표시됨)
+        // 단, tool invocation이 있거나, streamingMessageId와 일치하면 렌더링
+        const hasToolInvocations = message.toolInvocations && message.toolInvocations.length > 0;
+        const isCurrentlyStreaming = message.id === streamingMessageId;
         const isEmptyAssistant =
-          message.role === "assistant" && !message.content.trim();
-        if (isEmptyAssistant && isLoading) {
+          message.role === "assistant" && !message.content.trim() && !hasToolInvocations;
+        // 스트리밍 중인 메시지는 빈 상태여도 렌더링 (스피너 표시)
+        if (isEmptyAssistant && isLoading && !isCurrentlyStreaming) {
           return null;
         }
 
@@ -171,7 +183,10 @@ export function ChatMessageList({
 
       {/* 전송 후 응답 대기 중 로딩 인디케이터 */}
       {showBounceLoader && (
-        <div className="flex justify-start">
+        <div className="flex justify-start gap-2.5">
+          <div className="shrink-0 w-7 h-7 rounded-full bg-[var(--primary-bg)] flex items-center justify-center mt-0.5">
+            <Ghost className="w-4 h-4 text-primary" />
+          </div>
           <div className="bg-primary/10 rounded-2xl px-4 py-3">
             <div className="flex items-center gap-1.5">
               <span className="w-2 h-2 bg-primary/60 rounded-full animate-bounce [animation-delay:0ms]" />
