@@ -1,39 +1,9 @@
-import { streamText, type UIMessage, convertToModelMessages } from "ai";
-import { createVertex } from "@ai-sdk/google-vertex";
 import { NextRequest, NextResponse } from "next/server";
+import { type UIMessage } from "ai";
+import { createNeuroAgent } from "@/lib/mastra/agents/neuro-agent";
 import { loadGcpServiceAccount } from "@/lib/gcp-service-account";
-import {
-  loadSession,
-  createSession,
-  appendMessage,
-  saveSession,
-  generateSessionTitle,
-} from "@/lib/chat-session-utils";
-import { loadAIModelSettings } from "@/lib/ai-model-settings";
-import crypto from "crypto";
-
-const SYSTEM_PROMPT = `당신의 이름은 Neuro입니다. Synapse 노트 앱에 내장된 AI 어시스턴트입니다.
-"뉴런(Neuron)"에서 따온 이름으로, 시냅스를 통해 지식을 연결하는 것처럼 사용자의 생각을 연결하고 확장하는 역할을 합니다.
-
-## Synapse 앱 소개
-Synapse는 마크다운 기반 개인 지식 관리(PKM) 데스크톱 앱입니다. 주요 기능:
-
-- **노트 작성/편집**: 마크다운 에디터로 문서 CRUD. 폴더별 정리 가능.
-- **위키링크**: \`[[문서명]]\` 문법으로 문서 간 연결. 자동 백링크 생성.
-- **그래프 시각화**: D3.js 기반 인터랙티브 그래프로 문서 간 관계를 시각적으로 탐색.
-- **태그 시스템**: 프론트매터에 태그를 지정하여 문서 분류 및 검색.
-- **음성 메모**: 음성 녹음/업로드 → Google Speech-to-Text 자동 녹취록 생성 → AI 요약. 화자 분리(Speaker Diarization) 지원.
-- **퍼블리시**: Vercel 연동으로 노트를 읽기 전용 웹사이트로 배포. 폴더별 공개/비공개 설정 가능.
-- **검색**: 제목 검색(자동완성) + 본문 전체 검색 + 태그 필터링.
-- **AI 챗봇**: 바로 당신(Neuro)! 사용자의 질문에 답변하는 대화형 AI.
-
-## 응답 가이드라인
-- 한국어로 응답하되, 사용자가 다른 언어로 질문하면 해당 언어로 답변하세요.
-- 마크다운을 적극 활용하여 가독성 좋게 작성하세요 (헤딩, 리스트, 코드블록, 굵은 글씨 등).
-- 간결하면서도 충분한 정보를 담아 답변하세요. 불필요하게 길게 늘리지 마세요.
-- 사용자가 Synapse 기능에 대해 물으면 위 정보를 바탕으로 안내해주세요.
-- 코드, 개발, 학습, 일반 지식 등 폭넓은 주제에 답변할 수 있습니다.
-- 확실하지 않은 정보는 솔직하게 모른다고 말해주세요.`;;
+import { loadSession, saveSession } from "@/lib/chat-session-utils";
+import type { ChatMessage } from "@/types";
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,106 +23,199 @@ export async function POST(req: NextRequest) {
     const body = await req.json();
     const {
       messages: uiMessages,
-      sessionId: requestedSessionId,
+      sessionId,
     }: {
       messages: UIMessage[];
       sessionId?: string;
     } = body;
 
-    // 세션 확인 또는 생성
-    let sessionId = requestedSessionId;
-    if (sessionId) {
-      const existingSession = await loadSession(sessionId);
-      if (!existingSession) {
-        const newSession = await createSession();
-        sessionId = newSession.id;
-      }
-    } else {
-      const newSession = await createSession();
-      sessionId = newSession.id;
+    // Mastra Agent 생성 (동적 모델 로딩)
+    console.log("[Chat] Agent 생성 시작...");
+    const agent = await createNeuroAgent();
+    console.log("[Chat] Agent 생성 완료");
+
+    // UIMessage에서 마지막 사용자 메시지 추출
+    const lastMessage = uiMessages[uiMessages.length - 1];
+    const userMessage =
+      lastMessage?.role === "user"
+        ? lastMessage.parts
+            ?.filter(
+              (p): p is { type: "text"; text: string } => p.type === "text"
+            )
+            .map((p) => p.text)
+            .join("") ?? ""
+        : "";
+
+    if (!userMessage) {
+      return NextResponse.json(
+        { success: false, error: "메시지가 비어있습니다." },
+        { status: 400 }
+      );
     }
 
-    // 마지막 user 메시지 저장
-    const lastUiMessage = uiMessages[uiMessages.length - 1];
-    if (lastUiMessage && lastUiMessage.role === "user") {
-      // UIMessage에서 텍스트 추출
-      const textContent =
-        lastUiMessage.parts
-          ?.filter(
-            (p): p is { type: "text"; text: string } => p.type === "text"
-          )
-          .map((p) => p.text)
-          .join("") ?? "";
+    // Mastra Agent 스트리밍 호출
+    // Mastra Memory가 자체적으로 대화 이력을 관리함
+    // thread: 세션 ID (대화 이력 저장)
+    // resource: 사용자 ID (Working Memory 범위)
+    const threadId = sessionId || crypto.randomUUID();
+    const resourceId = "default-user"; // TODO: 다중 사용자 지원 시 변경
 
-      await appendMessage(sessionId, {
-        id: crypto.randomUUID(),
-        role: "user",
-        content: textContent,
-        createdAt: new Date().toISOString(),
-      });
-    }
-
-    // 모델 설정 로드
-    const aiSettings = await loadAIModelSettings();
-
-    // Gemini 3 모델은 global 리전 필요
-    const isGemini3 = aiSettings.modelId.startsWith("gemini-3");
-    const location = isGemini3 ? "global" : "us-central1";
-
-    // Vertex AI 모델 생성
-    const vertex = createVertex({
-      project: sa.project_id,
-      location,
-      googleAuthOptions: {
-        credentials: {
-          client_email: sa.client_email,
-          private_key: sa.private_key,
-        },
+    console.log("[Chat] 스트리밍 시작...", { userMessage, threadId, resourceId });
+    const mastraOutput = await agent.stream(userMessage, {
+      memory: {
+        thread: threadId,
+        resource: resourceId,
       },
     });
+    console.log("[Chat] 스트리밍 응답 수신");
 
-    // UIMessage → ModelMessage 변환 후 스트리밍 응답 생성
-    const modelMessages = await convertToModelMessages(uiMessages);
+    // Mastra textStream을 Vercel AI SDK v6 Data Stream Protocol 형식으로 변환
+    const textStream = mastraOutput.textStream;
+    const messageId = crypto.randomUUID();
+    const textId = crypto.randomUUID();
 
-    const result = streamText({
-      model: vertex(aiSettings.modelId),
-      system: SYSTEM_PROMPT,
-      messages: modelMessages,
-      onFinish: async ({ text }) => {
+    // 응답 텍스트를 수집 (백그라운드 저장용)
+    let fullResponse = "";
+
+    const stream = new ReadableStream({
+      async start(controller) {
+        const encoder = new TextEncoder();
+        const reader = textStream.getReader();
+
         try {
-          // assistant 응답 저장
-          await appendMessage(sessionId, {
-            id: crypto.randomUUID(),
-            role: "assistant",
-            content: text,
-            createdAt: new Date().toISOString(),
-          });
+          // 메시지 시작 신호 (필수 - 이게 있어야 로딩 UI가 표시됨)
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "start", messageId })}\n\n`)
+          );
 
-          // 첫 대화면 자동 제목 생성
-          const session = await loadSession(sessionId);
-          if (session && session.messages.length === 2) {
-            const userMsg = session.messages.find((m) => m.role === "user");
-            if (userMsg) {
-              session.title = generateSessionTitle(userMsg.content);
-              session.updatedAt = new Date().toISOString();
-              await saveSession(session);
-            }
+          // 텍스트 시작 신호
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "text-start", id: textId })}\n\n`)
+          );
+
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+
+            // 응답 텍스트 수집
+            fullResponse += value;
+
+            // AI SDK v6 Data Stream Protocol: text-delta
+            const data = `data: ${JSON.stringify({
+              type: "text-delta",
+              id: textId,
+              delta: value,
+            })}\n\n`;
+            controller.enqueue(encoder.encode(data));
+          }
+
+          // 텍스트 완료 신호
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "text-end", id: textId })}\n\n`)
+          );
+
+          // 메시지 완료 신호
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "finish", finishReason: "stop" })}\n\n`)
+          );
+
+          // 스트림 종료
+          controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
+
+          // 스트리밍 완료 후 AI 응답 저장 (백그라운드)
+          if (sessionId && fullResponse) {
+            saveAssistantMessage(sessionId, messageId, fullResponse).catch((err) => {
+              console.error("[Chat] AI 응답 저장 실패:", err);
+            });
           }
         } catch (err) {
-          console.error("[Chat] 응답 저장 실패:", err);
+          console.error("[Chat] 스트리밍 중 오류:", err);
+        } finally {
+          reader.releaseLock();
+          controller.close();
         }
       },
     });
 
-    return result.toUIMessageStreamResponse({
+    // AI 응답을 세션에 저장하는 헬퍼 함수
+    async function saveAssistantMessage(sid: string, msgId: string, content: string) {
+      const session = await loadSession(sid);
+      if (!session) return;
+
+      // 이미 같은 ID의 메시지가 있으면 중복 저장 방지
+      if (session.messages.some((m) => m.id === msgId)) {
+        console.log("[Chat] AI 응답 이미 저장됨, 스킵:", msgId);
+        return;
+      }
+
+      const now = new Date().toISOString();
+      const assistantMsg: ChatMessage = {
+        id: msgId,
+        role: "assistant",
+        content,
+        createdAt: now,
+      };
+      session.messages.push(assistantMsg);
+      session.pendingResponse = false; // 응답 완료
+      session.updatedAt = now;
+      await saveSession(session);
+      console.log("[Chat] AI 응답 저장 완료:", sid);
+
+      // 대화가 6개 이상이고 아직 AI 제목 생성 안 했으면 생성
+      if (session.messages.length >= 6 && !session.titleGenerated) {
+        generateAiTitle(sid, session.messages).catch((err) => {
+          console.error("[Chat] AI 제목 생성 실패:", err);
+        });
+      }
+    }
+
+    // AI로 대화 제목 생성
+    async function generateAiTitle(sid: string, messages: ChatMessage[]) {
+      try {
+        const titleAgent = await createNeuroAgent();
+        const conversation = messages
+          .map((m) => `${m.role === "user" ? "사용자" : "AI"}: ${m.content}`)
+          .join("\n");
+
+        const result = await titleAgent.generate(
+          `다음 대화의 주제를 한국어로 짧게 요약해서 제목을 만들어줘. 15자 이내로, 제목만 답변해줘.\n\n${conversation}`
+        );
+
+        const title = result.text?.trim().slice(0, 30) || "새 대화";
+
+        // 세션 제목 업데이트 및 플래그 설정
+        const session = await loadSession(sid);
+        if (session) {
+          session.title = title;
+          session.titleGenerated = true;
+          await saveSession(session);
+          console.log("[Chat] AI 제목 생성 완료:", title);
+        }
+      } catch (err) {
+        console.error("[Chat] AI 제목 생성 중 오류:", err);
+      }
+    }
+
+    return new Response(stream, {
       headers: {
-        "X-Session-Id": sessionId,
+        "Content-Type": "text/event-stream; charset=utf-8",
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Session-Id": threadId,
+        "x-vercel-ai-ui-message-stream": "v1",
       },
     });
   } catch (err) {
     console.error("[Chat] 스트리밍 실패:", err);
+    const errorMessage = err instanceof Error ? err.message : String(err);
+    const errorStack = err instanceof Error ? err.stack : undefined;
     return NextResponse.json(
-      { success: false, error: "AI 응답을 생성할 수 없습니다" },
+      {
+        success: false,
+        error: "AI 응답을 생성할 수 없습니다",
+        details: errorMessage,
+        stack: process.env.NODE_ENV === "development" ? errorStack : undefined,
+      },
       { status: 500 }
     );
   }

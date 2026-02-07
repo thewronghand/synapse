@@ -122,6 +122,8 @@ export interface ChatSession {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   messages: ChatMessage[];
+  pendingResponse?: boolean; // AI 응답 대기 중 여부
+  titleGenerated?: boolean; // AI가 제목을 생성했는지 여부
 }
 
 export interface ChatSessionMeta {

@@ -5,9 +5,12 @@ import {
   deleteSession,
 } from "@/lib/chat-session-utils";
 
-// GET: 세션 상세 조회 (메시지 포함)
+// GET: 세션 상세 조회 (메시지 포함, 페이지네이션 지원)
+// Query params:
+//   - limit: 가져올 메시지 수 (기본: 전체, 10 이상 권장)
+//   - before: 이 인덱스 이전의 메시지만 가져옴 (역방향 페이지네이션)
 export async function GET(
-  _req: NextRequest,
+  req: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
@@ -21,7 +24,38 @@ export async function GET(
       );
     }
 
-    return NextResponse.json({ success: true, data: session });
+    // 페이지네이션 파라미터
+    const url = new URL(req.url);
+    const limitParam = url.searchParams.get("limit");
+    const beforeParam = url.searchParams.get("before");
+
+    // limit이 없으면 전체 반환 (기존 동작 유지)
+    if (!limitParam) {
+      return NextResponse.json({ success: true, data: session });
+    }
+
+    const limit = Math.max(1, parseInt(limitParam, 10) || 10);
+    const totalMessages = session.messages.length;
+
+    // before: 해당 인덱스 이전 메시지만 (없으면 맨 끝에서부터)
+    const endIndex = beforeParam ? Math.min(parseInt(beforeParam, 10), totalMessages) : totalMessages;
+    const startIndex = Math.max(0, endIndex - limit);
+
+    const paginatedMessages = session.messages.slice(startIndex, endIndex);
+    const hasMore = startIndex > 0;
+
+    return NextResponse.json({
+      success: true,
+      data: {
+        ...session,
+        messages: paginatedMessages,
+        pagination: {
+          total: totalMessages,
+          hasMore,
+          nextBefore: hasMore ? startIndex : null,
+        },
+      },
+    });
   } catch (err) {
     console.error("[ChatSessions] 세션 조회 실패:", err);
     return NextResponse.json(
