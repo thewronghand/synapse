@@ -5,6 +5,7 @@ import {
   AI_MODELS,
   DEFAULT_MODEL_ID,
 } from "@/lib/ai-model-settings";
+import { clearNeuroCache } from "@/lib/mastra/agents/neuro-agent";
 
 // GET: 현재 모델 설정 조회
 export async function GET() {
@@ -43,6 +44,9 @@ export async function POST(req: NextRequest) {
     }
 
     await saveAIModelSettings({ modelId });
+
+    // 모델 변경 시 Agent 캐시 초기화
+    clearNeuroCache();
 
     return NextResponse.json({
       success: true,

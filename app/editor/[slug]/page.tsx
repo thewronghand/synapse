@@ -4,6 +4,7 @@ import { useEffect, useState, useRef, useTransition, useCallback } from "react";
 import { useParams, useRouter } from "next/navigation";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
+import { DraftRecoveryDialog } from "@/components/editor/DraftRecoveryDialog";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -12,6 +13,8 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { LoadingScreen } from "@/components/ui/spinner";
 import { Folder } from "lucide-react";
+import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import type { Draft } from "@/app/api/drafts/route";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
@@ -34,6 +37,11 @@ export default function EditorPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // 드래프트 복구 관련 상태
+  const [pendingDraft, setPendingDraft] = useState<Draft | null>(null);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
 
   // 에디터 값은 ref로 관리 (즉각적인 입력 반응을 위해)
   const editorContentRef = useRef("");
@@ -47,6 +55,9 @@ export default function EditorPage() {
   const [previewContent, setPreviewContent] = useState("");
   const [isPending, startTransition] = useTransition();
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // 페이지 이탈 경고
+  useBeforeUnload(isDirty);
 
   // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
@@ -73,12 +84,17 @@ export default function EditorPage() {
     fetchTagsAndTitles();
   }, [folder]);
 
-  // Fetch document using encoded title
+  // Fetch document and check for draft
   useEffect(() => {
-    async function fetchDocument() {
+    async function fetchDocumentAndDraft() {
       try {
-        const res = await fetch(`/api/documents/${encodeURIComponent(requestedTitle)}`);
-        const data = await res.json();
+        // 문서와 드래프트를 병렬로 조회
+        const [docRes, draftRes] = await Promise.all([
+          fetch(`/api/documents/${encodeURIComponent(requestedTitle)}`),
+          fetch(`/api/drafts?slug=${encodeURIComponent(slug)}`),
+        ]);
+
+        const data = await docRes.json();
 
         if (data.success) {
           const doc = data.data.document;
@@ -94,6 +110,24 @@ export default function EditorPage() {
           editorContentRef.current = doc.contentWithoutFrontmatter;
           setEditorInitialValue(doc.contentWithoutFrontmatter);
           setPreviewContent(doc.content);
+
+          // 드래프트가 있는지 확인
+          const draftResponse = await draftRes.json();
+          // draft가 null이 아니고 slug가 있으면 드래프트 존재
+          const draftData = draftResponse.draft === null ? null : draftResponse.slug ? draftResponse : null;
+          if (draftData) {
+            // 드래프트가 원본과 다른 경우에만 복구 다이얼로그 표시
+            if (draftData.content !== doc.contentWithoutFrontmatter ||
+                draftData.title !== docTitle) {
+              setPendingDraft(draftData);
+              setShowDraftDialog(true);
+            } else {
+              // 드래프트가 원본과 같으면 삭제
+              fetch(`/api/drafts?slug=${encodeURIComponent(slug)}`, {
+                method: "DELETE",
+              }).catch(console.error);
+            }
+          }
         } else {
           setError("Document not found");
         }
@@ -104,8 +138,8 @@ export default function EditorPage() {
       }
     }
 
-    fetchDocument();
-  }, [requestedTitle]);
+    fetchDocumentAndDraft();
+  }, [requestedTitle, slug]);
 
   // 전체 content 생성 헬퍼 함수
   const buildFullContent = useCallback((editorContent: string, currentTitle: string, currentTags: string[]) => {
@@ -120,6 +154,8 @@ ${editorContent}`;
 
   // Auto-save (debounced) - 30초마다 저장
   const saveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  // 드래프트 저장 (debounced) - 5초마다 저장
+  const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   const triggerAutoSave = useCallback(() => {
     if (saveTimeoutRef.current) {
@@ -129,6 +165,53 @@ ${editorContent}`;
       saveDocument();
     }, 30000);
   }, []);
+
+  // 드래프트 저장 함수
+  const saveDraft = useCallback(async () => {
+    if (!slug) return;
+
+    const draft: Draft = {
+      slug,
+      title: titleRef.current,
+      content: editorContentRef.current,
+      tags: tagsRef.current,
+      folder,
+      lastSaved: new Date().toISOString(),
+    };
+
+    try {
+      await fetch("/api/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+    } catch (err) {
+      console.error("Failed to save draft:", err);
+    }
+  }, [slug, folder]);
+
+  // 드래프트 삭제 함수
+  const deleteDraft = useCallback(async () => {
+    if (!slug) return;
+
+    try {
+      await fetch(`/api/drafts?slug=${encodeURIComponent(slug)}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.error("Failed to delete draft:", err);
+    }
+  }, [slug]);
+
+  // 드래프트 저장 트리거 (5초 디바운스)
+  const triggerDraftSave = useCallback(() => {
+    if (draftTimeoutRef.current) {
+      clearTimeout(draftTimeoutRef.current);
+    }
+    draftTimeoutRef.current = setTimeout(() => {
+      saveDraft();
+    }, 5000);
+  }, [saveDraft]);
 
   // 디바운스된 프리뷰 업데이트 함수
   const schedulePreviewUpdate = useCallback(() => {
@@ -152,8 +235,10 @@ ${editorContent}`;
   // 에디터 변경 시 자동 저장도 트리거
   const handleEditorChangeWithSave = useCallback((value: string) => {
     handleEditorChange(value);
+    setIsDirty(true);
     triggerAutoSave();
-  }, [handleEditorChange, triggerAutoSave]);
+    triggerDraftSave();
+  }, [handleEditorChange, triggerAutoSave, triggerDraftSave]);
 
   // 제목 onChange - ref만 업데이트 (비제어 컴포넌트, state 업데이트 없음)
   const handleTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -165,17 +250,21 @@ ${editorContent}`;
     }
     setError(null);
     titleRef.current = newValue;
+    setIsDirty(true);
     schedulePreviewUpdate();
     triggerAutoSave();
-  }, [schedulePreviewUpdate, triggerAutoSave]);
+    triggerDraftSave();
+  }, [schedulePreviewUpdate, triggerAutoSave, triggerDraftSave]);
 
   // 태그 onChange - ref 업데이트 + 디바운스 프리뷰
   const handleTagsChange = useCallback((newTags: string[]) => {
     tagsRef.current = newTags;
     setTags(newTags); // TagInput 표시용
+    setIsDirty(true);
     schedulePreviewUpdate();
     triggerAutoSave();
-  }, [schedulePreviewUpdate, triggerAutoSave]);
+    triggerDraftSave();
+  }, [schedulePreviewUpdate, triggerAutoSave, triggerDraftSave]);
 
   async function saveDocument() {
     const content = buildFullContent(editorContentRef.current, titleRef.current, tagsRef.current);
@@ -198,6 +287,9 @@ ${editorContent}`;
         const updatedDoc = data.data.document;
         setDocument(updatedDoc);
         setLastSaved(new Date());
+        setIsDirty(false);
+        // 저장 성공 시 드래프트 삭제
+        deleteDraft();
 
         // 제목이 변경되었으면 URL을 업데이트
         if (updatedDoc.title !== currentDocTitle) {
@@ -238,6 +330,7 @@ ${editorContent}`;
         const data = await res.json();
         if (data.success) {
           finalTitle = data.data.document.title;
+          setIsDirty(false);
         }
       } catch (err) {
         console.error("Failed to save:", err);
@@ -245,9 +338,36 @@ ${editorContent}`;
         setIsSaving(false);
       }
     }
+    // 드래프트 삭제 후 네비게이션
+    await deleteDraft();
     // Navigate to document view (use potentially updated title)
     router.push(`/note/${encodeURIComponent(finalTitle)}`);
   }
+
+  // 드래프트 복구 핸들러
+  const handleRecoverDraft = useCallback(() => {
+    if (!pendingDraft) return;
+
+    // 드래프트 내용으로 에디터 업데이트
+    titleRef.current = pendingDraft.title;
+    tagsRef.current = pendingDraft.tags;
+    editorContentRef.current = pendingDraft.content;
+    setTags(pendingDraft.tags);
+    setInitialTitle(pendingDraft.title);
+    setEditorInitialValue(pendingDraft.content);
+    setPreviewContent(buildFullContent(pendingDraft.content, pendingDraft.title, pendingDraft.tags));
+    setIsDirty(true);
+
+    setShowDraftDialog(false);
+    setPendingDraft(null);
+  }, [pendingDraft, buildFullContent]);
+
+  // 드래프트 무시 핸들러
+  const handleDiscardDraft = useCallback(() => {
+    deleteDraft();
+    setShowDraftDialog(false);
+    setPendingDraft(null);
+  }, [deleteDraft]);
 
   if (isLoading) {
     return <LoadingScreen message="문서 로딩 중..." />;
@@ -265,6 +385,16 @@ ${editorContent}`;
   }
 
   return (
+    <>
+      {/* 드래프트 복구 다이얼로그 */}
+      {pendingDraft && (
+        <DraftRecoveryDialog
+          open={showDraftDialog}
+          draft={pendingDraft}
+          onRecover={handleRecoverDraft}
+          onDiscard={handleDiscardDraft}
+        />
+      )}
     <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="border-b bg-card p-4">
@@ -353,5 +483,6 @@ ${editorContent}`;
         </div>
       </div>
     </div>
+    </>
   );
 }

@@ -30,9 +30,16 @@ interface FoundDocument {
 }
 
 /**
- * Find a document file by title (searches all folders)
+ * Find a document file by title
+ * @param requestedTitle - 찾을 문서 제목
+ * @param targetFolder - 특정 폴더에서만 검색 (undefined면 전체 검색)
  */
-async function findFileByTitle(requestedTitle: string): Promise<FoundDocument | null> {
+async function findFileByTitle(requestedTitle: string, targetFolder?: string): Promise<FoundDocument | null> {
+  // 특정 폴더에서만 검색하는 경우
+  if (targetFolder !== undefined) {
+    return findFileInFolder(requestedTitle, targetFolder);
+  }
+
   // First, check cache
   const cached = documentCache.getByTitle(requestedTitle);
   if (cached) {
@@ -91,8 +98,38 @@ async function findFileByTitle(requestedTitle: string): Promise<FoundDocument | 
 }
 
 /**
+ * Find a document file in a specific folder only
+ */
+async function findFileInFolder(requestedTitle: string, folder: string): Promise<FoundDocument | null> {
+  const folderPath = path.join(NOTES_DIR, folder);
+
+  try {
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith('.md'));
+
+    for (const file of markdownFiles) {
+      const filePath = path.join(folderPath, file);
+      const content = await fs.readFile(filePath, 'utf-8');
+      const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+      const filenameTitle = getTitleFromFilename(file);
+      const title = extractTitle(contentWithoutFrontmatter, frontmatter) || filenameTitle;
+
+      if (titlesMatch(title, requestedTitle)) {
+        return { filename: file, folder, title };
+      }
+    }
+  } catch {
+    // 폴더가 없거나 접근 불가
+  }
+
+  return null;
+}
+
+/**
  * GET /api/documents/[slug]
  * Get a single document by title
+ * Query params:
+ * - folder: 특정 폴더에서만 검색 (폴더 격리)
  */
 export async function GET(
   request: NextRequest,
@@ -101,7 +138,10 @@ export async function GET(
   try {
     const { slug } = await params;
     const requestedTitle = decodeURIComponent(slug).normalize('NFC');
-    const document = await getDocumentByTitle(requestedTitle);
+    const { searchParams } = new URL(request.url);
+    const folder = searchParams.get('folder') ?? undefined;
+
+    const document = await getDocumentByTitle(requestedTitle, folder);
 
     return NextResponse.json({
       success: true,
@@ -287,8 +327,10 @@ export async function DELETE(
 
 /**
  * Helper: Get document by title
+ * @param requestedTitle - 찾을 문서 제목
+ * @param targetFolder - 특정 폴더에서만 검색 (undefined면 전체 검색)
  */
-async function getDocumentByTitle(requestedTitle: string): Promise<Document> {
+async function getDocumentByTitle(requestedTitle: string, targetFolder?: string): Promise<Document> {
   if (isPublishedMode()) {
     const jsonPath = path.join(
       process.cwd(),
@@ -301,9 +343,9 @@ async function getDocumentByTitle(requestedTitle: string): Promise<Document> {
     return JSON.parse(jsonData);
   }
 
-  const found = await findFileByTitle(requestedTitle);
+  const found = await findFileByTitle(requestedTitle, targetFolder);
   if (!found) {
-    throw new Error(`Document not found: ${requestedTitle}`);
+    throw new Error(`Document not found: ${requestedTitle}${targetFolder ? ` in folder ${targetFolder}` : ''}`);
   }
 
   const { filename, folder, title } = found;
