@@ -55,6 +55,9 @@ firebase-debug.log
 # Claude Code
 .claude/
 
+# Oh my Claude Code
+.omc/
+
 # Serena
 .serena/
 
