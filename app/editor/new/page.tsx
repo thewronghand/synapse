@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, useEffect, useCallback, useRef, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import MarkdownEditor from "@/components/editor/MarkdownEditor";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
+import { DraftRecoveryDialog } from "@/components/editor/DraftRecoveryDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TagInput } from "@/components/ui/tag-input";
@@ -11,10 +12,15 @@ import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { LoadingScreen } from "@/components/ui/spinner";
 import { Folder } from "lucide-react";
+import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import type { Draft } from "@/app/api/drafts/route";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
 const FORBIDDEN_CHARS_MESSAGE = '제목에 다음 문자는 사용할 수 없습니다: / \\ : * ? " < > |';
+
+// 새 문서용 드래프트 slug 생성 (세션별 고유 ID)
+const NEW_DRAFT_PREFIX = "new-draft";
 
 function NewNotePageContent() {
   const router = useRouter();
@@ -29,6 +35,88 @@ function NewNotePageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isDirty, setIsDirty] = useState(false);
+
+  // 드래프트 관련 상태
+  const draftSlugRef = useRef<string>(NEW_DRAFT_PREFIX);
+  const draftTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const [pendingDraft, setPendingDraft] = useState<Draft | null>(null);
+  const [showDraftDialog, setShowDraftDialog] = useState(false);
+  const [isCheckingDraft, setIsCheckingDraft] = useState(true);
+
+  // 페이지 이탈 경고
+  useBeforeUnload(isDirty);
+
+  // 드래프트 저장 함수
+  const saveDraft = useCallback(async () => {
+    // 내용이 없으면 저장하지 않음
+    const frontmatterRegex = /^---\n[\s\S]*?\n---\n([\s\S]*)$/;
+    const match = content.match(frontmatterRegex);
+    const bodyContent = match ? match[1].trim() : content.trim();
+
+    if (!title.trim() && !bodyContent) return;
+
+    const draft: Draft = {
+      slug: draftSlugRef.current,
+      title: title,
+      content: bodyContent,
+      tags: tags,
+      folder,
+      lastSaved: new Date().toISOString(),
+    };
+
+    try {
+      await fetch("/api/drafts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(draft),
+      });
+    } catch (err) {
+      console.error("Failed to save draft:", err);
+    }
+  }, [content, title, tags, folder]);
+
+  // 드래프트 삭제 함수
+  const deleteDraft = useCallback(async () => {
+    try {
+      await fetch(`/api/drafts?slug=${encodeURIComponent(draftSlugRef.current)}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.error("Failed to delete draft:", err);
+    }
+  }, []);
+
+  // 드래프트 저장 트리거 (5초 디바운스)
+  const triggerDraftSave = useCallback(() => {
+    if (draftTimeoutRef.current) {
+      clearTimeout(draftTimeoutRef.current);
+    }
+    draftTimeoutRef.current = setTimeout(() => {
+      saveDraft();
+    }, 5000);
+  }, [saveDraft]);
+
+  // 초기 드래프트 확인
+  useEffect(() => {
+    async function checkForDraft() {
+      try {
+        const res = await fetch(`/api/drafts?slug=${encodeURIComponent(NEW_DRAFT_PREFIX)}`);
+        const data = await res.json();
+        // draft가 null이 아니고 slug가 있으면 드래프트 존재
+        const draftData = data.draft === null ? null : data.slug ? data : null;
+        if (draftData && (draftData.title || draftData.content)) {
+          setPendingDraft(draftData);
+          setShowDraftDialog(true);
+        }
+      } catch (err) {
+        console.error("Failed to check draft:", err);
+      } finally {
+        setIsCheckingDraft(false);
+      }
+    }
+    checkForDraft();
+  }, []);
 
   // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
@@ -136,6 +224,9 @@ ${bodyContent}`;
       const data = await res.json();
 
       if (data.success) {
+        // 저장 성공 시 드래프트 삭제
+        setIsDirty(false);
+        await deleteDraft();
         // Redirect to the newly created document's view page using the server-generated slug
         const createdSlug = data.data.document.slug;
         router.push(`/note/${createdSlug}`);
@@ -151,7 +242,7 @@ ${bodyContent}`;
   }
 
   async function handleCancel() {
-    // Clean up temp images before leaving
+    // Clean up temp images and draft before leaving
     if (content) {
       try {
         await fetch("/api/temp-images", {
@@ -164,11 +255,64 @@ ${bodyContent}`;
         // Continue with navigation even if cleanup fails
       }
     }
+    // 드래프트도 삭제
+    await deleteDraft();
+    setIsDirty(false);
     router.push("/documents");
   }
 
+  // 드래프트 복구 핸들러
+  const handleRecoverDraft = useCallback(() => {
+    if (!pendingDraft) return;
+
+    // 드래프트 내용으로 복구
+    setTitle(pendingDraft.title);
+    setTags(pendingDraft.tags);
+
+    // frontmatter 포함 content 생성
+    const tagsYaml = pendingDraft.tags.length > 0
+      ? `[${pendingDraft.tags.map(t => `"${t}"`).join(", ")}]`
+      : "[]";
+    const fullContent = `---
+title: ${pendingDraft.title}
+tags: ${tagsYaml}
+---
+
+${pendingDraft.content}`;
+
+    setContent(fullContent);
+    setIsInitialized(true);
+    setIsDirty(true);
+
+    setShowDraftDialog(false);
+    setPendingDraft(null);
+  }, [pendingDraft]);
+
+  // 드래프트 무시 핸들러
+  const handleDiscardDraft = useCallback(() => {
+    deleteDraft();
+    setShowDraftDialog(false);
+    setPendingDraft(null);
+  }, [deleteDraft]);
+
+  // 드래프트 확인 중일 때 로딩 표시
+  if (isCheckingDraft) {
+    return <LoadingScreen message="에디터 준비 중..." />;
+  }
+
   return (
-    <div className="flex flex-col h-screen">
+    <>
+      {/* 드래프트 복구 다이얼로그 */}
+      {pendingDraft && (
+        <DraftRecoveryDialog
+          open={showDraftDialog}
+          draft={pendingDraft}
+          onRecover={handleRecoverDraft}
+          onDiscard={handleDiscardDraft}
+        />
+      )}
+
+      <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="border-b bg-card p-4">
         <div className="container mx-auto">
@@ -195,6 +339,8 @@ ${bodyContent}`;
                     }
                     setTitle(newValue);
                     setError(null);
+                    setIsDirty(true);
+                    triggerDraftSave();
                   }}
                   className="text-lg font-bold"
                   autoFocus
@@ -223,7 +369,11 @@ ${bodyContent}`;
             </label>
             <TagInput
               tags={tags}
-              onChange={setTags}
+              onChange={(newTags) => {
+                setTags(newTags);
+                setIsDirty(true);
+                triggerDraftSave();
+              }}
               suggestions={availableTags}
               placeholder="태그를 입력하세요..."
               showHelper={true}
@@ -254,6 +404,8 @@ ${bodyContent}`;
                 } else {
                   setContent(newBody);
                 }
+                setIsDirty(true);
+                triggerDraftSave();
               }}
               folder={folder}
             />
@@ -275,6 +427,7 @@ ${bodyContent}`;
         </div>
       </div>
     </div>
+    </>
   );
 }
 

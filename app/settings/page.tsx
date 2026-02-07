@@ -108,6 +108,21 @@ function SettingsContent() {
   const [aiModels, setAiModels] = useState<{ id: string; label: string; description: string }[]>([]);
   const [aiModelSaving, setAiModelSaving] = useState(false);
 
+  // Working Memory states
+  const [workingMemory, setWorkingMemory] = useState<string>("");
+  const [workingMemoryTemplate, setWorkingMemoryTemplate] = useState<string>("");
+  const [workingMemoryLoading, setWorkingMemoryLoading] = useState(true);
+  const [workingMemorySaving, setWorkingMemorySaving] = useState(false);
+  const [workingMemoryEditing, setWorkingMemoryEditing] = useState(false);
+  const [workingMemoryDraft, setWorkingMemoryDraft] = useState<string>("");
+
+  // Neuro Custom Instructions states
+  const [customInstructions, setCustomInstructions] = useState<string>("");
+  const [customInstructionsLoading, setCustomInstructionsLoading] = useState(true);
+  const [customInstructionsSaving, setCustomInstructionsSaving] = useState(false);
+  const [customInstructionsEditing, setCustomInstructionsEditing] = useState(false);
+  const [customInstructionsDraft, setCustomInstructionsDraft] = useState<string>("");
+
   // Folder exclusion states for publish
   const [allFolders, setAllFolders] = useState<{ name: string; noteCount: number }[]>([]);
   const [excludedFolders, setExcludedFolders] = useState<string[]>([]);
@@ -153,6 +168,8 @@ function SettingsContent() {
     checkGcpConnection();
     checkGcsBucket();
     checkAiModelSettings();
+    checkWorkingMemory();
+    checkCustomInstructions();
 
     fetchFolders();
   }, []);
@@ -221,6 +238,158 @@ function SettingsContent() {
     } catch (error) {
       console.error("AI 모델 설정 확인 실패:", error);
     }
+  }
+
+  async function checkWorkingMemory() {
+    try {
+      const response = await fetch("/api/settings/working-memory");
+      const result = await response.json();
+      if (result.success) {
+        setWorkingMemory(result.data.content);
+        setWorkingMemoryTemplate(result.data.template);
+      }
+    } catch (error) {
+      console.error("Working Memory 확인 실패:", error);
+    } finally {
+      setWorkingMemoryLoading(false);
+    }
+  }
+
+  async function handleSaveWorkingMemory() {
+    setWorkingMemorySaving(true);
+    try {
+      const response = await fetch("/api/settings/working-memory", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ content: workingMemoryDraft }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setWorkingMemory(result.data.content);
+        setWorkingMemoryEditing(false);
+        toast.success("Working Memory가 저장되었습니다");
+      } else {
+        toast.error(result.error || "저장 실패");
+      }
+    } catch (error) {
+      console.error("Working Memory 저장 실패:", error);
+      toast.error("저장에 실패했습니다");
+    } finally {
+      setWorkingMemorySaving(false);
+    }
+  }
+
+  async function handleResetWorkingMemory() {
+    const confirmed = await confirm({
+      title: "Working Memory 초기화",
+      description: "AI가 기억하고 있는 사용자 정보를 모두 삭제합니다. 계속하시겠습니까?",
+      confirmLabel: "초기화",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch("/api/settings/working-memory", {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (result.success) {
+        setWorkingMemory("");
+        setWorkingMemoryEditing(false);
+        toast.success("Working Memory가 초기화되었습니다");
+      } else {
+        toast.error(result.error || "초기화 실패");
+      }
+    } catch (error) {
+      console.error("Working Memory 초기화 실패:", error);
+      toast.error("초기화에 실패했습니다");
+    }
+  }
+
+  function startEditingWorkingMemory() {
+    setWorkingMemoryDraft(workingMemory || workingMemoryTemplate);
+    setWorkingMemoryEditing(true);
+  }
+
+  function cancelEditingWorkingMemory() {
+    setWorkingMemoryEditing(false);
+    setWorkingMemoryDraft("");
+  }
+
+  // 커스텀 지시사항 관련 함수들
+  async function checkCustomInstructions() {
+    try {
+      const response = await fetch("/api/settings/neuro-prompt");
+      const result = await response.json();
+      if (result.success) {
+        setCustomInstructions(result.data.customInstructions || "");
+      }
+    } catch (error) {
+      console.error("커스텀 지시사항 확인 실패:", error);
+    } finally {
+      setCustomInstructionsLoading(false);
+    }
+  }
+
+  async function handleSaveCustomInstructions() {
+    setCustomInstructionsSaving(true);
+    try {
+      const response = await fetch("/api/settings/neuro-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ customInstructions: customInstructionsDraft }),
+      });
+      const result = await response.json();
+      if (result.success) {
+        setCustomInstructions(result.data.customInstructions);
+        setCustomInstructionsEditing(false);
+        toast.success("AI 지시사항이 저장되었습니다");
+      } else {
+        toast.error(result.error || "저장 실패");
+      }
+    } catch (error) {
+      console.error("커스텀 지시사항 저장 실패:", error);
+      toast.error("저장에 실패했습니다");
+    } finally {
+      setCustomInstructionsSaving(false);
+    }
+  }
+
+  async function handleResetCustomInstructions() {
+    const confirmed = await confirm({
+      title: "AI 지시사항 초기화",
+      description: "커스텀 지시사항을 모두 삭제하고 기본 설정으로 되돌립니다. 계속하시겠습니까?",
+      confirmLabel: "초기화",
+    });
+
+    if (!confirmed) return;
+
+    try {
+      const response = await fetch("/api/settings/neuro-prompt", {
+        method: "DELETE",
+      });
+      const result = await response.json();
+      if (result.success) {
+        setCustomInstructions("");
+        setCustomInstructionsEditing(false);
+        toast.success("AI 지시사항이 초기화되었습니다");
+      } else {
+        toast.error(result.error || "초기화 실패");
+      }
+    } catch (error) {
+      console.error("커스텀 지시사항 초기화 실패:", error);
+      toast.error("초기화에 실패했습니다");
+    }
+  }
+
+  function startEditingCustomInstructions() {
+    setCustomInstructionsDraft(customInstructions);
+    setCustomInstructionsEditing(true);
+  }
+
+  function cancelEditingCustomInstructions() {
+    setCustomInstructionsEditing(false);
+    setCustomInstructionsDraft("");
   }
 
   async function handleSaveAiModel(modelId: string) {
@@ -1450,6 +1619,188 @@ function SettingsContent() {
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Working Memory - GCP 연동 시에만 표시 */}
+            {gcpConnected && (
+              <div className="bg-muted rounded-lg p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold">Working Memory</h3>
+                  {!workingMemoryLoading && workingMemory && !workingMemoryEditing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetWorkingMemory}
+                      className="text-destructive hover:text-destructive cursor-pointer h-7 px-2"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      초기화
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1 mb-3">
+                  AI가 대화를 통해 기억하는 사용자 정보입니다. 세션이 바뀌어도 유지됩니다.
+                </p>
+
+                {workingMemoryLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner size="sm" />
+                    <span>로딩 중...</span>
+                  </div>
+                ) : workingMemoryEditing ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={workingMemoryDraft}
+                      onChange={(e) => setWorkingMemoryDraft(e.target.value)}
+                      className="w-full h-48 px-3 py-2 text-sm font-mono rounded-md border border-input bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder={workingMemoryTemplate}
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSaveWorkingMemory}
+                        disabled={workingMemorySaving}
+                        size="sm"
+                        className="cursor-pointer"
+                      >
+                        {workingMemorySaving ? (
+                          <span className="flex items-center gap-2">
+                            <Spinner size="sm" />
+                            저장 중...
+                          </span>
+                        ) : "저장"}
+                      </Button>
+                      <Button
+                        onClick={cancelEditingWorkingMemory}
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer"
+                        disabled={workingMemorySaving}
+                      >
+                        취소
+                      </Button>
+                    </div>
+                  </div>
+                ) : workingMemory ? (
+                  <div className="space-y-3">
+                    <pre className="w-full p-3 text-sm font-mono rounded-md border border-border bg-background whitespace-pre-wrap break-words">
+                      {workingMemory}
+                    </pre>
+                    <Button
+                      onClick={startEditingWorkingMemory}
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                    >
+                      편집
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground italic">
+                      아직 저장된 정보가 없습니다. AI와 대화하면 자동으로 정보가 수집됩니다.
+                    </p>
+                    <Button
+                      onClick={startEditingWorkingMemory}
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                    >
+                      직접 입력
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* AI 커스텀 지시사항 - GCP 연동 시에만 표시 */}
+            {gcpConnected && (
+              <div className="bg-muted rounded-lg p-4">
+                <div className="flex items-center justify-between mb-1">
+                  <h3 className="font-semibold">AI 지시사항</h3>
+                  {!customInstructionsLoading && customInstructions && !customInstructionsEditing && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleResetCustomInstructions}
+                      className="text-destructive hover:text-destructive cursor-pointer h-7 px-2"
+                    >
+                      <Trash2 className="h-3.5 w-3.5 mr-1" />
+                      초기화
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground mt-1 mb-3">
+                  Neuro에게 추가 지시사항을 설정하세요. 기본 시스템 프롬프트 뒤에 추가됩니다.
+                </p>
+
+                {customInstructionsLoading ? (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <Spinner size="sm" />
+                    <span>로딩 중...</span>
+                  </div>
+                ) : customInstructionsEditing ? (
+                  <div className="space-y-3">
+                    <textarea
+                      value={customInstructionsDraft}
+                      onChange={(e) => setCustomInstructionsDraft(e.target.value)}
+                      className="w-full h-48 px-3 py-2 text-sm rounded-md border border-input bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
+                      placeholder="예: 항상 반말로 대답해줘. / 코드 예시를 많이 포함해줘. / 답변은 3문장 이내로 간결하게."
+                    />
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleSaveCustomInstructions}
+                        disabled={customInstructionsSaving}
+                        size="sm"
+                        className="cursor-pointer"
+                      >
+                        {customInstructionsSaving ? (
+                          <span className="flex items-center gap-2">
+                            <Spinner size="sm" />
+                            저장 중...
+                          </span>
+                        ) : "저장"}
+                      </Button>
+                      <Button
+                        onClick={cancelEditingCustomInstructions}
+                        variant="outline"
+                        size="sm"
+                        className="cursor-pointer"
+                        disabled={customInstructionsSaving}
+                      >
+                        취소
+                      </Button>
+                    </div>
+                  </div>
+                ) : customInstructions ? (
+                  <div className="space-y-3">
+                    <pre className="w-full p-3 text-sm rounded-md border border-border bg-background whitespace-pre-wrap break-words">
+                      {customInstructions}
+                    </pre>
+                    <Button
+                      onClick={startEditingCustomInstructions}
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                    >
+                      편집
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground italic">
+                      아직 설정된 지시사항이 없습니다. 추가하면 Neuro가 더 맞춤화된 응답을 제공합니다.
+                    </p>
+                    <Button
+                      onClick={startEditingCustomInstructions}
+                      variant="outline"
+                      size="sm"
+                      className="cursor-pointer"
+                    >
+                      지시사항 추가
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
           </div>

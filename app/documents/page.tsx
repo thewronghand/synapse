@@ -16,6 +16,7 @@ import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import { Pagination } from "@/components/ui/Pagination";
+import { useNotesWatcher } from "@/hooks/useNotesWatcher";
 
 interface SearchResult {
   title: string;
@@ -54,15 +55,39 @@ function DocumentsContent() {
     selectedFolder: null as string | null,
   });
 
+  const fetchDocuments = useCallback(async () => {
+    try {
+      const res = await fetch("/api/documents");
+      const data = await res.json();
+
+      if (data.success) {
+        setDocuments(data.data.documents);
+      }
+    } catch (err) {
+      console.error("Failed to fetch documents:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   useEffect(() => {
     fetchDocuments();
-  }, []);
+  }, [fetchDocuments]);
 
   // Fetch tags and titles (folder-scoped) when folder changes
   useEffect(() => {
     fetchTags(selectedFolder);
     fetchTitles(selectedFolder);
   }, [selectedFolder]);
+
+  // 파일 와처: 노트 변경 시 자동 새로고침
+  useNotesWatcher({
+    onNotesChanged: useCallback(() => {
+      fetchDocuments();
+      fetchTags(selectedFolder);
+      fetchTitles(selectedFolder);
+    }, [fetchDocuments, selectedFolder]),
+  });
 
   // Debounce search input
   useEffect(() => {
@@ -162,21 +187,6 @@ function DocumentsContent() {
       setSelectedFolder(null);
     }
   }, [searchParams]);
-
-  async function fetchDocuments() {
-    try {
-      const res = await fetch("/api/documents");
-      const data = await res.json();
-
-      if (data.success) {
-        setDocuments(data.data.documents);
-      }
-    } catch (err) {
-      console.error("Failed to fetch documents:", err);
-    } finally {
-      setIsLoading(false);
-    }
-  }
 
   async function fetchTags(folder: string | null) {
     try {

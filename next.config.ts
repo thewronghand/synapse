@@ -6,6 +6,9 @@ const nextConfig: NextConfig = {
   output: 'standalone',
   serverExternalPackages: [
     "@mastra/core",
+    "@mastra/memory",
+    "@mastra/libsql",
+    "@mastra/ai-sdk",
     "@mastra/voice-google",
     "@ai-sdk/google-vertex",
     "@google-cloud/speech",

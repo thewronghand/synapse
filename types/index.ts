@@ -114,6 +114,25 @@ export interface ChatMessage {
   role: "user" | "assistant" | "system";
   content: string;
   createdAt: string; // ISO 8601
+  /** Tool 호출 정보 (assistant 메시지에서 사용) */
+  toolInvocations?: ToolInvocation[];
+}
+
+/** Tool 호출 상태 (AI SDK v6 Data Stream Protocol) */
+export type ToolInvocationState =
+  | "input-streaming"    // Tool 인자 생성 중
+  | "input-available"    // Tool 인자 완료, 실행 중
+  | "output-available"   // Tool 실행 완료
+  | "output-error";      // Tool 실행 에러
+
+/** Tool 호출 정보 */
+export interface ToolInvocation {
+  toolCallId: string;
+  toolName: string;
+  state: ToolInvocationState;
+  input?: Record<string, unknown>;  // Tool 인자 (args)
+  output?: unknown;                  // Tool 결과
+  errorText?: string;                // 에러 메시지
 }
 
 export interface ChatSession {
@@ -122,6 +141,8 @@ export interface ChatSession {
   createdAt: string; // ISO 8601
   updatedAt: string; // ISO 8601
   messages: ChatMessage[];
+  pendingResponse?: boolean; // AI 응답 대기 중 여부
+  titleGenerated?: boolean; // AI가 제목을 생성했는지 여부
 }
 
 export interface ChatSessionMeta {
@@ -142,4 +163,29 @@ export interface PublishConfig {
   enabled: boolean;
   deploymentUrl?: string;
   lastPublishedAt?: Date;
+}
+
+// Electron IPC types
+
+export interface NotesChangedEvent {
+  event: "add" | "change" | "unlink" | "addDir" | "unlinkDir";
+  folder: string;
+  filename: string;
+  path: string;
+}
+
+// Electron window API
+declare global {
+  interface Window {
+    electron?: {
+      platform: string;
+      onNavBack: (callback: () => void) => void;
+      onNavForward: (callback: () => void) => void;
+      removeNavListeners: () => void;
+      onToggleFind: (callback: () => void) => void;
+      removeToggleFind: () => void;
+      onNotesChanged: (callback: (data: NotesChangedEvent) => void) => void;
+      removeNotesChangedListener: () => void;
+    };
+  }
 }
