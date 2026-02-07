@@ -1,12 +1,13 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { cn } from "@/lib/utils";
 import { Plus, X, Check, Pencil } from "lucide-react";
 import { isPublishedMode } from "@/lib/env";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
 import { useConfirm } from "@/components/ui/confirm-provider";
+import { useNotesWatcher } from "@/hooks/useNotesWatcher";
 
 interface FolderInfo {
   name: string;
@@ -42,7 +43,7 @@ export function FolderTabs({
   const confirm = useConfirm();
   const published = isPublishedMode();
 
-  async function fetchFolders() {
+  const fetchFolders = useCallback(async () => {
     try {
       const res = await fetch("/api/folders");
       const data = await res.json();
@@ -59,11 +60,16 @@ export function FolderTabs({
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     fetchFolders();
-  }, []);
+  }, [fetchFolders]);
+
+  // 파일 와처: 노트/폴더 변경 시 자동 새로고침
+  useNotesWatcher({
+    onNotesChanged: fetchFolders,
+  });
 
   // Auto-select first folder when hideAllTab is true and no folder selected
   useEffect(() => {

@@ -3,19 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, ChevronUp, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-
-declare global {
-  interface Window {
-    electron?: {
-      platform: string;
-      onNavBack: (callback: () => void) => void;
-      onNavForward: (callback: () => void) => void;
-      removeNavListeners: () => void;
-      onToggleFind: (callback: () => void) => void;
-      removeToggleFind: () => void;
-    };
-  }
-}
+import "@/types"; // Electron window 타입 import
 
 // 텍스트 노드 수집 (검색 대상)
 function getTextNodes(root: Element): Text[] {

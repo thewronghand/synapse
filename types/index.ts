@@ -145,3 +145,28 @@ export interface PublishConfig {
   deploymentUrl?: string;
   lastPublishedAt?: Date;
 }
+
+// Electron IPC types
+
+export interface NotesChangedEvent {
+  event: "add" | "change" | "unlink" | "addDir" | "unlinkDir";
+  folder: string;
+  filename: string;
+  path: string;
+}
+
+// Electron window API
+declare global {
+  interface Window {
+    electron?: {
+      platform: string;
+      onNavBack: (callback: () => void) => void;
+      onNavForward: (callback: () => void) => void;
+      removeNavListeners: () => void;
+      onToggleFind: (callback: () => void) => void;
+      removeToggleFind: () => void;
+      onNotesChanged: (callback: (data: NotesChangedEvent) => void) => void;
+      removeNotesChangedListener: () => void;
+    };
+  }
+}

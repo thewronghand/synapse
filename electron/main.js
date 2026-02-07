@@ -3,8 +3,10 @@ const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
 const net = require('net');
+const chokidar = require('chokidar');
 
 let mainWindow;
+let notesWatcher = null;
 let nextServer;
 // Use app.isPackaged to reliably detect if app is packaged or in development
 const isDev = !app.isPackaged;
@@ -298,6 +300,102 @@ function createMenu() {
 // Find in page: 검색 자체는 프론트엔드 CSS Highlight API로 처리
 // 메인 프로세스는 Cmd+F 메뉴 단축키 → toggle-find 이벤트 전송만 담당
 
+// 파일 와처: 노트 폴더 변경 감지 → renderer에 이벤트 전송
+function startNotesWatcher(notesDir) {
+  if (notesWatcher) {
+    notesWatcher.close();
+  }
+
+  console.log('[FileWatcher] Starting watcher for:', notesDir);
+
+  // chokidar 설정
+  notesWatcher = chokidar.watch(notesDir, {
+    ignored: [
+      /(^|[\/\\])\../,  // .으로 시작하는 파일/폴더 무시 (.trash 등)
+      /node_modules/,
+    ],
+    persistent: true,
+    ignoreInitial: true,  // 초기 스캔 이벤트 무시
+    awaitWriteFinish: {   // 파일 쓰기 완료 대기
+      stabilityThreshold: 300,
+      pollInterval: 100,
+    },
+  });
+
+  // 디바운스용 타이머 - 파일 경로별로 관리하여 서로 다른 파일/이벤트가 씹히지 않도록
+  const debounceTimers = new Map();
+  const DEBOUNCE_MS = 300;
+
+  function notifyChange(event, filePath) {
+    // .md 파일만 처리
+    if (!filePath.endsWith('.md')) return;
+
+    // 파일 경로 + 이벤트 타입별 디바운스: 같은 파일의 같은 이벤트만 합침
+    // 예: unlink와 add가 동시에 발생해도 각각 전송됨
+    const timerKey = `${event}:${filePath}`;
+    if (debounceTimers.has(timerKey)) {
+      clearTimeout(debounceTimers.get(timerKey));
+    }
+
+    debounceTimers.set(timerKey, setTimeout(() => {
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const relativePath = path.relative(notesDir, filePath);
+        const folder = path.dirname(relativePath);
+        const filename = path.basename(filePath);
+
+        console.log(`[FileWatcher] ${event}: ${relativePath}`);
+        mainWindow.webContents.send('notes-changed', {
+          event,  // 'add' | 'change' | 'unlink'
+          folder: folder === '.' ? '' : folder,
+          filename,
+          path: relativePath,
+        });
+      }
+      debounceTimers.delete(timerKey);
+    }, DEBOUNCE_MS));
+  }
+
+  notesWatcher
+    .on('add', (filePath) => notifyChange('add', filePath))
+    .on('change', (filePath) => notifyChange('change', filePath))
+    .on('unlink', (filePath) => notifyChange('unlink', filePath))
+    .on('addDir', (dirPath) => {
+      // 폴더 추가 시에도 알림 (폴더 목록 새로고침용)
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const relativePath = path.relative(notesDir, dirPath);
+        if (relativePath && !relativePath.startsWith('.')) {
+          console.log(`[FileWatcher] addDir: ${relativePath}`);
+          mainWindow.webContents.send('notes-changed', {
+            event: 'addDir',
+            folder: relativePath,
+            filename: '',
+            path: relativePath,
+          });
+        }
+      }
+    })
+    .on('unlinkDir', (dirPath) => {
+      // 폴더 삭제 시에도 알림
+      if (mainWindow && !mainWindow.isDestroyed()) {
+        const relativePath = path.relative(notesDir, dirPath);
+        if (relativePath && !relativePath.startsWith('.')) {
+          console.log(`[FileWatcher] unlinkDir: ${relativePath}`);
+          mainWindow.webContents.send('notes-changed', {
+            event: 'unlinkDir',
+            folder: relativePath,
+            filename: '',
+            path: relativePath,
+          });
+        }
+      }
+    })
+    .on('error', (error) => {
+      console.error('[FileWatcher] Error:', error);
+    });
+
+  console.log('[FileWatcher] Watcher started successfully');
+}
+
 function startNextServer() {
   return new Promise((resolve, reject) => {
     if (isDev) {
@@ -407,6 +505,11 @@ app.whenReady().then(async () => {
     createMenu();
     createWindow();
 
+    // 파일 와처 시작
+    const documentsPath = app.getPath('documents');
+    const notesDir = path.join(documentsPath, 'Synapse', 'notes');
+    startNotesWatcher(notesDir);
+
     app.on('activate', () => {
       if (BrowserWindow.getAllWindows().length === 0) {
         createWindow();
@@ -425,6 +528,10 @@ app.on('window-all-closed', () => {
 });
 
 app.on('quit', () => {
+  if (notesWatcher) {
+    notesWatcher.close();
+    notesWatcher = null;
+  }
   if (nextServer) {
     nextServer.kill();
   }

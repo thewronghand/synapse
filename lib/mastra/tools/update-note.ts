@@ -14,6 +14,7 @@ import { getNotesDir } from "@/lib/notes-path";
 import { documentCache } from "@/lib/document-cache";
 import { tagCache } from "@/lib/tag-cache";
 import { graphCache } from "@/lib/graph-cache";
+import { fileLock } from "@/lib/file-lock";
 
 const NOTES_DIR = getNotesDir();
 
@@ -45,6 +46,8 @@ export const updateNoteTool = createTool({
     message: z.string(),
   }),
   execute: async ({ title, folder: targetFolder, content, newTitle, appendContent }) => {
+    // 파일별 락을 사용하여 동시 수정 방지
+    return fileLock.withLock(`note:${title}`, async () => {
     try {
       const requestedTitle = title.normalize("NFC");
 
@@ -148,6 +151,7 @@ export const updateNoteTool = createTool({
         message: `노트 수정 중 오류가 발생했습니다: ${error}`,
       };
     }
+    }); // fileLock.withLock 종료
   },
 });
 

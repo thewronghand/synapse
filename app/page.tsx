@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useState } from "react";
+import { Suspense, useEffect, useState, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Graph, DigitalGardenNode, GraphEdge } from "@/types";
@@ -11,6 +11,7 @@ import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
 import { List, Plus, Ghost } from "lucide-react";
 import { MobileMenuItem } from "@/components/layout/AppHeader";
+import { useNotesWatcher } from "@/hooks/useNotesWatcher";
 
 // Filter graph nodes and links by folder
 function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
@@ -113,13 +114,10 @@ function HomeContent() {
     return () => window.removeEventListener('resize', handleResize);
   }, []);
 
-  useEffect(() => {
-    fetchGraph();
-  }, []);
-
-  async function fetchGraph() {
+  const fetchGraph = useCallback(async (refresh = false) => {
     try {
-      const res = await fetch("/api/graph");
+      const url = refresh ? "/api/graph?refresh=true" : "/api/graph";
+      const res = await fetch(url);
       const data = await res.json();
 
       if (data.success) {
@@ -130,7 +128,21 @@ function HomeContent() {
     } finally {
       setIsLoading(false);
     }
-  }
+  }, []);
+
+  useEffect(() => {
+    fetchGraph();
+  }, [fetchGraph]);
+
+  // 파일 와처: 노트 변경 시 그래프 자동 새로고침
+  // 파일 생성/삭제/수정 시에는 캐시 강제 리프레시
+  useNotesWatcher({
+    onNotesChanged: (event) => {
+      const needsRefresh = ["add", "addDir", "unlink", "unlinkDir", "change"].includes(event.event);
+      console.log(`[HomePage] Notes changed: ${event.event}, refresh=${needsRefresh}`, event);
+      fetchGraph(needsRefresh);
+    },
+  });
 
   function handleFolderChange(folder: string | null) {
     if (folder) {

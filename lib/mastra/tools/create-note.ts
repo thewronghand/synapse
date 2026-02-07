@@ -9,6 +9,7 @@ import { documentCache } from "@/lib/document-cache";
 import { tagCache } from "@/lib/tag-cache";
 import { graphCache } from "@/lib/graph-cache";
 import { DEFAULT_FOLDER_NAME } from "@/lib/folder-utils";
+import { fileLock } from "@/lib/file-lock";
 
 const NOTES_DIR = getNotesDir();
 
@@ -40,6 +41,8 @@ export const createNoteTool = createTool({
     message: z.string(),
   }),
   execute: async ({ title, content, folder = DEFAULT_FOLDER_NAME, tags }) => {
+    // 파일별 락을 사용하여 동시 생성 방지
+    return fileLock.withLock(`note:${title}`, async () => {
     try {
       const normalizedTitle = title.normalize("NFC").trim();
 
@@ -111,5 +114,6 @@ export const createNoteTool = createTool({
         message: `노트 생성 중 오류가 발생했습니다: ${error}`,
       };
     }
+    }); // fileLock.withLock 종료
   },
 });

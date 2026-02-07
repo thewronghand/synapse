@@ -10,6 +10,7 @@ import { createNoteTool } from "./create-note";
 import { updateNoteTool } from "./update-note";
 import { deleteNoteTool } from "./delete-note";
 import { moveNoteTool } from "./move-note";
+import { deleteFolderTool } from "./delete-folder";
 
 /**
  * 모든 Tools를 하나의 객체로 export
@@ -24,4 +25,5 @@ export const neuroTools = {
   updateNote: updateNoteTool,
   deleteNote: deleteNoteTool,
   moveNote: moveNoteTool,
+  deleteFolder: deleteFolderTool,
 };

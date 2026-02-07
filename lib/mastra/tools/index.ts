@@ -10,6 +10,7 @@
  * - updateNote: 문서 수정
  * - deleteNote: 문서 삭제 (소프트 딜리트 - .trash 폴더로 이동)
  * - moveNote: 문서를 다른 폴더로 이동
+ * - deleteFolder: 폴더 삭제
  */
 
 export { listFoldersTool } from "./list-folders";
@@ -20,6 +21,7 @@ export { createNoteTool } from "./create-note";
 export { updateNoteTool } from "./update-note";
 export { deleteNoteTool } from "./delete-note";
 export { moveNoteTool } from "./move-note";
+export { deleteFolderTool } from "./delete-folder";
 
 // 모든 Tools를 하나의 객체로 export
 export { neuroTools } from "./all-tools";

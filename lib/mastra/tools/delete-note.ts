@@ -13,6 +13,7 @@ import { getNotesDir } from "@/lib/notes-path";
 import { documentCache } from "@/lib/document-cache";
 import { graphCache } from "@/lib/graph-cache";
 import { tagCache } from "@/lib/tag-cache";
+import { fileLock } from "@/lib/file-lock";
 
 const NOTES_DIR = getNotesDir();
 const TRASH_FOLDER = ".trash";
@@ -44,6 +45,8 @@ export const deleteNoteTool = createTool({
     message: z.string(),
   }),
   execute: async ({ title, folder: targetFolder, permanent = false }) => {
+    // 파일별 락을 사용하여 동시 삭제 방지
+    return fileLock.withLock(`note:${title}`, async () => {
     try {
       const requestedTitle = title.normalize("NFC");
 
@@ -104,6 +107,7 @@ export const deleteNoteTool = createTool({
         message: `노트 삭제 중 오류가 발생했습니다: ${error}`,
       };
     }
+    }); // fileLock.withLock 종료
   },
 });
 

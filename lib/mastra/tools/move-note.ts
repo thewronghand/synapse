@@ -12,6 +12,8 @@ import {
 } from "@/lib/document-parser";
 import { getNotesDir } from "@/lib/notes-path";
 import { documentCache } from "@/lib/document-cache";
+import { graphCache } from "@/lib/graph-cache";
+import { fileLock } from "@/lib/file-lock";
 
 const NOTES_DIR = getNotesDir();
 
@@ -36,6 +38,8 @@ export const moveNoteTool = createTool({
     message: z.string(),
   }),
   execute: async ({ title, fromFolder, toFolder }) => {
+    // 파일별 락을 사용하여 동시 이동 방지
+    return fileLock.withLock(`note:${title}`, async () => {
     try {
       const requestedTitle = title.normalize("NFC");
 
@@ -69,6 +73,9 @@ export const moveNoteTool = createTool({
       // 캐시 업데이트
       documentCache.updateDocument(found.currentTitle, found.currentTitle, found.filename, toFolder);
 
+      // 그래프 캐시도 무효화 (폴더 이동 시 그래프 재생성 필요)
+      graphCache.invalidate();
+
       console.log(`[moveNote] Moved: ${found.currentTitle} from ${fromFolder} to ${toFolder}`);
 
       return {
@@ -85,6 +92,7 @@ export const moveNoteTool = createTool({
         message: `노트 이동 중 오류가 발생했습니다: ${error}`,
       };
     }
+    }); // fileLock.withLock 종료
   },
 });
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useEffect, useState, useMemo, useCallback } from "react";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
@@ -30,6 +30,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useNotesWatcher } from "@/hooks/useNotesWatcher";
 
 // Filter graph to only include nodes and links from the same folder
 function filterGraphByFolder(graph: Graph, folder: string): Graph {
@@ -70,10 +71,13 @@ function filterGraphByFolder(graph: Graph, folder: string): Graph {
 export default function NotePage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { theme, setTheme } = useTheme();
   // Decode URL-encoded title (slug is now the title)
   const slug = params.slug as string;
   const title = decodeURIComponent(slug);
+  // folder 쿼리 파라미터 (위키링크 클릭 시 폴더 격리를 위해 사용)
+  const folderParam = searchParams.get('folder');
 
   const [document, setDocument] = useState<Document | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
@@ -112,60 +116,71 @@ export default function NotePage() {
     return () => window.removeEventListener("resize", calculateHeight);
   }, []);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        // Fetch document and graph in parallel
-        // Use encodeURIComponent to handle special characters in title
-        const [docRes, graphRes] = await Promise.all([
-          fetch(`/api/documents/${encodeURIComponent(title)}`),
-          fetch(`/api/graph`),
-        ]);
+  const fetchData = useCallback(async () => {
+    try {
+      // Fetch document and graph in parallel
+      // Use encodeURIComponent to handle special characters in title
+      // folderParam이 있으면 해당 폴더에서만 검색 (폴더 격리)
+      const docUrl = folderParam
+        ? `/api/documents/${encodeURIComponent(title)}?folder=${encodeURIComponent(folderParam)}`
+        : `/api/documents/${encodeURIComponent(title)}`;
 
-        const docData = await docRes.json();
-        const graphData = await graphRes.json();
+      const [docRes, graphRes] = await Promise.all([
+        fetch(docUrl),
+        fetch(`/api/graph`),
+      ]);
 
-        if (docData.success) {
-          const doc = docData.data.document;
-          setDocument(doc);
+      const docData = await docRes.json();
+      const graphData = await graphRes.json();
 
-          // Fetch folder-scoped titles for wiki link validation
-          const folder = doc.folder || "default";
-          const titlesRes = await fetch(
-            `/api/documents/titles?folder=${encodeURIComponent(folder)}`,
-          );
-          const titlesData = await titlesRes.json();
-          if (titlesData.success) {
-            setFolderTitles(titlesData.data.titles || []);
-          }
-        } else {
-          setError("Document not found");
+      if (docData.success) {
+        const doc = docData.data.document;
+        setDocument(doc);
+
+        // Fetch folder-scoped titles for wiki link validation
+        const folder = doc.folder || "default";
+        const titlesRes = await fetch(
+          `/api/documents/titles?folder=${encodeURIComponent(folder)}`,
+        );
+        const titlesData = await titlesRes.json();
+        if (titlesData.success) {
+          setFolderTitles(titlesData.data.titles || []);
         }
-
-        if (graphData.success) {
-          // Filter graph to only show same-folder nodes and links
-          const currentFolder = docData.success
-            ? docData.data.document.folder || "default"
-            : "default";
-          const filteredGraph = filterGraphByFolder(
-            graphData.data,
-            currentFolder,
-          );
-          setGraph(filteredGraph);
-        }
-      } catch (err) {
-        setError("Failed to load document");
-      } finally {
-        setIsLoading(false);
+      } else {
+        setError("Document not found");
       }
+
+      if (graphData.success) {
+        // Filter graph to only show same-folder nodes and links
+        const currentFolder = docData.success
+          ? docData.data.document.folder || "default"
+          : "default";
+        const filteredGraph = filterGraphByFolder(
+          graphData.data,
+          currentFolder,
+        );
+        setGraph(filteredGraph);
+      }
+    } catch (err) {
+      setError("Failed to load document");
+    } finally {
+      setIsLoading(false);
     }
+  }, [title, folderParam]);
 
+  useEffect(() => {
     fetchData();
-  }, [title]);
+  }, [fetchData]);
 
-  // Wiki link click handler - navigate using encoded title
+  // 파일 와처: 현재 문서 변경 시 자동 새로고침
+  useNotesWatcher({
+    onNotesChanged: fetchData,
+  });
+
+  // Wiki link click handler - navigate using encoded title with folder context
   function handleWikiLinkClick(pageName: string) {
-    router.push(`/note/${encodeURIComponent(pageName)}`);
+    const currentFolder = document?.folder || 'default';
+    router.push(`/note/${encodeURIComponent(pageName)}?folder=${encodeURIComponent(currentFolder)}`);
   }
 
   async function handleDelete() {
@@ -213,13 +228,19 @@ export default function NotePage() {
   if (error || !document) {
     // Display the decoded title for user-friendly error message
     const displayTitle = title;
+    const displayFolder = folderParam || 'default';
 
     return (
       <div className="flex min-h-screen items-center justify-center">
         <div className="text-center">
           <h1 className="text-2xl font-bold mb-2">"{displayTitle}"</h1>
+          {folderParam && (
+            <p className="text-sm text-muted-foreground mb-2">
+              폴더: <span className="font-medium">{displayFolder}</span>
+            </p>
+          )}
           <p className="text-lg text-muted-foreground mb-6">
-            문서가 존재하지 않습니다
+            {folderParam ? '이 폴더에 문서가 존재하지 않습니다' : '문서가 존재하지 않습니다'}
           </p>
           <div className="flex gap-3 justify-center">
             <Button
@@ -233,12 +254,12 @@ export default function NotePage() {
               <Button
                 onClick={() =>
                   router.push(
-                    `/editor/new?title=${encodeURIComponent(displayTitle)}`,
+                    `/editor/new?title=${encodeURIComponent(displayTitle)}&folder=${encodeURIComponent(displayFolder)}`,
                   )
                 }
                 className="cursor-pointer"
               >
-                "{displayTitle}" 문서 만들기
+                &quot;{displayFolder}&quot; 폴더에 문서 만들기
               </Button>
             )}
           </div>
