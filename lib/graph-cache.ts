@@ -11,6 +11,7 @@ import {
 import { getNotesDir } from './notes-path';
 import { isPublishedMode } from './env';
 import { Graph, GraphEdge, DigitalGardenNode } from '@/types';
+import { TRASH_FOLDER } from './folder-utils';
 
 const NOTES_DIR = getNotesDir();
 
@@ -73,7 +74,8 @@ class GraphCache {
 
     try {
       const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
-      const folders = entries.filter((e) => e.isDirectory());
+      // .trash 폴더는 제외 (휴지통)
+      const folders = entries.filter((e) => e.isDirectory() && e.name !== TRASH_FOLDER);
       const rootFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));
 
       this.documents.clear();

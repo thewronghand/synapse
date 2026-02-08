@@ -19,7 +19,7 @@ import { moveImagesFromTemp } from '@/lib/image-utils';
 import { moveAudioFromTemp } from '@/lib/audio-utils';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
-import { ensureDefaultFolder, DEFAULT_FOLDER_NAME } from '@/lib/folder-utils';
+import { ensureDefaultFolder, DEFAULT_FOLDER_NAME, TRASH_FOLDER } from '@/lib/folder-utils';
 
 const NOTES_DIR = getNotesDir();
 
@@ -172,7 +172,8 @@ async function getAllDocuments(folderFilter?: string): Promise<Document[]> {
   await ensureDefaultFolder();
 
   const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
-  const folders = entries.filter((e) => e.isDirectory());
+  // .trash 폴더는 제외 (휴지통)
+  const folders = entries.filter((e) => e.isDirectory() && e.name !== TRASH_FOLDER);
   const rootFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));
 
   const documentsWithoutBacklinks: Document[] = [];
