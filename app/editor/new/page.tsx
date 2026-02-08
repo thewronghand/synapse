@@ -11,8 +11,9 @@ import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { LoadingScreen } from "@/components/ui/spinner";
-import { Folder } from "lucide-react";
+import { Folder, ArrowLeft } from "lucide-react";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import { useNavigationGuard } from "@/contexts/NavigationGuardContext";
 import type { Draft } from "@/app/api/drafts/route";
 
 // 파일 시스템 금지 문자
@@ -35,7 +36,16 @@ function NewNotePageContent() {
   const [isInitialized, setIsInitialized] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirtyLocal, setIsDirtyLocal] = useState(false);
+
+  // Navigation guard context
+  const { setIsDirty: setIsDirtyContext, confirmNavigation } = useNavigationGuard();
+
+  // Sync local dirty state with context
+  const setIsDirty = useCallback((dirty: boolean) => {
+    setIsDirtyLocal(dirty);
+    setIsDirtyContext(dirty);
+  }, [setIsDirtyContext]);
 
   // 드래프트 관련 상태
   const draftSlugRef = useRef<string>(NEW_DRAFT_PREFIX);
@@ -45,7 +55,7 @@ function NewNotePageContent() {
   const [isCheckingDraft, setIsCheckingDraft] = useState(true);
 
   // 페이지 이탈 경고
-  useBeforeUnload(isDirty);
+  useBeforeUnload(isDirtyLocal);
 
   // 드래프트 저장 함수
   const saveDraft = useCallback(async () => {
@@ -241,7 +251,7 @@ ${bodyContent}`;
     }
   }
 
-  async function handleCancel() {
+  async function performCancel() {
     // Clean up temp images and draft before leaving
     if (content) {
       try {
@@ -259,6 +269,14 @@ ${bodyContent}`;
     await deleteDraft();
     setIsDirty(false);
     router.push("/documents");
+  }
+
+  function handleCancel() {
+    if (isDirtyLocal) {
+      confirmNavigation(performCancel);
+    } else {
+      performCancel();
+    }
   }
 
   // 드래프트 복구 핸들러
@@ -315,41 +333,12 @@ ${pendingDraft.content}`;
       <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="border-b bg-card p-4">
-        <div className="container mx-auto">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-4 flex-1">
-              <Button variant="outline" onClick={handleCancel} className="cursor-pointer">
-                ← 취소
-              </Button>
-              <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50">
-                <Folder className="w-3 h-3 mr-1" />
-                {folder}
-              </Badge>
-              <div className="flex-1 max-w-md">
-                <Input
-                  type="text"
-                  placeholder="노트 제목을 입력하세요..."
-                  value={title}
-                  onChange={(e) => {
-                    const newValue = e.target.value;
-                    // 금지 문자 검증
-                    if (FORBIDDEN_CHARS.test(newValue)) {
-                      setError(FORBIDDEN_CHARS_MESSAGE);
-                      return;
-                    }
-                    setTitle(newValue);
-                    setError(null);
-                    setIsDirty(true);
-                    triggerDraftSave();
-                  }}
-                  className="text-lg font-bold"
-                  autoFocus
-                />
-                {error && (
-                  <p className="text-sm text-red-600 mt-1">{error}</p>
-                )}
-              </div>
-            </div>
+        <div className="container mx-auto space-y-4">
+          {/* Top Row: Back, Theme, Save */}
+          <div className="flex items-center justify-between">
+            <Button variant="outline" size="icon" onClick={handleCancel} className="cursor-pointer">
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
             <div className="flex items-center gap-2">
               <ThemeToggle />
               <Button
@@ -360,6 +349,41 @@ ${pendingDraft.content}`;
                 {isSaving ? "저장 중..." : "저장"}
               </Button>
             </div>
+          </div>
+
+          {/* Title Section */}
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                제목
+              </label>
+              <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50">
+                <Folder className="w-3 h-3 mr-1" />
+                {folder}
+              </Badge>
+            </div>
+            <Input
+              type="text"
+              placeholder="노트 제목을 입력하세요..."
+              value={title}
+              onChange={(e) => {
+                const newValue = e.target.value;
+                // 금지 문자 검증
+                if (FORBIDDEN_CHARS.test(newValue)) {
+                  setError(FORBIDDEN_CHARS_MESSAGE);
+                  return;
+                }
+                setTitle(newValue);
+                setError(null);
+                setIsDirty(true);
+                triggerDraftSave();
+              }}
+              className="text-lg font-bold"
+              autoFocus
+            />
+            {error && (
+              <p className="text-sm text-red-600 mt-1">{error}</p>
+            )}
           </div>
 
           {/* Tags Section */}
@@ -383,45 +407,47 @@ ${pendingDraft.content}`;
       </header>
 
       {/* Editor + Preview */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 min-h-0 overflow-hidden">
-        {/* Editor */}
-        <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
-          <h2 className="text-lg font-semibold mb-2 shrink-0">Editor</h2>
-          <div className="flex-1 border rounded-lg min-h-0 overflow-hidden">
-            <MarkdownEditor
-              value={(() => {
-                // Extract body content without frontmatter
-                const frontmatterRegex = /^---\n[\s\S]*?\n---\n([\s\S]*)$/;
-                const match = content.match(frontmatterRegex);
-                return match ? match[1] : content;
-              })()}
-              onChange={(newBody) => {
-                // Update content with frontmatter + new body
-                const frontmatterRegex = /^(---\n[\s\S]*?\n---\n)/;
-                const match = content.match(frontmatterRegex);
-                if (match) {
-                  setContent(match[1] + newBody);
-                } else {
-                  setContent(newBody);
-                }
-                setIsDirty(true);
-                triggerDraftSave();
-              }}
-              folder={folder}
-            />
-          </div>
-        </div>
-
-        {/* Preview */}
-        <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
-          <h2 className="text-lg font-semibold mb-2 shrink-0">Preview</h2>
-          <div className="flex-1 border rounded-lg relative min-h-0">
-            <div className="absolute inset-0 overflow-y-auto">
-              <MarkdownViewer
-                content={content}
-                existingTitles={existingTitles}
-                isPreview
+      <div className="flex-1 p-4 min-h-0 overflow-hidden">
+        <div className="container mx-auto h-full flex flex-col lg:flex-row gap-4">
+          {/* Editor */}
+          <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
+            <h2 className="text-lg font-semibold mb-2 shrink-0">Editor</h2>
+            <div className="flex-1 border rounded-lg min-h-0 overflow-hidden">
+              <MarkdownEditor
+                value={(() => {
+                  // Extract body content without frontmatter
+                  const frontmatterRegex = /^---\n[\s\S]*?\n---\n([\s\S]*)$/;
+                  const match = content.match(frontmatterRegex);
+                  return match ? match[1] : content;
+                })()}
+                onChange={(newBody) => {
+                  // Update content with frontmatter + new body
+                  const frontmatterRegex = /^(---\n[\s\S]*?\n---\n)/;
+                  const match = content.match(frontmatterRegex);
+                  if (match) {
+                    setContent(match[1] + newBody);
+                  } else {
+                    setContent(newBody);
+                  }
+                  setIsDirty(true);
+                  triggerDraftSave();
+                }}
+                folder={folder}
               />
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
+            <h2 className="text-lg font-semibold mb-2 shrink-0">Preview</h2>
+            <div className="flex-1 border rounded-lg relative min-h-0">
+              <div className="absolute inset-0 overflow-y-auto">
+                <MarkdownViewer
+                  content={content}
+                  existingTitles={existingTitles}
+                  isPreview
+                />
+              </div>
             </div>
           </div>
         </div>

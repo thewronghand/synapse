@@ -6,8 +6,6 @@ import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import AppHeader from "@/components/layout/AppHeader";
-import { MobileMenuItem } from "@/components/layout/AppHeader";
-import { List, Network } from "lucide-react";
 import { FolderTabs } from "@/components/ui/FolderTabs";
 import { LoadingScreen } from "@/components/ui/spinner";
 
@@ -103,29 +101,7 @@ function TagsContent() {
               ? `${selectedFolder} 폴더 · ${sortedTags.length}개 태그 · ${documents.length}개 문서`
               : `전체 · ${sortedTags.length}개 태그 · ${documents.length}개 문서`
           }
-          actions={
-            <>
-              <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
-                문서 목록
-              </Button>
-              <Button variant="outline" onClick={() => router.push("/")} className="cursor-pointer">
-                그래프 뷰
-              </Button>
-            </>
-          }
-          mobileMenuItems={[
-            {
-              label: "문서 목록",
-              icon: <List className="h-4 w-4" />,
-              onClick: () => router.push("/documents"),
-            },
-            {
-              label: "그래프 뷰",
-              icon: <Network className="h-4 w-4" />,
-              onClick: () => router.push("/"),
-            },
-          ] as MobileMenuItem[]}
-        />
+                  />
       </div>
 
       {/* Folder Tabs */}
