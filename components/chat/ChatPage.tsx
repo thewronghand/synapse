@@ -32,6 +32,18 @@ export function ChatPage() {
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [gcpConnected, setGcpConnected] = useState<boolean | null>(null);
   const [mobileSessionsOpen, setMobileSessionsOpen] = useState(false);
+
+  // md 이상 화면에서는 모바일 세션 목록 자동 닫기
+  useEffect(() => {
+    const mediaQuery = window.matchMedia("(min-width: 768px)");
+    const handleChange = (e: MediaQueryListEvent) => {
+      if (e.matches && mobileSessionsOpen) {
+        setMobileSessionsOpen(false);
+      }
+    };
+    mediaQuery.addEventListener("change", handleChange);
+    return () => mediaQuery.removeEventListener("change", handleChange);
+  }, [mobileSessionsOpen]);
   const pendingMessageRef = useRef<string | null>(null);
   const [aiModelId, setAiModelId] = useState<string>("");
   const [aiModels, setAiModels] = useState<{ id: string; label: string; description: string }[]>([]);
