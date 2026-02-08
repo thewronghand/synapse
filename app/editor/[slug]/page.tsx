@@ -12,8 +12,9 @@ import { TagInput } from "@/components/ui/tag-input";
 import { ThemeToggle } from "@/components/ui/ThemeToggle";
 import { Badge } from "@/components/ui/badge";
 import { LoadingScreen } from "@/components/ui/spinner";
-import { Folder } from "lucide-react";
+import { Folder, ArrowLeft } from "lucide-react";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
+import { useNavigationGuard } from "@/contexts/NavigationGuardContext";
 import type { Draft } from "@/app/api/drafts/route";
 
 // 파일 시스템 금지 문자
@@ -37,7 +38,16 @@ export default function EditorPage() {
   const [lastSaved, setLastSaved] = useState<Date | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isDirty, setIsDirty] = useState(false);
+  const [isDirtyLocal, setIsDirtyLocal] = useState(false);
+
+  // Navigation guard context
+  const { setIsDirty: setIsDirtyContext, confirmNavigation } = useNavigationGuard();
+
+  // Sync local dirty state with context
+  const setIsDirty = useCallback((dirty: boolean) => {
+    setIsDirtyLocal(dirty);
+    setIsDirtyContext(dirty);
+  }, [setIsDirtyContext]);
 
   // 드래프트 복구 관련 상태
   const [pendingDraft, setPendingDraft] = useState<Draft | null>(null);
@@ -57,7 +67,7 @@ export default function EditorPage() {
   const updateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // 페이지 이탈 경고
-  useBeforeUnload(isDirty);
+  useBeforeUnload(isDirtyLocal);
 
   // Fetch available tags and existing titles (folder-scoped)
   useEffect(() => {
@@ -398,42 +408,62 @@ ${editorContent}`;
     <div className="flex flex-col h-screen">
       {/* Header */}
       <header className="border-b bg-card p-4">
-        <div className="container mx-auto">
-          <div className="mb-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-3 flex-1 max-w-lg">
-                <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50 shrink-0">
-                  <Folder className="w-3 h-3 mr-1" />
-                  {folder}
-                </Badge>
-                <Input
-                  key={initialTitle} // key로 초기값이 변경되면 리마운트
-                  type="text"
-                  placeholder="문서 제목을 입력하세요..."
-                  defaultValue={initialTitle}
-                  onChange={handleTitleChange}
-                  className="text-lg font-bold"
-                />
-                {error && (
-                  <p className="text-sm text-red-600 mt-1">{error}</p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <ThemeToggle />
-                <Button onClick={handleDone} className="cursor-pointer">
-                  완료
-                </Button>
-              </div>
+        <div className="container mx-auto space-y-4">
+          {/* Top Row: Back, Theme, Done */}
+          <div className="flex items-center justify-between">
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                if (isDirtyLocal) {
+                  confirmNavigation(() => router.back());
+                } else {
+                  router.back();
+                }
+              }}
+              className="cursor-pointer"
+            >
+              <ArrowLeft className="h-5 w-5" />
+            </Button>
+            <div className="flex items-center gap-2">
+              <ThemeToggle />
+              <Button onClick={handleDone} className="cursor-pointer">
+                완료
+              </Button>
             </div>
-            <p className="text-sm text-muted-foreground mt-1">
-              {isSaving ? (
-                "저장 중..."
-              ) : lastSaved ? (
-                `마지막 저장: ${lastSaved.toLocaleTimeString()}`
-              ) : (
-                "모든 변경사항 저장됨"
-              )}
-            </p>
+          </div>
+
+          {/* Title Section */}
+          <div className="max-w-2xl">
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-sm font-medium text-muted-foreground">
+                제목
+              </label>
+              <Badge variant="outline" className="text-xs font-normal bg-muted/50 text-muted-foreground border-border/50">
+                <Folder className="w-3 h-3 mr-1" />
+                {folder}
+              </Badge>
+              <span className="text-xs text-muted-foreground ml-auto">
+                {isSaving ? (
+                  "저장 중..."
+                ) : lastSaved ? (
+                  `마지막 저장: ${lastSaved.toLocaleTimeString()}`
+                ) : (
+                  "모든 변경사항 저장됨"
+                )}
+              </span>
+            </div>
+            <Input
+              key={initialTitle}
+              type="text"
+              placeholder="문서 제목을 입력하세요..."
+              defaultValue={initialTitle}
+              onChange={handleTitleChange}
+              className="text-lg font-bold"
+            />
+            {error && (
+              <p className="text-sm text-red-600 mt-1">{error}</p>
+            )}
           </div>
 
           {/* Tags Section */}
@@ -452,32 +482,34 @@ ${editorContent}`;
       </header>
 
       {/* Editor + Preview */}
-      <div className="flex-1 flex flex-col lg:flex-row gap-4 p-4 min-h-0 overflow-hidden">
-        {/* Editor */}
-        <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
-          <h2 className="text-lg font-semibold mb-2 shrink-0">편집기</h2>
-          <div className="flex-1 border rounded-lg min-h-0 overflow-hidden">
-            <MarkdownEditor
-              value={editorInitialValue}
-              onChange={handleEditorChangeWithSave}
-              folder={folder}
-            />
-          </div>
-        </div>
-
-        {/* Preview */}
-        <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
-          <h2 className="text-lg font-semibold mb-2 shrink-0">
-            미리보기
-            {isPending && <span className="ml-2 text-sm text-muted-foreground font-normal">업데이트 중...</span>}
-          </h2>
-          <div className="flex-1 border rounded-lg relative min-h-0">
-            <div className="absolute inset-0 overflow-y-auto">
-              <MarkdownViewer
-                content={previewContent}
-                existingTitles={existingTitles}
-                isPreview
+      <div className="flex-1 p-4 min-h-0 overflow-hidden">
+        <div className="container mx-auto h-full flex flex-col lg:flex-row gap-4">
+          {/* Editor */}
+          <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
+            <h2 className="text-lg font-semibold mb-2 shrink-0">편집기</h2>
+            <div className="flex-1 border rounded-lg min-h-0 overflow-hidden">
+              <MarkdownEditor
+                value={editorInitialValue}
+                onChange={handleEditorChangeWithSave}
+                folder={folder}
               />
+            </div>
+          </div>
+
+          {/* Preview */}
+          <div className="h-1/2 lg:h-auto lg:flex-1 lg:w-1/2 flex flex-col min-h-0">
+            <h2 className="text-lg font-semibold mb-2 shrink-0">
+              미리보기
+              {isPending && <span className="ml-2 text-sm text-muted-foreground font-normal">업데이트 중...</span>}
+            </h2>
+            <div className="flex-1 border rounded-lg relative min-h-0">
+              <div className="absolute inset-0 overflow-y-auto">
+                <MarkdownViewer
+                  content={previewContent}
+                  existingTitles={existingTitles}
+                  isPreview
+                />
+              </div>
             </div>
           </div>
         </div>
