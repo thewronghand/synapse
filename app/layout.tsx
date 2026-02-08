@@ -8,6 +8,8 @@ import { FindInPage } from "@/components/ui/FindInPage";
 import { NavigationHandler } from "@/components/ui/NavigationHandler";
 import { RecordingProvider } from "@/components/voice-memo/RecordingProvider";
 import { ChatOverlayProvider } from "@/components/chat/ChatOverlayProvider";
+import { NavigationGuardProvider } from "@/contexts/NavigationGuardContext";
+import { Sidebar } from "@/components/layout/Sidebar";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -58,14 +60,19 @@ export default function RootLayout({
       >
         <ThemeProvider>
           <ConfirmProvider>
-            <RecordingProvider>
-              <ChatOverlayProvider>
-                <FindInPage />
-                <NavigationHandler />
-                {children}
-                <Toaster />
-              </ChatOverlayProvider>
-            </RecordingProvider>
+            <NavigationGuardProvider>
+              <RecordingProvider>
+                <ChatOverlayProvider>
+                  <Sidebar />
+                  <div className="pl-11 md:pl-14">
+                    <FindInPage />
+                    <NavigationHandler />
+                    {children}
+                  </div>
+                  <Toaster />
+                </ChatOverlayProvider>
+              </RecordingProvider>
+            </NavigationGuardProvider>
           </ConfirmProvider>
         </ThemeProvider>
       </body>

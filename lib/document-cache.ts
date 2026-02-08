@@ -4,7 +4,7 @@ import path from 'path';
 import { parseFrontmatter, extractTitle, getTitleFromFilename } from './document-parser';
 import { getNotesDir } from './notes-path';
 import { isPublishedMode } from './env';
-import { ensureDefaultFolder, DEFAULT_FOLDER_NAME } from './folder-utils';
+import { ensureDefaultFolder, DEFAULT_FOLDER_NAME, TRASH_FOLDER } from './folder-utils';
 
 const NOTES_DIR = getNotesDir();
 
@@ -57,7 +57,8 @@ class DocumentCache {
       await ensureDefaultFolder();
 
       const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
-      const folders = entries.filter((e) => e.isDirectory());
+      // .trash 폴더는 제외 (휴지통)
+      const folders = entries.filter((e) => e.isDirectory() && e.name !== TRASH_FOLDER);
 
       // Also check for root-level md files (legacy, should be migrated)
       const rootFiles = entries.filter((e) => e.isFile() && e.name.endsWith('.md'));

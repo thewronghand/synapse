@@ -4,6 +4,7 @@ import path from 'path';
 import { getNotesDir } from './notes-path';
 
 const DEFAULT_FOLDER = 'default';
+export const TRASH_FOLDER = '.trash';
 
 export interface FolderInfo {
   name: string;
@@ -21,7 +22,8 @@ export async function getFolders(): Promise<FolderInfo[]> {
   const folders: FolderInfo[] = [];
 
   for (const entry of entries) {
-    if (entry.isDirectory()) {
+    // .trash 폴더는 제외 (휴지통)
+    if (entry.isDirectory() && entry.name !== TRASH_FOLDER) {
       const folderPath = path.join(notesDir, entry.name);
       const files = await fs.readdir(folderPath);
       const noteCount = files.filter(f => f.endsWith('.md')).length;

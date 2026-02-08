@@ -9,8 +9,7 @@ import { FolderTabs } from "@/components/ui/FolderTabs";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
-import { List, Plus, Ghost } from "lucide-react";
-import { MobileMenuItem } from "@/components/layout/AppHeader";
+import { Plus } from "lucide-react";
 import { useNotesWatcher } from "@/hooks/useNotesWatcher";
 
 // Filter graph nodes and links by folder
@@ -193,13 +192,13 @@ function HomeContent() {
                 </Button>
               ) : undefined
             }
-            mobileMenuItems={[
-              ...(!isPublishedMode() ? [{
+            mobileMenuItems={
+              !isPublishedMode() ? [{
                 label: "새 노트",
                 icon: <Plus className="h-4 w-4" />,
                 onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
-              }] : []),
-            ] as MobileMenuItem[]}
+              }] : []
+            }
           />
         </div>
 
@@ -258,42 +257,21 @@ function HomeContent() {
               : `${totalNodeCount}개 노트`
           }
           actions={
-            <>
-              <Button variant="outline" onClick={() => router.push("/documents")} className="cursor-pointer">
-                목록 보기
+            !isPublishedMode() ? (
+              <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
+                + 새 노트
               </Button>
-              {!isPublishedMode() && (
-                <>
-                  <Button variant="outline" onClick={() => router.push("/chat")} className="cursor-pointer">
-                    <Ghost className="h-4 w-4 mr-1" />
-                    Neuro
-                  </Button>
-                  <Button onClick={() => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`)} className="cursor-pointer">
-                    + 새 노트
-                  </Button>
-                </>
-              )}
-            </>
+            ) : undefined
           }
-          mobileMenuItems={[
-            {
-              label: "목록 보기",
-              icon: <List className="h-4 w-4" />,
-              onClick: () => router.push("/documents"),
-            },
-            ...(!isPublishedMode() ? [
-              {
-                label: "Neuro",
-                icon: <Ghost className="h-4 w-4" />,
-                onClick: () => router.push("/chat"),
-              },
+          mobileMenuItems={
+            !isPublishedMode() ? [
               {
                 label: "새 노트",
                 icon: <Plus className="h-4 w-4" />,
                 onClick: () => router.push(`/editor/new${selectedFolder ? `?folder=${encodeURIComponent(selectedFolder)}` : ''}`),
               },
-            ] : []),
-          ] as MobileMenuItem[]}
+            ] : []
+          }
         />
       </div>
 
