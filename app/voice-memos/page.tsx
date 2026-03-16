@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, Suspense } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { Mic, BookOpen } from "lucide-react";
+import { Mic, BookOpen, Search, ArrowUpDown } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
 import AppHeader from "@/components/layout/AppHeader";
 import { LoadingScreen } from "@/components/ui/spinner";
@@ -26,6 +27,12 @@ function VoiceMemosContent() {
   const [selectedPhraseSetName, setSelectedPhraseSetName] = useState<
     string | null
   >(null);
+
+  // 검색, 필터, 정렬
+  const [searchQuery, setSearchQuery] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "recorded" | "transcribed" | "summarized">("all");
+  type SortKey = "created-desc" | "created-asc" | "updated-desc" | "updated-asc" | "title-asc" | "title-desc" | "duration-desc" | "duration-asc";
+  const [sortBy, setSortBy] = useState<SortKey>("created-desc");
 
   // 선택된 구문 세트 이름 조회
   const fetchPhraseSetName = useCallback(async () => {
@@ -110,6 +117,53 @@ function VoiceMemosContent() {
     }
   }
 
+  // 검색 + 필터 + 정렬 적용
+  const processedMemos = useMemo(() => {
+    let result = memos;
+
+    // 상태 필터
+    if (statusFilter !== "all") {
+      result = result.filter((m) => m.status === statusFilter);
+    }
+
+    // 검색 (제목, 파일명, 전사 내용)
+    if (searchQuery.trim()) {
+      const q = searchQuery.trim().toLowerCase();
+      result = result.filter(
+        (m) =>
+          (m.title?.toLowerCase().includes(q)) ||
+          m.filename.toLowerCase().includes(q) ||
+          (m.transcript?.toLowerCase().includes(q))
+      );
+    }
+
+    // 정렬
+    result = [...result].sort((a, b) => {
+      switch (sortBy) {
+        case "created-desc":
+          return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+        case "created-asc":
+          return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+        case "updated-desc":
+          return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+        case "updated-asc":
+          return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+        case "title-asc":
+          return (a.title || a.filename).localeCompare(b.title || b.filename, "ko");
+        case "title-desc":
+          return (b.title || b.filename).localeCompare(a.title || a.filename, "ko");
+        case "duration-desc":
+          return b.duration - a.duration;
+        case "duration-asc":
+          return a.duration - b.duration;
+        default:
+          return 0;
+      }
+    });
+
+    return result;
+  }, [memos, searchQuery, statusFilter, sortBy]);
+
   if (isLoading) {
     return <LoadingScreen message="음성 메모 로딩 중..." />;
   }
@@ -159,6 +213,60 @@ function VoiceMemosContent() {
           onFolderChange={handleFolderChange}
         />
 
+        {/* 검색 + 필터 + 정렬 */}
+        {memos.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+            {/* 검색 */}
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="제목, 파일명, 녹취록 검색..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-9"
+              />
+            </div>
+
+            {/* 상태 필터 */}
+            <select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value as typeof statusFilter)}
+              className="h-9 rounded-md border border-input bg-background px-3 text-sm cursor-pointer"
+            >
+              <option value="all">전체 상태</option>
+              <option value="recorded">녹음됨</option>
+              <option value="transcribed">전사됨</option>
+              <option value="summarized">요약됨</option>
+            </select>
+
+            {/* 정렬 */}
+            <div className="flex items-center gap-1">
+              <ArrowUpDown className="h-4 w-4 text-muted-foreground shrink-0" />
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortKey)}
+                className="h-9 rounded-md border border-input bg-background px-3 text-sm cursor-pointer"
+              >
+                <option value="created-desc">최신순</option>
+                <option value="created-asc">오래된순</option>
+                <option value="updated-desc">수정 최신순</option>
+                <option value="updated-asc">수정 오래된순</option>
+                <option value="title-asc">제목 오름차순</option>
+                <option value="title-desc">제목 내림차순</option>
+                <option value="duration-desc">길이 긴순</option>
+                <option value="duration-asc">길이 짧은순</option>
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* 결과 카운트 */}
+        {memos.length > 0 && (searchQuery || statusFilter !== "all") && (
+          <p className="text-xs text-muted-foreground">
+            {processedMemos.length}개 결과 (전체 {memos.length}개)
+          </p>
+        )}
+
         {/* 메모 목록 */}
         {memos.length === 0 ? (
           <div className="text-center py-16 text-muted-foreground">
@@ -168,9 +276,14 @@ function VoiceMemosContent() {
               상단의 &quot;새 녹음&quot; 버튼으로 녹음을 시작해보세요.
             </p>
           </div>
+        ) : processedMemos.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Search className="h-8 w-8 mx-auto mb-3 opacity-30" />
+            <p className="text-sm">검색 결과가 없습니다</p>
+          </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {memos.map((memo) => (
+            {processedMemos.map((memo) => (
               <VoiceMemoCard
                 key={memo.id}
                 memo={memo}
