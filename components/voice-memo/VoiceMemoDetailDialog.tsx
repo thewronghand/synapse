@@ -27,7 +27,7 @@ export function VoiceMemoDetailDialog({
   onUpdated,
 }: VoiceMemoDetailDialogProps) {
   const [editingField, setEditingField] = useState<
-    "transcript" | "summary" | null
+    "title" | "transcript" | "summary" | null
   >(null);
   const [editValue, setEditValue] = useState("");
   const [isSaving, setIsSaving] = useState(false);
@@ -44,11 +44,15 @@ export function VoiceMemoDetailDialog({
 
   const audioSrc = `/api/audio/${encodeURIComponent(memo.folder)}/${encodeURIComponent(memo.filename)}`;
 
-  const startEdit = (field: "transcript" | "summary") => {
+  const startEdit = (field: "title" | "transcript" | "summary") => {
     setEditingField(field);
-    setEditValue(
-      field === "transcript" ? memo.transcript ?? "" : memo.summary ?? ""
-    );
+    if (field === "title") {
+      setEditValue(memo.title ?? "");
+    } else {
+      setEditValue(
+        field === "transcript" ? memo.transcript ?? "" : memo.summary ?? ""
+      );
+    }
   };
 
   const cancelEdit = () => {
@@ -66,7 +70,7 @@ export function VoiceMemoDetailDialog({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           folder: memo.folder,
-          [editingField]: editValue,
+          [editingField]: editingField === "title" ? (editValue.trim() || null) : editValue,
         }),
       });
       const patchData = await patchRes.json();
@@ -75,11 +79,12 @@ export function VoiceMemoDetailDialog({
         throw new Error(patchData.error || "저장 실패");
       }
 
-      toast.success(
-        editingField === "transcript"
-          ? "녹취록이 수정되었습니다"
-          : "요약이 수정되었습니다"
-      );
+      const messages = {
+        title: "제목이 수정되었습니다",
+        transcript: "녹취록이 수정되었습니다",
+        summary: "요약이 수정되었습니다",
+      };
+      toast.success(messages[editingField]);
       onUpdated(patchData.data);
       setEditingField(null);
       setEditValue("");
@@ -97,12 +102,67 @@ export function VoiceMemoDetailDialog({
     <Dialog open={open} onOpenChange={(isOpen) => !isOpen && onClose()}>
       <DialogContent className="sm:max-w-[600px] max-h-[80vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-lg">{memo.filename}</DialogTitle>
+          {editingField === "title" ? (
+            <div className="flex items-center gap-2">
+              <input
+                type="text"
+                value={editValue}
+                onChange={(e) => setEditValue(e.target.value)}
+                className="flex-1 text-lg font-semibold bg-transparent border-b border-border focus:border-primary focus:outline-none px-0 py-1"
+                placeholder="제목을 입력하세요"
+                autoFocus
+                disabled={isSaving}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") saveEdit();
+                  if (e.key === "Escape") cancelEdit();
+                }}
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 cursor-pointer"
+                onClick={cancelEdit}
+                disabled={isSaving}
+              >
+                <X className="h-3.5 w-3.5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 cursor-pointer"
+                onClick={saveEdit}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Check className="h-3.5 w-3.5" />
+                )}
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 group">
+              <DialogTitle className="text-lg">
+                {memo.title || memo.filename}
+              </DialogTitle>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-muted-foreground"
+                onClick={() => startEdit("title")}
+              >
+                <Pencil className="h-3.5 w-3.5" />
+              </Button>
+            </div>
+          )}
+          {editingField !== "title" && memo.title && (
+            <p className="text-xs text-muted-foreground">{memo.filename}</p>
+          )}
         </DialogHeader>
 
         <div className="space-y-4">
           {/* 오디오 플레이어 */}
-          <AudioPlayer src={audioSrc} title={memo.filename} />
+          <AudioPlayer src={audioSrc} title={memo.title || memo.filename} />
 
           {/* 요약 */}
           {memo.summary && (

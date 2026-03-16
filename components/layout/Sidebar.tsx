@@ -8,6 +8,7 @@ import {
   PenLine,
   Tags,
   AudioLines,
+  Mic,
   Ghost,
   Settings,
 } from "lucide-react";
@@ -21,12 +22,13 @@ import {
 } from "@/components/ui/tooltip";
 import { NewNoteDialog } from "@/components/layout/NewNoteDialog";
 import { useNavigationGuard } from "@/contexts/NavigationGuardContext";
+import { useRecording } from "@/components/voice-memo/RecordingProvider";
 
 interface NavItem {
   icon: React.ElementType;
   label: string;
   href?: string;
-  action?: "new-note";
+  action?: "new-note" | "start-recording";
 }
 
 const navItems: NavItem[] = [
@@ -35,6 +37,7 @@ const navItems: NavItem[] = [
   { icon: PenLine, label: "새 노트", action: "new-note" },
   { icon: Tags, label: "태그 관리", href: "/tags" },
   { icon: AudioLines, label: "음성 메모 목록", href: "/voice-memos" },
+  { icon: Mic, label: "녹음", action: "start-recording" },
   { icon: Ghost, label: "Neuro", href: "/chat" },
   { icon: Settings, label: "설정", href: "/settings" },
 ];
@@ -52,6 +55,7 @@ export function Sidebar() {
   const [newNoteOpen, setNewNoteOpen] = useState(false);
   const isPublished = isPublishedMode();
   const { confirmNavigation } = useNavigationGuard();
+  const { state: recordingState, startRecording } = useRecording();
 
   const items = isPublished ? publishedNavItems : navItems;
 
@@ -93,6 +97,31 @@ export function Sidebar() {
                   </TooltipTrigger>
                   <TooltipContent side="right">
                     <p>{item.label}</p>
+                  </TooltipContent>
+                </Tooltip>
+              );
+            }
+
+            if (item.action === "start-recording") {
+              return (
+                <Tooltip key={item.label}>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={startRecording}
+                      disabled={recordingState.isRecording}
+                      className={cn(
+                        "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors",
+                        "hover:bg-accent hover:text-accent-foreground",
+                        recordingState.isRecording
+                          ? "text-destructive"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      <Icon className="h-4 w-4 md:h-5 md:w-5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">
+                    <p>{recordingState.isRecording ? "녹음 중..." : item.label}</p>
                   </TooltipContent>
                 </Tooltip>
               );

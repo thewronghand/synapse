@@ -8,6 +8,7 @@ interface RecordingOverlayProps {
   duration: number;
   isPaused: boolean;
   analyser: AnalyserNode | null;
+  warningActive?: boolean;
   onPause: () => void;
   onResume: () => void;
   onStop: () => void;
@@ -104,6 +105,7 @@ export function RecordingOverlay({
   duration,
   isPaused,
   analyser,
+  warningActive = false,
   onPause,
   onResume,
   onStop,
@@ -126,7 +128,7 @@ export function RecordingOverlay({
       <AudioWaveform analyser={analyser} isPaused={isPaused} />
 
       {/* 녹음 시간 */}
-      <span className="text-lg font-mono font-semibold tabular-nums min-w-[60px] text-center">
+      <span className={`text-lg font-mono font-semibold tabular-nums min-w-[60px] text-center ${warningActive ? "text-destructive" : ""}`}>
         {formatDuration(duration)}
       </span>
 

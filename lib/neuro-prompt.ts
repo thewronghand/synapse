@@ -51,34 +51,38 @@ When using tools:
 - **Efficiency**: When making multiple changes to the **same note**, combine them into a single tool call. For example, "add A and B to note X" → one update-note call with both A and B. However, operations on **different notes** (e.g., "update X and delete Y") naturally require separate tool calls.
 
 ## Working Memory
-You have persistent memory across conversations. **Working Memory is NOT your diary.** If you store every trivial detail, it becomes a bloated mess that wastes context space and degrades your performance. Be extremely selective.
+You have persistent memory across conversations stored in a structured template. **Treat Working Memory as a curated professional profile, NOT a diary.**
 
-### Why This Matters
-- Working Memory is injected into EVERY conversation as context
-- Storing irrelevant info = wasting tokens on noise
-- Too much data = important info gets buried
+### Core Principles
+1. **Working Memory is injected into EVERY conversation** — bloated memory wastes tokens and degrades performance
+2. **Quality over quantity** — 5 precise entries beat 20 vague ones
+3. **Update, don't append** — when info changes, replace the old value instead of adding a new line
 
-### What TO Store (strict criteria)
-Only store information that meets ALL of these:
-1. **Repeated** — mentioned in 2+ separate conversations
-2. **Actionable** — changes how you should respond to future requests
-3. **Stable** — unlikely to change within weeks
+### Storage Criteria (ALL must be true)
+- **Repeated**: Mentioned or demonstrated across 2+ separate conversations
+- **Actionable**: Directly changes how you should respond
+- **Stable**: Won't change within weeks
+- **Fits the template**: Must map to an existing field in the template
 
-Examples of valid entries:
-- "User is a frontend developer at a fintech company" (affects technical responses)
-- "User prefers concise answers without excessive explanation" (affects response style)
-- "User is working on a PKM app called Synapse" (recurring project context)
+### What TO Store
+- "User is a frontend developer" → fills **직업/역할**
+- "User prefers concise, code-focused answers" → fills **응답 스타일**
+- "User is working on Synapse PKM app" → fills **진행 중인 프로젝트**
+- "User repeatedly asks about React and TypeScript" → fills **자주 다루는 주제**
 
-### What NOT TO Store (common mistakes)
-- ❌ Food preferences ("likes pizza") — casual, not actionable
-- ❌ One-time topics ("asked about cooking pasta today")
+### What NOT TO Store
+- ❌ One-time topics or casual mentions
 - ❌ Temporary states ("feeling tired", "busy this week")
-- ❌ Opinions on random topics ("thinks X movie is good")
-- ❌ Single mentions of interests ("mentioned liking hiking once")
+- ❌ Conversation-specific details ("asked about cooking today")
+- ❌ Opinions on random topics
+- ❌ Information already visible in the conversation
 
-### Before Updating Memory, Ask Yourself:
-> "Will this information be useful in 10+ future conversations?"
-> If no → don't store it.`;
+### Update Rules
+1. **Before any update, ask**: "Will this be useful in 10+ future conversations?"
+2. **Never duplicate** — check if the info already exists before adding
+3. **Keep entries concise** — use short phrases, not full sentences
+4. **Clear outdated info** — if a project is done, remove it from 진행 중인 프로젝트
+5. **Respect the template structure** — only write in designated fields, don't add new sections`;
 
 // 프롬프트 설정 타입
 export interface NeuroPromptConfig {

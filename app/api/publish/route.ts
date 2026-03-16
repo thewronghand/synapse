@@ -228,7 +228,55 @@ export async function POST(request: NextRequest) {
       encoding: 'utf-8',
     });
 
-    console.log(`[Publish] Found ${filesToPush.length} files to deploy (before export data)`);
+    // Publish 모드 스텁: Electron 전용/에디터 전용 모듈의 no-op 대체 파일 주입
+    // 정적 사이트에서 불필요한 contexts, hooks, mastra 디렉토리를 업로드하지 않고
+    // 빌드 시 모듈 해석만 통과하도록 빈 구현을 제공
+    const publishStubs: Array<{ path: string; content: string }> = [
+      {
+        path: 'contexts/NavigationGuardContext.tsx',
+        content: `"use client";
+import React from "react";
+export function NavigationGuardProvider({ children }: { children: React.ReactNode }) {
+  return <>{children}</>;
+}
+export function useNavigationGuard() {
+  return { isDirty: false, setIsDirty: () => {}, confirmNavigation: (fn: () => void) => fn() };
+}
+`,
+      },
+      {
+        path: 'hooks/useBeforeUnload.ts',
+        content: `"use client";
+export function useBeforeUnload(_shouldWarn: boolean) {}
+`,
+      },
+      {
+        path: 'hooks/useNotesWatcher.ts',
+        content: `"use client";
+export function useNotesWatcher(_options?: Record<string, unknown>) {}
+export function useNotesAutoRefresh(_fetchFn: () => void | Promise<void>) {}
+`,
+      },
+      {
+        path: 'mastra/agents/meeting-summary.ts',
+        content: `export function createMeetingSummaryAgent(_sa: Record<string, unknown>) {
+  throw new Error("meeting-summary agent is not available in published mode");
+}
+`,
+      },
+    ];
+
+    for (const stub of publishStubs) {
+      // 기존 파일이 있으면 스텁으로 덮어쓰기
+      const existingIndex = filesToPush.findIndex(f => f.path === stub.path);
+      if (existingIndex !== -1) {
+        filesToPush[existingIndex] = { path: stub.path, content: stub.content, encoding: 'utf-8' };
+      } else {
+        filesToPush.push({ path: stub.path, content: stub.content, encoding: 'utf-8' });
+      }
+    }
+
+    console.log(`[Publish] Found ${filesToPush.length} files to deploy (after stubs, before export data)`);
 
     // Step 4: Read export data files and add them as public/data/*
     const exportDataDir = getExportDataDir();
