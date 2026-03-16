@@ -10,10 +10,11 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 
 interface FolderSelectDialogProps {
   open: boolean;
-  onSelect: (folder: string) => void;
+  onSelect: (folder: string, title?: string) => void;
   onCancel: () => void;
 }
 
@@ -29,9 +30,13 @@ export function FolderSelectDialog({
 }: FolderSelectDialogProps) {
   const [folders, setFolders] = useState<FolderInfo[]>([]);
   const [loading, setLoading] = useState(false);
+  const [title, setTitle] = useState("");
 
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      setTitle("");
+      return;
+    }
 
     setLoading(true);
     fetch("/api/folders")
@@ -55,6 +60,17 @@ export function FolderSelectDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {/* 녹음 제목 입력 */}
+        <div className="px-1">
+          <label className="text-sm font-medium text-muted-foreground">녹음 제목 (선택)</label>
+          <Input
+            placeholder="제목을 입력하지 않으면 자동 생성됩니다"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="mt-1"
+          />
+        </div>
+
         <div className="space-y-1 max-h-[300px] overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -66,7 +82,7 @@ export function FolderSelectDialog({
                 key={folder.name}
                 variant="ghost"
                 className="w-full justify-start gap-2 h-auto py-3 cursor-pointer"
-                onClick={() => onSelect(folder.name)}
+                onClick={() => onSelect(folder.name, title.trim() || undefined)}
               >
                 <Folder className="h-4 w-4 shrink-0 text-muted-foreground" />
                 <span className="font-medium">{folder.name}</span>
