@@ -11,6 +11,7 @@ import { updateNoteTool } from "./update-note";
 import { deleteNoteTool } from "./delete-note";
 import { moveNoteTool } from "./move-note";
 import { deleteFolderTool } from "./delete-folder";
+import { graphSearchTool } from "./graph-search";
 
 /**
  * 모든 Tools를 하나의 객체로 export
@@ -26,4 +27,5 @@ export const neuroTools = {
   deleteNote: deleteNoteTool,
   moveNote: moveNoteTool,
   deleteFolder: deleteFolderTool,
+  graphSearch: graphSearchTool,
 };
