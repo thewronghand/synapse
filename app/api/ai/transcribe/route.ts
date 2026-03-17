@@ -4,6 +4,7 @@ import {
   loadGcsBucketName,
 } from "@/lib/gcp-service-account";
 import { getSelectedPhrases } from "@/lib/phrase-sets";
+import { isPublishedMode } from "@/lib/env";
 import { v2 } from "@google-cloud/speech";
 
 // chirp_3는 "us" 멀티 리전에서 모든 피처(화자 분리 포함) 지원이 확인됨
@@ -49,6 +50,13 @@ function formatDiarizedTranscript(words: WordInfo[]): string {
  * FormData: audio (File), enableDiarization ("true" | "false")
  */
 export async function POST(request: NextRequest) {
+  if (isPublishedMode()) {
+    return NextResponse.json(
+      { success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." },
+      { status: 403 }
+    );
+  }
+
   try {
     const sa = await loadGcpServiceAccount();
     if (!sa) {
