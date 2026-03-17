@@ -20,6 +20,7 @@ import { moveAudioFromTemp } from '@/lib/audio-utils';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
 import { ensureDefaultFolder, DEFAULT_FOLDER_NAME, TRASH_FOLDER } from '@/lib/folder-utils';
+import { embedDocument } from '@/lib/mastra/embedding';
 
 const NOTES_DIR = getNotesDir();
 
@@ -136,6 +137,11 @@ export async function POST(request: NextRequest) {
 
     // Get the created document
     const document = await getDocumentByTitle(extractedTitle);
+
+    // 벡터 임베딩 (백그라운드)
+    embedDocument(updatedContent, extractedTitle, folder, filename).catch((err) =>
+      console.error('[Embedding] 문서 생성 임베딩 실패:', err)
+    );
 
     return NextResponse.json({
       success: true,

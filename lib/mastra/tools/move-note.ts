@@ -14,6 +14,7 @@ import { getNotesDir } from "@/lib/notes-path";
 import { documentCache } from "@/lib/document-cache";
 import { graphCache } from "@/lib/graph-cache";
 import { fileLock } from "@/lib/file-lock";
+import { deleteDocumentEmbedding, embedDocument } from "@/lib/mastra/embedding";
 
 const NOTES_DIR = getNotesDir();
 
@@ -75,6 +76,15 @@ export const moveNoteTool = createTool({
 
       // 그래프 캐시도 무효화 (폴더 이동 시 그래프 재생성 필요)
       graphCache.invalidate();
+
+      // 벡터 임베딩 업데이트 (백그라운드: 기존 폴더 청크 삭제 → 새 폴더로 재임베딩)
+      const movedFilePath = path.join(NOTES_DIR, toFolder, found.filename);
+      deleteDocumentEmbedding(fromFolder, found.filename)
+        .then(async () => {
+          const content = await fs.readFile(movedFilePath, "utf-8");
+          await embedDocument(content, found.currentTitle, toFolder, found.filename);
+        })
+        .catch((err) => console.error("[Embedding] 문서 이동 임베딩 실패:", err));
 
       console.log(`[moveNote] Moved: ${found.currentTitle} from ${fromFolder} to ${toFolder}`);
 

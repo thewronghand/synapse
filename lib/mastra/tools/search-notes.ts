@@ -8,6 +8,7 @@ import {
   getTitleFromFilename,
 } from "@/lib/document-parser";
 import { getNotesDir } from "@/lib/notes-path";
+import { searchByEmbedding } from "@/lib/mastra/embedding";
 
 const NOTES_DIR = getNotesDir();
 
@@ -16,6 +17,7 @@ interface SearchResultItem {
   folder: string;
   snippet: string;
   tags: string[];
+  score?: number;
 }
 
 /**
@@ -45,6 +47,7 @@ export const searchNotesTool = createTool({
         folder: z.string(),
         snippet: z.string(),
         tags: z.array(z.string()),
+        score: z.number().optional(),
       })
     ),
     total: z.number(),
@@ -60,58 +63,35 @@ export const searchNotesTool = createTool({
         };
       }
 
-      const results: SearchResultItem[] = [];
-      const lowerQuery = query.toLowerCase();
-      const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
-      const folders = entries.filter(
-        (e) => e.isDirectory() && e.name !== ".trash"
-      );
+      // 키워드 검색과 벡터 검색을 병렬 실행
+      const [keywordResults, vectorResults] = await Promise.all([
+        keywordSearch(query, folder, limit),
+        vectorSearch(query, folder, limit).catch((err) => {
+          console.warn("[searchNotes] 벡터 검색 실패 (키워드 검색으로 폴백):", err);
+          return [] as SearchResultItem[];
+        }),
+      ]);
 
-      for (const folderEntry of folders) {
-        if (folder && folderEntry.name !== folder) continue;
-        if (results.length >= limit) break;
+      // 결과 병합 (키워드 매칭 우선, 벡터 결과는 중복 제거 후 추가)
+      const seen = new Set(keywordResults.map((r) => r.title.normalize("NFC").toLowerCase()));
+      const merged: SearchResultItem[] = [...keywordResults];
 
-        const folderPath = path.join(NOTES_DIR, folderEntry.name);
-        const files = await fs.readdir(folderPath);
-        const markdownFiles = files.filter((f) => f.endsWith(".md"));
-
-        for (const file of markdownFiles) {
-          if (results.length >= limit) break;
-
-          const filePath = path.join(folderPath, file);
-          const content = await fs.readFile(filePath, "utf-8");
-          const { frontmatter, contentWithoutFrontmatter } =
-            parseFrontmatter(content);
-          const filenameTitle = getTitleFromFilename(file);
-          const title =
-            extractTitle(contentWithoutFrontmatter, frontmatter) ||
-            filenameTitle;
-
-          const lowerContent = contentWithoutFrontmatter.toLowerCase();
-          const matchIndex = lowerContent.indexOf(lowerQuery);
-
-          if (matchIndex !== -1) {
-            const snippet = extractSnippet(
-              contentWithoutFrontmatter,
-              matchIndex,
-              query.length
-            );
-            results.push({
-              title,
-              folder: folderEntry.name,
-              snippet,
-              tags: frontmatter.tags || [],
-            });
-          }
+      for (const vr of vectorResults) {
+        const key = vr.title.normalize("NFC").toLowerCase();
+        if (!seen.has(key)) {
+          seen.add(key);
+          merged.push(vr);
         }
       }
 
+      const limited = merged.slice(0, limit);
+
       return {
-        results,
-        total: results.length,
+        results: limited,
+        total: limited.length,
         message:
-          results.length > 0
-            ? `"${query}"로 ${results.length}개의 노트를 찾았습니다.`
+          limited.length > 0
+            ? `"${query}"로 ${limited.length}개의 노트를 찾았습니다.`
             : `"${query}"에 해당하는 노트를 찾지 못했습니다.`,
       };
     } catch (error) {
@@ -124,6 +104,82 @@ export const searchNotesTool = createTool({
     }
   },
 });
+
+/**
+ * 키워드 기반 검색 (기존 로직)
+ */
+async function keywordSearch(
+  query: string,
+  folder: string | undefined,
+  limit: number
+): Promise<SearchResultItem[]> {
+  const results: SearchResultItem[] = [];
+  const lowerQuery = query.toLowerCase();
+  const entries = await fs.readdir(NOTES_DIR, { withFileTypes: true });
+  const folders = entries.filter(
+    (e) => e.isDirectory() && e.name !== ".trash"
+  );
+
+  for (const folderEntry of folders) {
+    if (folder && folderEntry.name !== folder) continue;
+    if (results.length >= limit) break;
+
+    const folderPath = path.join(NOTES_DIR, folderEntry.name);
+    const files = await fs.readdir(folderPath);
+    const markdownFiles = files.filter((f) => f.endsWith(".md"));
+
+    for (const file of markdownFiles) {
+      if (results.length >= limit) break;
+
+      const filePath = path.join(folderPath, file);
+      const content = await fs.readFile(filePath, "utf-8");
+      const { frontmatter, contentWithoutFrontmatter } =
+        parseFrontmatter(content);
+      const filenameTitle = getTitleFromFilename(file);
+      const title =
+        extractTitle(contentWithoutFrontmatter, frontmatter) ||
+        filenameTitle;
+
+      const lowerContent = contentWithoutFrontmatter.toLowerCase();
+      const matchIndex = lowerContent.indexOf(lowerQuery);
+
+      if (matchIndex !== -1) {
+        const snippet = extractSnippet(
+          contentWithoutFrontmatter,
+          matchIndex,
+          query.length
+        );
+        results.push({
+          title,
+          folder: folderEntry.name,
+          snippet,
+          tags: frontmatter.tags || [],
+        });
+      }
+    }
+  }
+
+  return results;
+}
+
+/**
+ * 벡터 유사도 기반 검색
+ */
+async function vectorSearch(
+  query: string,
+  folder: string | undefined,
+  limit: number
+): Promise<SearchResultItem[]> {
+  const results = await searchByEmbedding(query, limit, folder);
+
+  return results.map((r) => ({
+    title: r.title,
+    folder: r.folder,
+    snippet: r.text.slice(0, 150) + (r.text.length > 150 ? "..." : ""),
+    tags: [],
+    score: r.score,
+  }));
+}
 
 /**
  * 매칭 부분 주변의 스니펫 추출
