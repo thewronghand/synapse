@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { loadGcpServiceAccount } from "@/lib/gcp-service-account";
 import { createMeetingSummaryAgent } from "@/mastra/agents/meeting-summary";
+import { isPublishedMode } from "@/lib/env";
 
 /**
  * POST /api/ai/summarize
@@ -8,6 +9,13 @@ import { createMeetingSummaryAgent } from "@/mastra/agents/meeting-summary";
  * Body: { transcript: string }
  */
 export async function POST(request: NextRequest) {
+  if (isPublishedMode()) {
+    return NextResponse.json(
+      { success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." },
+      { status: 403 }
+    );
+  }
+
   try {
     const sa = await loadGcpServiceAccount();
     if (!sa) {
