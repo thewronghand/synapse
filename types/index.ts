@@ -86,6 +86,7 @@ export interface VoiceMemoMeta {
   id: string; // 파일명에서 확장자 제외 (예: "2026-01-31-a1b2c3d4e5f6")
   filename: string; // 오디오 파일명 (예: "2026-01-31-a1b2c3d4e5f6.webm")
   folder: string; // 저장 폴더 (예: "default")
+  title: string | null; // 사용자 지정 제목 (null이면 filename 표시)
   status: "recorded" | "transcribed" | "summarized";
   duration: number; // 녹음 길이 (초)
   transcript: string | null;

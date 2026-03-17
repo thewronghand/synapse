@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
-import { Search, Folder, FileText, Type, Plus } from "lucide-react";
+import { Search, Folder, FileText, Type, Plus, ArrowUpDown } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
@@ -44,6 +44,7 @@ function DocumentsContent() {
   const [searchMode, setSearchMode] = useState<"title" | "content">("title");
   const [contentSearchResults, setContentSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
+  const [sortBy, setSortBy] = useState<"title-asc" | "title-desc" | "created-desc" | "created-asc" | "updated-desc" | "updated-asc">("updated-desc");
   const itemsPerPage = 12; // 3x4 grid
 
   // Track previous filter values to detect actual changes
@@ -298,11 +299,31 @@ function DocumentsContent() {
     return matchesFolder && matchesSearch && matchesIncludeTags && matchesExcludeTags;
   });
 
+  // 정렬
+  const sortedDocuments = [...filteredDocuments].sort((a, b) => {
+    switch (sortBy) {
+      case "title-asc":
+        return a.title.localeCompare(b.title, "ko");
+      case "title-desc":
+        return b.title.localeCompare(a.title, "ko");
+      case "created-desc":
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      case "created-asc":
+        return new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      case "updated-desc":
+        return new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime();
+      case "updated-asc":
+        return new Date(a.updatedAt).getTime() - new Date(b.updatedAt).getTime();
+      default:
+        return 0;
+    }
+  });
+
   // Pagination
-  const totalPages = Math.ceil(filteredDocuments.length / itemsPerPage);
+  const totalPages = Math.ceil(sortedDocuments.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
-  const paginatedDocuments = filteredDocuments.slice(startIndex, endIndex);
+  const paginatedDocuments = sortedDocuments.slice(startIndex, endIndex);
 
   if (isLoading) {
     return <LoadingScreen message="문서 로딩 중..." />;
@@ -465,8 +486,9 @@ function DocumentsContent() {
         </p>
       </div>
 
-      {/* Stats */}
-      <div className="mb-6 text-sm text-muted-foreground">
+      {/* Stats + Sort */}
+      <div className="mb-6 flex items-center justify-between">
+        <div className="text-sm text-muted-foreground">
         {searchMode === "content" && searchQuery ? (
           isSearching ? (
             "검색 중..."
@@ -482,15 +504,35 @@ function DocumentsContent() {
               ? `${filteredResults.length}개의 검색 결과${selectedTags.length > 0 || excludedTags.length > 0 ? ' (필터 적용됨)' : ''}`
               : "검색 결과 없음";
           })()
-        ) : filteredDocuments.length > 0 ? (
+        ) : sortedDocuments.length > 0 ? (
           <>
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredDocuments.length)} of {filteredDocuments.length} {filteredDocuments.length === 1 ? "note" : "notes"}
+            Showing {startIndex + 1}-{Math.min(endIndex, sortedDocuments.length)} of {sortedDocuments.length} {sortedDocuments.length === 1 ? "note" : "notes"}
             {searchQuery && ` matching "${searchQuery}"`}
             {selectedTags.length > 0 && ` with tags: ${selectedTags.join(", ")}`}
             {excludedTags.length > 0 && ` excluding: ${excludedTags.join(", ")}`}
           </>
         ) : (
           "0 notes"
+        )}
+        </div>
+
+        {/* 정렬 드롭다운 */}
+        {searchMode === "title" && (
+          <div className="flex items-center gap-2">
+            <ArrowUpDown className="h-4 w-4 text-muted-foreground" />
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
+              className="text-sm bg-card border border-border rounded-md px-2 py-1 text-foreground"
+            >
+              <option value="updated-desc">수정일 (최신순)</option>
+              <option value="updated-asc">수정일 (오래된순)</option>
+              <option value="created-desc">생성일 (최신순)</option>
+              <option value="created-asc">생성일 (오래된순)</option>
+              <option value="title-asc">이름순 (ㄱ→ㅎ)</option>
+              <option value="title-desc">이름순 (ㅎ→ㄱ)</option>
+            </select>
+          </div>
         )}
       </div>
 

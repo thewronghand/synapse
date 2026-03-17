@@ -36,10 +36,11 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { folder, filename, duration } = body as {
+    const { folder, filename, duration, title } = body as {
       folder: string;
       filename: string;
       duration: number;
+      title?: string;
     };
 
     if (!folder || !filename) {
@@ -60,6 +61,7 @@ export async function POST(request: NextRequest) {
       id,
       filename,
       folder,
+      title: title || null,
       status: "recorded",
       duration: duration || 0,
       transcript: null,

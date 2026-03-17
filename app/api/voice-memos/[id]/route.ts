@@ -49,6 +49,7 @@ export async function PATCH(
     const body = await request.json();
     const { folder, ...updates } = body as {
       folder: string;
+      title?: string | null;
       status?: VoiceMemoMeta["status"];
       transcript?: string;
       summary?: string;

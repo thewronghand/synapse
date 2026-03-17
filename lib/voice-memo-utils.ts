@@ -20,7 +20,10 @@ export async function readVoiceMemoMeta(
   try {
     const metaPath = getVoiceMemoMetaPath(folder, id);
     const content = await fs.readFile(metaPath, "utf-8");
-    return JSON.parse(content) as VoiceMemoMeta;
+    const meta = JSON.parse(content) as VoiceMemoMeta;
+    // 기존 메타데이터에 title 필드가 없을 수 있음 (하위 호환)
+    if (meta.title === undefined) meta.title = null;
+    return meta;
   } catch {
     return null;
   }
@@ -70,7 +73,9 @@ async function listVoiceMemosInFolder(
           path.join(audioDir, metaFile),
           "utf-8"
         );
-        memos.push(JSON.parse(content) as VoiceMemoMeta);
+        const meta = JSON.parse(content) as VoiceMemoMeta;
+        if (meta.title === undefined) meta.title = null;
+        memos.push(meta);
       } catch {
         // 파싱 실패한 메타데이터는 건너뜀
       }

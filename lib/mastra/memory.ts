@@ -25,39 +25,45 @@ export function getMemory(): Memory {
       url: `file:${path.join(dataDir, "memory.db")}`,
     }),
 
-    // 벡터 저장소 (Phase 3에서 활성화 예정)
-    // vector: new LibSQLVector({
-    //   url: `file:${path.join(dataDir, "vector.db")}`,
-    // }),
-
-    // 임베딩 모델 (Phase 3에서 설정)
-    // embedder: ...
-
     options: {
       // 최근 메시지 개수
       lastMessages: 20,
 
       // Observational Memory: 대화에서 사실 추출 및 장기 기억
       // Claude의 Memory/Compact와 유사
-      // TODO: Phase 2에서 활성화 - 모델 연동 필요
-      // observationalMemory: true,
-
-      // Semantic Recall: 벡터 기반 과거 대화 검색 (Phase 3)
-      // semanticRecall: {
-      //   topK: 3,
-      //   messageRange: 2,
-      //   scope: "resource",
-      // },
+      observationalMemory: {
+        model: "google/gemini-2.5-flash",
+        scope: "resource",
+        observation: {
+          messageTokens: 50_000,
+        },
+        reflection: {
+          observationTokens: 60_000,
+        },
+      },
 
       // Working Memory: 세션 간 지속되는 사용자 정보
       workingMemory: {
         enabled: true,
         scope: "resource",
-        template: `# 사용자 정보
+        template: `# 사용자 프로필
 - **이름**:
-- **관심사**:
-- **작업 중인 주제**:
-- **선호하는 응답 스타일**:
+- **직업/역할**:
+- **기술 수준**: (초급/중급/고급)
+
+# 관심사 및 프로젝트
+- **주요 관심 분야**:
+- **진행 중인 프로젝트**:
+- **자주 다루는 주제**:
+
+# 선호도
+- **응답 스타일**: (간결/상세/코드 중심)
+- **언어 선호**: (한국어/영어/혼합)
+- **기술 설명 수준**: (비유 사용/기술적 정확도 우선)
+
+# 중요 컨텍스트
+- **반복적으로 언급된 사항**:
+- **특별 요청사항**:
 `,
       },
     },
@@ -110,10 +116,23 @@ export async function resetWorkingMemory(resourceId: string): Promise<void> {
 
 // Working Memory 템플릿 조회
 export function getWorkingMemoryTemplate(): string {
-  return `# 사용자 정보
+  return `# 사용자 프로필
 - **이름**:
-- **관심사**:
-- **작업 중인 주제**:
-- **선호하는 응답 스타일**:
+- **직업/역할**:
+- **기술 수준**: (초급/중급/고급)
+
+# 관심사 및 프로젝트
+- **주요 관심 분야**:
+- **진행 중인 프로젝트**:
+- **자주 다루는 주제**:
+
+# 선호도
+- **응답 스타일**: (간결/상세/코드 중심)
+- **언어 선호**: (한국어/영어/혼합)
+- **기술 설명 수준**: (비유 사용/기술적 정확도 우선)
+
+# 중요 컨텍스트
+- **반복적으로 언급된 사항**:
+- **특별 요청사항**:
 `;
 }

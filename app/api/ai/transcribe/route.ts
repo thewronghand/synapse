@@ -110,7 +110,8 @@ export async function POST(request: NextRequest) {
     };
 
     // 선택된 구문 세트가 있으면 인라인 adaptation 추가
-    if (phrases.length > 0) {
+    const hasPhrases = phrases.length > 0;
+    if (hasPhrases) {
       config.adaptation = {
         phraseSets: [
           {
@@ -130,6 +131,26 @@ export async function POST(request: NextRequest) {
     const useBatch = !!bucketName;
 
     let transcript: string | undefined;
+
+    // phrase set 적용 실패 시 phrase set 없이 재시도하는 헬퍼
+    async function runWithPhraseFallback<T>(
+      fn: (cfg: Record<string, unknown>) => Promise<T>
+    ): Promise<T> {
+      try {
+        return await fn(config);
+      } catch (error) {
+        if (hasPhrases) {
+          console.warn(
+            "[Transcribe] 구문 세트 적용 실패, 구문 세트 없이 재시도:",
+            error instanceof Error ? error.message : error
+          );
+          const configWithoutAdaptation = { ...config };
+          delete configWithoutAdaptation.adaptation;
+          return await fn(configWithoutAdaptation);
+        }
+        throw error;
+      }
+    }
 
     if (useBatch) {
       // GCS에 임시 업로드 후 batchRecognize
@@ -156,42 +177,45 @@ export async function POST(request: NextRequest) {
       console.log(`[Transcribe] GCS 업로드 완료: ${gcsUri}`);
 
       try {
-        const [operation] = await speechClient.batchRecognize({
-          recognizer,
-          config,
-          files: [{ uri: gcsUri }],
-          recognitionOutputConfig: {
-            inlineResponseConfig: {},
-          },
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = await runWithPhraseFallback(async (cfg) => {
+          const [operation] = await speechClient.batchRecognize({
+            recognizer,
+            config: cfg,
+            files: [{ uri: gcsUri }],
+            recognitionOutputConfig: {
+              inlineResponseConfig: {},
+            },
+          });
+
+          if (!operation.name) {
+            throw new Error("BatchRecognize operation 생성 실패: operation name이 없습니다");
+          }
+
+          console.log(`[Transcribe] BatchRecognize operation: ${operation.name}`);
+
+          // operation.promise() 대신 수동 폴링 (Node.js V2 클라이언트의 hang 방지)
+          const POLL_INTERVAL_MS = 5_000;
+          const MAX_POLL_MS = 600_000; // 10분 타임아웃
+          const startTime = Date.now();
+          let pollResult = await speechClient.checkBatchRecognizeProgress(operation.name);
+
+          while (!pollResult.done) {
+            if (Date.now() - startTime > MAX_POLL_MS) {
+              throw new Error("BatchRecognize 타임아웃 (10분 초과). 오디오 파일이 너무 크거나 서비스가 지연되고 있습니다.");
+            }
+            await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+            pollResult = await speechClient.checkBatchRecognizeProgress(operation.name!);
+          }
+
+          return pollResult.result;
         });
 
-        if (!operation.name) {
-          throw new Error("BatchRecognize operation 생성 실패: operation name이 없습니다");
-        }
-
-        console.log(`[Transcribe] BatchRecognize operation: ${operation.name}`);
-
-        // operation.promise() 대신 수동 폴링 (Node.js V2 클라이언트의 hang 방지)
-        const POLL_INTERVAL_MS = 5_000;
-        const MAX_POLL_MS = 600_000; // 10분 타임아웃
-        const startTime = Date.now();
-        let pollResult = await speechClient.checkBatchRecognizeProgress(operation.name);
-
-        while (!pollResult.done) {
-          if (Date.now() - startTime > MAX_POLL_MS) {
-            throw new Error("BatchRecognize 타임아웃 (10분 초과). 오디오 파일이 너무 크거나 서비스가 지연되고 있습니다.");
-          }
-          await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-          pollResult = await speechClient.checkBatchRecognizeProgress(operation.name!);
-        }
-
-        // pollResult.result의 타입이 {}로 추론되므로 타입 단언 필요
-        // (google-gax LROperation의 result 프로퍼티 타입 정의 한계)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const response = pollResult.result as any;
+        const batchResponse = response as any;
 
         // batchRecognize 응답: results 맵에서 transcript 추출
-        const inlineResults = response?.results;
+        const inlineResults = batchResponse?.results;
         if (inlineResults) {
           // 파일별 에러 체크
           for (const [uri, fileResult] of Object.entries(inlineResults)) {
@@ -255,10 +279,13 @@ export async function POST(request: NextRequest) {
         `[Transcribe] Recognize 사용 (${Math.round(buffer.length / 1024)}KB)`
       );
 
-      const [response] = await speechClient.recognize({
-        recognizer,
-        config,
-        content: buffer,
+      const response = await runWithPhraseFallback(async (cfg) => {
+        const [res] = await speechClient.recognize({
+          recognizer,
+          config: cfg,
+          content: buffer,
+        });
+        return res;
       });
 
       if (enableDiarization) {

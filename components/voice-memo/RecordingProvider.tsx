@@ -14,6 +14,13 @@ import { RecordingOverlay } from "@/components/voice-memo/RecordingOverlay";
 import { FolderSelectDialog } from "@/components/voice-memo/FolderSelectDialog";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
 
+// --- 상수 ---
+
+// 전사 API 제한 (60분) 전에 자동 정지
+const AUTO_STOP_SECONDS = 59 * 60 + 50; // 59분 50초
+// 경고 표시 시작 시점
+const WARNING_SECONDS = 58 * 60; // 58분
+
 // --- Context 타입 ---
 
 interface RecordingState {
@@ -21,6 +28,7 @@ interface RecordingState {
   isPaused: boolean;
   duration: number;
   selectedFolder: string | null;
+  autoStopped: boolean; // 자동 정지 여부
 }
 
 interface RecordingContextType {
@@ -30,6 +38,8 @@ interface RecordingContextType {
   pauseRecording: () => void;
   resumeRecording: () => void;
   cancelRecording: () => void;
+  continueRecording: () => void;
+  dismissAutoStop: () => void;
 }
 
 const RecordingContext = createContext<RecordingContextType | null>(null);
@@ -54,9 +64,15 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
     isPaused: false,
     duration: 0,
     selectedFolder: null,
+    autoStopped: false,
   });
 
   const [showFolderDialog, setShowFolderDialog] = useState(false);
+
+  // 제목 및 파트 관리
+  const customTitleRef = useRef<string | null>(null);
+  const recordingPartRef = useRef(1);
+  const lastFolderRef = useRef<string | null>(null);
 
   // 녹음 중일 때 페이지 이탈 경고
   useBeforeUnload(state.isRecording);
@@ -110,10 +126,29 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
     setShowFolderDialog(true);
   }, [state.isRecording]);
 
-  // 폴더 선택 후 실제 녹음 시작
-  const handleFolderSelect = useCallback(async (folder: string) => {
-    setShowFolderDialog(false);
+  // 파일명 생성 헬퍼
+  const generateFilename = useCallback(() => {
+    const title = customTitleRef.current;
+    const part = recordingPartRef.current;
+    const suffix = part > 1 ? `-${part}` : "";
 
+    if (title) {
+      // 파일명 안전 문자로 변환
+      const safe = title.replace(/[<>:"/\\|?*]/g, "_").trim();
+      return `${safe}${suffix}.webm`;
+    }
+    const timestamp = new Date()
+      .toISOString()
+      .replace(/[:.]/g, "-")
+      .slice(0, 19);
+    return `recording-${timestamp}${suffix}.webm`;
+  }, []);
+
+  // 자동 정지 여부 추적용 ref
+  const autoStoppedRef = useRef(false);
+
+  // 실제 녹음 시작 (폴더 선택 후 또는 이어서 녹음 시)
+  const startRecordingInternal = useCallback(async (folder: string) => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
@@ -154,20 +189,17 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
             isPaused: false,
             duration: 0,
             selectedFolder: null,
+            autoStopped: false,
           });
           return;
         }
 
         const blob = new Blob(chunksRef.current, { type: mimeType });
-        const timestamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, "-")
-          .slice(0, 19);
-        const file = new File([blob], `recording-${timestamp}.webm`, {
-          type: mimeType,
-        });
-
+        const filename = generateFilename();
+        const file = new File([blob], filename, { type: mimeType });
         const currentDuration = durationRef.current;
+        const wasAutoStopped = autoStoppedRef.current;
+        autoStoppedRef.current = false;
 
         // 서버에 업로드
         try {
@@ -185,6 +217,12 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
           }
 
           // 음성 메모 메타데이터 생성
+          const title = customTitleRef.current;
+          const part = recordingPartRef.current;
+          const memoTitle = title
+            ? (part > 1 ? `${title} (${part})` : title)
+            : null;
+
           const memoRes = await fetch("/api/voice-memos", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -192,6 +230,7 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
               folder,
               filename: uploadData.data.filename,
               duration: currentDuration,
+              title: memoTitle,
             }),
           });
           const memoData = await memoRes.json();
@@ -200,15 +239,20 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
             throw new Error(memoData.error || "메모 생성 실패");
           }
 
-          toast.success("음성 메모가 저장되었습니다", {
-            action: {
-              label: "처리하러 가기",
-              onClick: () => {
-                // Phase 2에서 /voice-memos 페이지로 연결
-                window.location.href = "/voice-memos";
+          if (wasAutoStopped) {
+            toast.info("녹음이 59분 50초에 자동 정지되었습니다", {
+              duration: 5000,
+            });
+          } else {
+            toast.success("음성 메모가 저장되었습니다", {
+              action: {
+                label: "처리하러 가기",
+                onClick: () => {
+                  window.location.href = "/voice-memos";
+                },
               },
-            },
-          });
+            });
+          }
         } catch (error) {
           console.error("[Recording] 저장 실패:", error);
           toast.error(
@@ -218,12 +262,24 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
           );
         }
 
-        setState({
-          isRecording: false,
-          isPaused: false,
-          duration: 0,
-          selectedFolder: null,
-        });
+        if (wasAutoStopped) {
+          // 자동 정지: 오버레이에 "이어서 녹음" 표시
+          setState({
+            isRecording: false,
+            isPaused: false,
+            duration: 0,
+            selectedFolder: folder,
+            autoStopped: true,
+          });
+        } else {
+          setState({
+            isRecording: false,
+            isPaused: false,
+            duration: 0,
+            selectedFolder: null,
+            autoStopped: false,
+          });
+        }
       };
 
       // 녹음 시작
@@ -234,13 +290,25 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
         isPaused: false,
         duration: 0,
         selectedFolder: folder,
+        autoStopped: false,
       });
 
       // 타이머 시작
       durationRef.current = 0;
       timerRef.current = setInterval(() => {
         durationRef.current += 1;
-        setState((prev) => ({ ...prev, duration: prev.duration + 1 }));
+        const newDuration = durationRef.current;
+
+        // 자동 정지 체크
+        if (newDuration >= AUTO_STOP_SECONDS) {
+          autoStoppedRef.current = true;
+          if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+          }
+          return;
+        }
+
+        setState((prev) => ({ ...prev, duration: newDuration }));
       }, 1000);
     } catch (err) {
       console.error("[Recording] 녹음 시작 실패:", err);
@@ -254,7 +322,16 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
         toast.error("마이크를 사용할 수 없습니다.");
       }
     }
-  }, [clearTimer, cleanupStream, state.duration]);
+  }, [clearTimer, cleanupStream, generateFilename]);
+
+  // 폴더 선택 후 실제 녹음 시작
+  const handleFolderSelect = useCallback(async (folder: string, title?: string) => {
+    setShowFolderDialog(false);
+    customTitleRef.current = title || null;
+    recordingPartRef.current = 1;
+    lastFolderRef.current = folder;
+    await startRecordingInternal(folder);
+  }, [startRecordingInternal]);
 
   // 녹음 중지 (저장)
   const stopRecording = useCallback(() => {
@@ -280,7 +357,19 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
 
       // 타이머 재시작
       timerRef.current = setInterval(() => {
-        setState((prev) => ({ ...prev, duration: prev.duration + 1 }));
+        durationRef.current += 1;
+        const newDuration = durationRef.current;
+
+        // 자동 정지 체크
+        if (newDuration >= AUTO_STOP_SECONDS) {
+          autoStoppedRef.current = true;
+          if (mediaRecorderRef.current?.state === "recording") {
+            mediaRecorderRef.current.stop();
+          }
+          return;
+        }
+
+        setState((prev) => ({ ...prev, duration: newDuration }));
       }, 1000);
     }
   }, []);
@@ -296,13 +385,45 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
       mediaRecorderRef.current.stop();
     }
     cleanupStream();
+    customTitleRef.current = null;
+    recordingPartRef.current = 1;
     setState({
       isRecording: false,
       isPaused: false,
       duration: 0,
       selectedFolder: null,
+      autoStopped: false,
     });
   }, [clearTimer, cleanupStream]);
+
+  // 이어서 녹음 (자동 정지 후)
+  const continueRecording = useCallback(async () => {
+    const folder = lastFolderRef.current;
+    if (!folder) return;
+    recordingPartRef.current += 1;
+    setState((prev) => ({ ...prev, autoStopped: false }));
+    try {
+      await startRecordingInternal(folder);
+    } catch {
+      // 녹음 시작 실패 시 autoStopped 상태 복원
+      setState((prev) => ({ ...prev, autoStopped: true }));
+      recordingPartRef.current -= 1;
+    }
+  }, [startRecordingInternal]);
+
+  // 자동 정지 알림 닫기
+  const dismissAutoStop = useCallback(() => {
+    customTitleRef.current = null;
+    recordingPartRef.current = 1;
+    lastFolderRef.current = null;
+    setState({
+      isRecording: false,
+      isPaused: false,
+      duration: 0,
+      selectedFolder: null,
+      autoStopped: false,
+    });
+  }, []);
 
   const handleFolderCancel = useCallback(() => {
     setShowFolderDialog(false);
@@ -317,6 +438,8 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
         pauseRecording,
         resumeRecording,
         cancelRecording,
+        continueRecording,
+        dismissAutoStop,
       }}
     >
       {children}
@@ -328,12 +451,33 @@ export function RecordingProvider({ children }: RecordingProviderProps) {
         onCancel={handleFolderCancel}
       />
 
+      {/* 자동 정지 후 이어서 녹음 오버레이 */}
+      {state.autoStopped && !state.isRecording && (
+        <div className="fixed bottom-6 right-6 z-50 flex items-center gap-3 px-4 py-3 bg-background border border-border rounded-xl shadow-lg animate-in slide-in-from-bottom-4 duration-300">
+          <span className="h-2.5 w-2.5 rounded-full shrink-0 bg-yellow-500" />
+          <span className="text-sm">녹음이 59분 50초에 자동 정지되었습니다</span>
+          <button
+            onClick={continueRecording}
+            className="text-sm font-medium text-primary hover:underline cursor-pointer"
+          >
+            이어서 녹음
+          </button>
+          <button
+            onClick={dismissAutoStop}
+            className="text-sm text-muted-foreground hover:text-foreground cursor-pointer"
+          >
+            닫기
+          </button>
+        </div>
+      )}
+
       {/* 녹음 중 플로팅 오버레이 */}
       {state.isRecording && (
         <RecordingOverlay
           duration={state.duration}
           isPaused={state.isPaused}
           analyser={analyserRef.current}
+          warningActive={state.duration >= WARNING_SECONDS}
           onPause={pauseRecording}
           onResume={resumeRecording}
           onStop={stopRecording}

@@ -18,6 +18,7 @@ import { graphCache } from '@/lib/graph-cache';
 import { getNotesDir } from '@/lib/notes-path';
 import { isPublishedMode } from '@/lib/env';
 import { ensureDefaultFolder } from '@/lib/folder-utils';
+import { updateDocumentEmbedding, deleteDocumentEmbedding } from '@/lib/mastra/embedding';
 import { moveImagesFromTemp } from '@/lib/image-utils';
 import { moveAudioFromTemp } from '@/lib/audio-utils';
 
@@ -254,11 +255,21 @@ export async function PUT(
       graphCache.renameDocument(oldTitle, extractedNewTitle, newFilename, processedContent);
 
       console.log(`[Document] Renamed: ${oldTitle} -> ${extractedNewTitle}`);
+
+      // 벡터 임베딩 업데이트 (백그라운드)
+      updateDocumentEmbedding(processedContent, extractedNewTitle, folder, newFilename).catch(
+        (err) => console.error('[Embedding] 문서 수정 임베딩 실패:', err)
+      );
     } else {
       await fs.writeFile(oldFilePath, processedContent, 'utf-8');
       documentCache.updateDocument(oldTitle, oldTitle, oldFilename, folder);
       await graphCache.updateDocument(oldTitle, oldFilename, processedContent);
       console.log(`[Document] Updated: ${oldTitle}`);
+
+      // 벡터 임베딩 업데이트 (백그라운드)
+      updateDocumentEmbedding(processedContent, oldTitle, folder, oldFilename).catch((err) =>
+        console.error('[Embedding] 문서 수정 임베딩 실패:', err)
+      );
     }
 
     // Update tag cache
@@ -308,6 +319,11 @@ export async function DELETE(
     await fs.unlink(filePath);
     documentCache.removeDocument(title);
     graphCache.removeDocument(title);
+
+    // 벡터 임베딩 삭제 (백그라운드)
+    deleteDocumentEmbedding(folder, filename).catch((err) =>
+      console.error('[Embedding] 문서 삭제 임베딩 실패:', err)
+    );
 
     console.log(`[Document] Deleted: ${title}`);
     await tagCache.refreshTags();
