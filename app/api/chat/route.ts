@@ -2,10 +2,18 @@ import { NextRequest, NextResponse } from "next/server";
 import { type UIMessage } from "ai";
 import { createNeuroAgent } from "@/lib/mastra/agents/neuro-agent";
 import { loadGcpServiceAccount } from "@/lib/gcp-service-account";
+import { isPublishedMode } from "@/lib/env";
 import { loadSession, saveSession } from "@/lib/chat-session-utils";
 import type { ChatMessage } from "@/types";
 
 export async function POST(req: NextRequest) {
+  if (isPublishedMode()) {
+    return NextResponse.json(
+      { success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." },
+      { status: 403 }
+    );
+  }
+
   try {
     // GCP SA 확인
     const sa = await loadGcpServiceAccount();
