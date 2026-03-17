@@ -100,6 +100,13 @@ function SettingsContent() {
   const [showGcpDisconnect, setShowGcpDisconnect] = useState(false);
   const gcpFileInputRef = useRef<HTMLInputElement>(null);
 
+  // 벡터 임베딩 states
+  const [embeddingSyncing, setEmbeddingSyncing] = useState(false);
+  const [embeddingSyncResult, setEmbeddingSyncResult] = useState<{
+    totalDocuments: number;
+    errors?: string[];
+  } | null>(null);
+
   // GCS Bucket states
   const [gcsBucketName, setGcsBucketName] = useState("");
   const [gcsBucketSaved, setGcsBucketSaved] = useState<string | null>(null);
@@ -1835,6 +1842,73 @@ function SettingsContent() {
               </div>
             )}
           </div>
+        </section>
+
+        {/* 벡터 임베딩 동기화 */}
+        <section className="bg-card rounded-lg border p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <FolderSync className="h-5 w-5" />
+            <h2 className="text-xl font-bold">벡터 임베딩</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            문서를 벡터로 변환하여 Neuro가 의미 기반으로 관련 문서를 검색할 수 있게 합니다.
+            문서 생성/수정/삭제 시 자동으로 반영되지만, 기존 문서를 일괄 임베딩하거나 동기화가 어긋났을 때 수동으로 실행할 수 있습니다.
+          </p>
+          <div className="flex items-center gap-3">
+            <Button
+              onClick={async () => {
+                setEmbeddingSyncing(true);
+                setEmbeddingSyncResult(null);
+                try {
+                  const res = await fetch("/api/settings/embeddings", {
+                    method: "POST",
+                  });
+                  const data = await res.json();
+                  if (data.success) {
+                    setEmbeddingSyncResult(data.data);
+                    toast.success(
+                      `${data.data.totalDocuments}개 문서 임베딩 완료`
+                    );
+                  } else {
+                    toast.error(data.error || "임베딩 동기화 실패");
+                  }
+                } catch (err) {
+                  toast.error("임베딩 동기화 중 오류가 발생했습니다.");
+                  console.error(err);
+                } finally {
+                  setEmbeddingSyncing(false);
+                }
+              }}
+              disabled={embeddingSyncing || !gcpConnected}
+              className="cursor-pointer"
+            >
+              {embeddingSyncing ? (
+                <>
+                  <Spinner className="mr-2 h-4 w-4" />
+                  동기화 중...
+                </>
+              ) : (
+                "전체 문서 임베딩"
+              )}
+            </Button>
+            {!gcpConnected && (
+              <p className="text-sm text-muted-foreground">
+                GCP 서비스 어카운트를 먼저 설정해주세요.
+              </p>
+            )}
+          </div>
+          {embeddingSyncResult && (
+            <div className="mt-4 p-3 bg-muted rounded-md text-sm">
+              <p>
+                총 <strong>{embeddingSyncResult.totalDocuments}</strong>개 문서 임베딩 완료
+              </p>
+              {embeddingSyncResult.errors && embeddingSyncResult.errors.length > 0 && (
+                <p className="text-destructive mt-1">
+                  {embeddingSyncResult.errors.length}개 문서에서 오류 발생
+                </p>
+              )}
+            </div>
+          )}
         </section>
           </TabsContent>
 
