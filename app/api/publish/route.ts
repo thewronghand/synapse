@@ -259,7 +259,7 @@ export function useNotesAutoRefresh(_fetchFn: () => void | Promise<void>) {}
       },
       {
         path: 'mastra/agents/meeting-summary.ts',
-        content: `export function createMeetingSummaryAgent(_sa: Record<string, unknown>) {
+        content: `export function createMeetingSummaryAgent(_sa: Record<string, unknown>): never {
   throw new Error("meeting-summary agent is not available in published mode");
 }
 `,
