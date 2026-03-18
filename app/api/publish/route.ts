@@ -264,6 +264,42 @@ export function useNotesAutoRefresh(_fetchFn: () => void | Promise<void>) {}
 }
 `,
       },
+      // AI 관련 API 라우트 스텁 (GCP/Mastra 의존성 제거)
+      {
+        path: 'app/api/ai/summarize/route.ts',
+        content: `import { NextResponse } from "next/server";
+export async function POST() {
+  return NextResponse.json({ success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." }, { status: 403 });
+}
+`,
+      },
+      {
+        path: 'app/api/ai/transcribe/route.ts',
+        content: `import { NextResponse } from "next/server";
+export async function POST() {
+  return NextResponse.json({ success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." }, { status: 403 });
+}
+`,
+      },
+      {
+        path: 'app/api/chat/route.ts',
+        content: `import { NextResponse } from "next/server";
+export async function POST() {
+  return NextResponse.json({ success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." }, { status: 403 });
+}
+`,
+      },
+      {
+        path: 'app/api/voice-memos/route.ts',
+        content: `import { NextResponse } from "next/server";
+export async function GET() {
+  return NextResponse.json({ success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." }, { status: 403 });
+}
+export async function POST() {
+  return NextResponse.json({ success: false, error: "이 기능은 퍼블리시 모드에서 사용할 수 없습니다." }, { status: 403 });
+}
+`,
+      },
     ];
 
     for (const stub of publishStubs) {
