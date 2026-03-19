@@ -240,7 +240,7 @@ export function NavigationGuardProvider({ children }: { children: React.ReactNod
   return <>{children}</>;
 }
 export function useNavigationGuard() {
-  return { isDirty: false, setIsDirty: () => {}, confirmNavigation: (fn: () => void) => fn() };
+  return { isDirty: false, setIsDirty: (_dirty: boolean) => {}, confirmNavigation: (fn: () => void) => fn() };
 }
 `,
       },
