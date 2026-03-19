@@ -253,7 +253,12 @@ export function useBeforeUnload(_shouldWarn: boolean) {}
       {
         path: 'hooks/useNotesWatcher.ts',
         content: `"use client";
-export function useNotesWatcher(_options?: Record<string, unknown>) {}
+interface UseNotesWatcherOptions {
+  onNotesChanged?: (event: { event: string; path: string; stats?: unknown }) => void;
+  debounceMs?: number;
+  enabled?: boolean;
+}
+export function useNotesWatcher(_options?: UseNotesWatcherOptions) {}
 export function useNotesAutoRefresh(_fetchFn: () => void | Promise<void>) {}
 `,
       },
