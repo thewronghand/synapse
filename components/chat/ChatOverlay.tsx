@@ -737,23 +737,31 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
         )}
         {/* 인용된 텍스트 블록 */}
         {quotedText && (
-          <div className="mx-3 mb-1 flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-xs">
-            <div className="flex-1 line-clamp-2 text-muted-foreground italic">
-              &ldquo;{quotedText}&rdquo;
+          <div className="mx-3 mb-1 rounded-md border-l-2 border-primary/50 bg-muted/50 px-3 py-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground">인용된 텍스트</span>
+              <button
+                onClick={clearQuotedText}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3 h-3" />
+              </button>
             </div>
-            <button
-              onClick={clearQuotedText}
-              className="shrink-0 text-muted-foreground hover:text-foreground"
-            >
-              <X className="w-3 h-3" />
-            </button>
+            <div className="max-h-20 overflow-y-auto text-xs text-muted-foreground italic whitespace-pre-wrap">
+              {quotedText}
+            </div>
+            {quotedText.length > 2000 && (
+              <p className="text-[10px] text-amber-500 mt-1">
+                긴 텍스트는 2,000자까지만 전송됩니다
+              </p>
+            )}
           </div>
         )}
         <ChatInput
           onSend={(text) => {
-            // 인용 텍스트가 있으면 메시지에 포함
             if (quotedText) {
-              handleSendMessage(`[인용: "${quotedText.slice(0, 500)}"]\n\n${text}`);
+              const trimmed = quotedText.slice(0, 2000);
+              handleSendMessage(`[인용: "${trimmed}"]\n\n${text}`);
               clearQuotedText();
             } else {
               handleSendMessage(text);
