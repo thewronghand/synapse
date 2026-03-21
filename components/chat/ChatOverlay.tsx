@@ -23,7 +23,7 @@ interface ChatOverlayProps {
 
 export function ChatOverlay({ onClose }: ChatOverlayProps) {
   const router = useRouter();
-  const { documentContext } = useChatOverlay();
+  const { documentContext, quotedText, clearQuotedText } = useChatOverlay();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [gcpConnected, setGcpConnected] = useState<boolean | null>(null);
@@ -735,8 +735,30 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
             </DropdownMenu>
           </div>
         )}
+        {/* 인용된 텍스트 블록 */}
+        {quotedText && (
+          <div className="mx-3 mb-1 flex items-start gap-2 rounded-md bg-muted px-3 py-2 text-xs">
+            <div className="flex-1 line-clamp-2 text-muted-foreground italic">
+              &ldquo;{quotedText}&rdquo;
+            </div>
+            <button
+              onClick={clearQuotedText}
+              className="shrink-0 text-muted-foreground hover:text-foreground"
+            >
+              <X className="w-3 h-3" />
+            </button>
+          </div>
+        )}
         <ChatInput
-          onSend={handleSendMessage}
+          onSend={(text) => {
+            // 인용 텍스트가 있으면 메시지에 포함
+            if (quotedText) {
+              handleSendMessage(`[인용: "${quotedText.slice(0, 500)}"]\n\n${text}`);
+              clearQuotedText();
+            } else {
+              handleSendMessage(text);
+            }
+          }}
           isLoading={isSending}
           disabled={isGcpNotConnected}
           disabledMessage={
