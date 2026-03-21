@@ -162,6 +162,47 @@ export async function searchByEmbedding(
   }));
 }
 
+// 문서 목록을 임베딩하여 JSON export용 데이터 생성
+export async function generateEmbeddingsForExport(
+  documents: { title: string; folder: string; content: string }[]
+): Promise<
+  {
+    text: string;
+    vector: number[];
+    title: string;
+    folder: string;
+  }[]
+> {
+  const model = await getEmbeddingModel();
+  const allChunks: {
+    text: string;
+    vector: number[];
+    title: string;
+    folder: string;
+  }[] = [];
+
+  for (const doc of documents) {
+    const chunks = await chunkMarkdown(doc.content);
+    if (chunks.length === 0) continue;
+
+    const { embeddings } = await embedMany({
+      model,
+      values: chunks.map((c) => c.text),
+    });
+
+    for (let i = 0; i < chunks.length; i++) {
+      allChunks.push({
+        text: chunks[i].text,
+        vector: embeddings[i],
+        title: doc.title,
+        folder: doc.folder,
+      });
+    }
+  }
+
+  return allChunks;
+}
+
 // SA 캐시 초기화
 export function clearEmbeddingCache(): void {
   cachedSa = null;
