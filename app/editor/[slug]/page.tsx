@@ -16,6 +16,7 @@ import { Folder, ArrowLeft } from "lucide-react";
 import { useBeforeUnload } from "@/hooks/useBeforeUnload";
 import { useNavigationGuard } from "@/contexts/NavigationGuardContext";
 import type { Draft } from "@/app/api/drafts/route";
+import { useChatOverlay } from "@/components/chat/ChatOverlayProvider";
 
 // 파일 시스템 금지 문자
 const FORBIDDEN_CHARS = /[/\\:*?"<>|]/;
@@ -24,6 +25,7 @@ const FORBIDDEN_CHARS_MESSAGE = '제목에 다음 문자는 사용할 수 없습
 export default function EditorPage() {
   const params = useParams();
   const router = useRouter();
+  const { setDocumentContext, setSelectedText } = useChatOverlay();
   // URL에서 제목 디코딩
   const slug = params.slug as string;
   const requestedTitle = decodeURIComponent(slug);
@@ -150,6 +152,33 @@ export default function EditorPage() {
 
     fetchDocumentAndDraft();
   }, [requestedTitle, slug]);
+
+  // 현재 문서 컨텍스트를 ChatOverlay에 공유
+  useEffect(() => {
+    if (document) {
+      setDocumentContext({
+        title: document.title,
+        folder: document.folder || "default",
+        content: document.contentWithoutFrontmatter?.slice(0, 3000),
+      });
+    }
+    return () => setDocumentContext(null);
+  }, [document, setDocumentContext]);
+
+  // 텍스트 선택 감지
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim() || "";
+      setSelectedText(text);
+    };
+
+    globalThis.document?.addEventListener("selectionchange", handleSelectionChange);
+
+    return () => {
+      globalThis.document?.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [setSelectedText]);
 
   // 전체 content 생성 헬퍼 함수
   const buildFullContent = useCallback((editorContent: string, currentTitle: string, currentTags: string[]) => {

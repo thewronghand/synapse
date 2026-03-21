@@ -31,6 +31,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useNotesWatcher } from "@/hooks/useNotesWatcher";
+import { useChatOverlay } from "@/components/chat/ChatOverlayProvider";
 
 // Filter graph to only include nodes and links from the same folder
 function filterGraphByFolder(graph: Graph, folder: string): Graph {
@@ -78,6 +79,8 @@ export default function NotePage() {
   const title = decodeURIComponent(slug);
   // folder 쿼리 파라미터 (위키링크 클릭 시 폴더 격리를 위해 사용)
   const folderParam = searchParams.get('folder');
+
+  const { setDocumentContext, setSelectedText } = useChatOverlay();
 
   const [document, setDocument] = useState<Document | null>(null);
   const [graph, setGraph] = useState<Graph | null>(null);
@@ -176,6 +179,32 @@ export default function NotePage() {
   useNotesWatcher({
     onNotesChanged: fetchData,
   });
+
+  // 현재 문서 컨텍스트를 ChatOverlay에 공유
+  useEffect(() => {
+    if (document) {
+      setDocumentContext({
+        title: document.title,
+        folder: document.folder || "default",
+        content: document.contentWithoutFrontmatter?.slice(0, 3000),
+      });
+    }
+    return () => setDocumentContext(null);
+  }, [document, setDocumentContext]);
+
+  // 텍스트 선택 감지
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim() || "";
+      setSelectedText(text);
+    };
+
+    globalThis.document?.addEventListener("selectionchange", handleSelectionChange);
+    return () => {
+      globalThis.document?.removeEventListener("selectionchange", handleSelectionChange);
+    };
+  }, [setSelectedText]);
 
   // Wiki link click handler - navigate using encoded title with folder context
   function handleWikiLinkClick(pageName: string) {

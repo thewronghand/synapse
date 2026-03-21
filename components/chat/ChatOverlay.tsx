@@ -15,6 +15,7 @@ import {
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import type { ChatMessage, ChatSessionMeta, ToolInvocation } from "@/types";
+import { useChatOverlay } from "@/components/chat/ChatOverlayProvider";
 
 interface ChatOverlayProps {
   onClose: () => void;
@@ -22,6 +23,7 @@ interface ChatOverlayProps {
 
 export function ChatOverlay({ onClose }: ChatOverlayProps) {
   const router = useRouter();
+  const { documentContext } = useChatOverlay();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [gcpConnected, setGcpConnected] = useState<boolean | null>(null);
@@ -308,6 +310,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
         body: JSON.stringify({
           messages: uiMessages,
           sessionId,
+          documentContext: documentContext || undefined,
         }),
         signal: abortController.signal,
       });
