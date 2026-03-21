@@ -107,6 +107,13 @@ function SettingsContent() {
     errors?: string[];
   } | null>(null);
 
+  // 퍼블리시 챗봇 states
+  const [publishedChatEnabled, setPublishedChatEnabled] = useState(false);
+  const [publishedChatDailyLimit, setPublishedChatDailyLimit] = useState(50);
+  const [publishedChatInstructions, setPublishedChatInstructions] = useState("");
+  const [publishedChatLoading, setPublishedChatLoading] = useState(true);
+  const [publishedChatSaving, setPublishedChatSaving] = useState(false);
+
   // GCS Bucket states
   const [gcsBucketName, setGcsBucketName] = useState("");
   const [gcsBucketSaved, setGcsBucketSaved] = useState<string | null>(null);
@@ -138,6 +145,26 @@ function SettingsContent() {
   const [foldersLoading, setFoldersLoading] = useState(true);
 
   // Auto-scroll logs to bottom when new logs arrive
+  // 퍼블리시 챗봇 설정 로드
+  useEffect(() => {
+    async function loadChatbotSettings() {
+      try {
+        const res = await fetch("/api/settings/published-chatbot");
+        const data = await res.json();
+        if (data.success) {
+          setPublishedChatEnabled(data.data.enabled);
+          setPublishedChatDailyLimit(data.data.dailyLimit);
+          setPublishedChatInstructions(data.data.customInstructions || "");
+        }
+      } catch (err) {
+        console.error("Failed to load chatbot settings:", err);
+      } finally {
+        setPublishedChatLoading(false);
+      }
+    }
+    loadChatbotSettings();
+  }, []);
+
   useEffect(() => {
     if (logsContainerRef.current && showBuildLogs) {
       logsContainerRef.current.scrollTop = logsContainerRef.current.scrollHeight;
@@ -1905,6 +1932,141 @@ function SettingsContent() {
               {embeddingSyncResult.errors && embeddingSyncResult.errors.length > 0 && (
                 <p className="text-destructive mt-1">
                   {embeddingSyncResult.errors.length}개 문서에서 오류 발생
+                </p>
+              )}
+            </div>
+          )}
+        </section>
+
+        {/* 퍼블리시 챗봇 설정 */}
+        <section className="bg-card rounded-lg border p-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Bot className="h-5 w-5" />
+            <h2 className="text-xl font-bold">퍼블리시 챗봇</h2>
+          </div>
+          <p className="text-sm text-muted-foreground mb-4">
+            퍼블리시된 사이트에서 방문자가 문서에 대해 질문할 수 있는 챗봇을 설정합니다.
+          </p>
+
+          {publishedChatLoading ? (
+            <Spinner className="h-6 w-6" />
+          ) : (
+            <div className="space-y-4">
+              {/* 활성화 토글 */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium text-sm">챗봇 활성화</p>
+                  <p className="text-xs text-muted-foreground">
+                    다음 퍼블리시부터 적용됩니다
+                  </p>
+                </div>
+                <button
+                  onClick={async () => {
+                    const newValue = !publishedChatEnabled;
+                    setPublishedChatEnabled(newValue);
+                    await fetch("/api/settings/published-chatbot", {
+                      method: "PUT",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ enabled: newValue }),
+                    });
+                    toast.success(newValue ? "챗봇 활성화됨" : "챗봇 비활성화됨");
+                  }}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors cursor-pointer ${
+                    publishedChatEnabled ? "bg-primary" : "bg-muted"
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      publishedChatEnabled ? "translate-x-6" : "translate-x-1"
+                    }`}
+                  />
+                </button>
+              </div>
+
+              {/* 일일 사용량 제한 */}
+              <div>
+                <label className="font-medium text-sm">1일 사용량 제한</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  방문자가 하루에 보낼 수 있는 최대 메시지 수 (0 = 무제한)
+                </p>
+                <div className="flex items-center gap-2">
+                  <input
+                    type="number"
+                    min="0"
+                    value={publishedChatDailyLimit}
+                    onChange={(e) =>
+                      setPublishedChatDailyLimit(parseInt(e.target.value) || 0)
+                    }
+                    className="w-24 rounded-md border bg-background px-3 py-1.5 text-sm"
+                  />
+                  <span className="text-sm text-muted-foreground">회/일</span>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    disabled={publishedChatSaving}
+                    onClick={async () => {
+                      setPublishedChatSaving(true);
+                      try {
+                        await fetch("/api/settings/published-chatbot", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ dailyLimit: publishedChatDailyLimit }),
+                        });
+                        toast.success("사용량 제한 저장됨");
+                      } finally {
+                        setPublishedChatSaving(false);
+                      }
+                    }}
+                  >
+                    저장
+                  </Button>
+                </div>
+              </div>
+
+              {/* 커스텀 지시사항 */}
+              <div>
+                <label className="font-medium text-sm">챗봇 커스텀 지시사항</label>
+                <p className="text-xs text-muted-foreground mb-2">
+                  퍼블리시 챗봇의 응답 스타일이나 역할을 지정합니다
+                </p>
+                <textarea
+                  value={publishedChatInstructions}
+                  onChange={(e) => setPublishedChatInstructions(e.target.value)}
+                  placeholder="예: 이 사이트는 개발 블로그입니다. 기술적인 질문에 친절하게 답변해주세요."
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm min-h-[80px] resize-y"
+                  rows={3}
+                />
+                <div className="mt-2 flex justify-end">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="cursor-pointer"
+                    disabled={publishedChatSaving}
+                    onClick={async () => {
+                      setPublishedChatSaving(true);
+                      try {
+                        await fetch("/api/settings/published-chatbot", {
+                          method: "PUT",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({
+                            customInstructions: publishedChatInstructions,
+                          }),
+                        });
+                        toast.success("지시사항 저장됨");
+                      } finally {
+                        setPublishedChatSaving(false);
+                      }
+                    }}
+                  >
+                    저장
+                  </Button>
+                </div>
+              </div>
+
+              {!gcpConnected && (
+                <p className="text-sm text-amber-500">
+                  GCP 서비스 어카운트를 먼저 설정해야 챗봇을 사용할 수 있습니다.
                 </p>
               )}
             </div>
