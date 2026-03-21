@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { VercelClient } from '@/lib/vercel-client';
 import { deleteVercelToken } from '@/lib/vercel-token';
 import { getExportDataDir } from '@/lib/data-path';
+import { loadGcpServiceAccount } from '@/lib/gcp-service-account';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -210,10 +211,15 @@ export async function POST(request: NextRequest) {
       encoding: 'utf-8',
     });
 
-    // Add .env file with NEXT_PUBLIC_IS_PUBLISHED=true
+    // Add .env file with publish mode config + SA for chatbot
+    const sa = await loadGcpServiceAccount();
+    const envLines = ['NEXT_PUBLIC_IS_PUBLISHED=true'];
+    if (sa) {
+      envLines.push(`GCP_SA_JSON=${JSON.stringify(JSON.stringify(sa))}`);
+    }
     filesToPush.push({
       path: '.env',
-      content: 'NEXT_PUBLIC_IS_PUBLISHED=true\n',
+      content: envLines.join('\n') + '\n',
       encoding: 'utf-8',
     });
 
