@@ -202,7 +202,7 @@ export function ChatMessageItem({
                 </div>
               </div>
             ) : (
-              <p className="whitespace-pre-wrap text-sm">{message.content}</p>
+              <UserMessageContent content={message.content} />
             )
           ) : (
             <div className="flex flex-col gap-2">
@@ -277,4 +277,26 @@ export function ChatMessageItem({
       )}
     </div>
   );
+}
+
+// 사용자 메시지에서 [인용: "..."] 패턴을 인용 블록으로 렌더링
+function UserMessageContent({ content }: { content: string }) {
+  const quoteMatch = content.match(/^\[인용: "([\s\S]*?)"\]\n\n([\s\S]*)$/);
+
+  if (quoteMatch) {
+    const [, quoted, message] = quoteMatch;
+    return (
+      <div className="text-sm">
+        <div className="border-l-2 border-primary/40 bg-muted/30 rounded-r px-2 py-1 mb-2">
+          <p className="text-[10px] font-medium text-muted-foreground mb-0.5">인용</p>
+          <div className="max-h-16 overflow-y-auto text-xs text-muted-foreground italic whitespace-pre-wrap">
+            {quoted}
+          </div>
+        </div>
+        <p className="whitespace-pre-wrap">{message}</p>
+      </div>
+    );
+  }
+
+  return <p className="whitespace-pre-wrap text-sm">{content}</p>;
 }
