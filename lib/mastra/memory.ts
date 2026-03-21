@@ -1,5 +1,5 @@
 import { Memory } from "@mastra/memory";
-import { LibSQLStore } from "@mastra/libsql";
+import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
 import path from "path";
 import { getSynapseRootDir } from "@/lib/notes-path";
 
@@ -18,16 +18,32 @@ export function getMemory(): Memory {
 
   const dataDir = getMastraDataDir();
 
+  const dbUrl = `file:${path.join(dataDir, "memory.db")}`;
+
   memoryInstance = new Memory({
     // 메시지 저장소 (LibSQL)
     storage: new LibSQLStore({
       id: "synapse-memory",
-      url: `file:${path.join(dataDir, "memory.db")}`,
+      url: dbUrl,
     }),
+
+    // Semantic Recall용 벡터 스토어 + 임베딩 모델
+    vector: new LibSQLVector({
+      id: "synapse-memory-vector",
+      url: dbUrl,
+    }),
+    embedder: "google/text-embedding-004",
 
     options: {
       // 최근 메시지 개수
       lastMessages: 20,
+
+      // Semantic Recall: 과거 대화에서 의미적으로 관련된 메시지 검색
+      semanticRecall: {
+        topK: 3,
+        messageRange: 2,
+        scope: "resource",
+      },
 
       // Observational Memory: 대화에서 사실 추출 및 장기 기억
       // Claude의 Memory/Compact와 유사
