@@ -37,6 +37,7 @@ export async function GET(request: NextRequest) {
     const folder = searchParams.get('folder');
     const limit = parseInt(searchParams.get('limit') || '20', 10);
     const mode = searchParams.get('mode') || 'keyword';
+    const minScore = parseFloat(searchParams.get('minScore') || '0.7');
 
     if (!query || query.trim().length === 0) {
       return NextResponse.json({
@@ -47,7 +48,7 @@ export async function GET(request: NextRequest) {
 
     // 시맨틱 검색 모드
     if (mode === 'semantic') {
-      const semanticResults = await searchSemantic(query.trim(), folder || undefined, limit);
+      const semanticResults = await searchSemantic(query.trim(), folder || undefined, limit, minScore);
       return NextResponse.json({
         success: true,
         data: {
@@ -255,17 +256,20 @@ function extractSnippet(
 async function searchSemantic(
   query: string,
   folderFilter?: string,
-  limit: number = 20
+  limit: number = 20,
+  minScore: number = 0.7
 ): Promise<SearchResult[]> {
   const results = await searchByEmbedding(query, limit, folderFilter);
 
-  return results.map((r) => ({
-    title: r.title,
-    folder: r.folder,
-    snippet: r.text.slice(0, 200) + (r.text.length > 200 ? '...' : ''),
-    matchStart: 0,
-    matchEnd: 0,
-    tags: [],
-    score: r.score,
-  }));
+  return results
+    .filter((r) => r.score >= minScore)
+    .map((r) => ({
+      title: r.title,
+      folder: r.folder,
+      snippet: r.text.slice(0, 200) + (r.text.length > 200 ? '...' : ''),
+      matchStart: 0,
+      matchEnd: 0,
+      tags: [],
+      score: r.score,
+    }));
 }

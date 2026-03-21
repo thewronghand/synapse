@@ -42,6 +42,7 @@ function DocumentsContent() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
   const [searchMode, setSearchMode] = useState<"title" | "content" | "semantic">("title");
+  const [semanticMinScore, setSemanticMinScore] = useState<"high" | "medium" | "low">("medium");
   const [contentSearchResults, setContentSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [sortBy, setSortBy] = useState<"title-asc" | "title-desc" | "created-desc" | "created-asc" | "updated-desc" | "updated-asc">("updated-desc");
@@ -105,7 +106,7 @@ function DocumentsContent() {
     } else {
       setContentSearchResults([]);
     }
-  }, [searchQuery, searchMode, selectedFolder]);
+  }, [searchQuery, searchMode, selectedFolder, semanticMinScore]);
 
   async function searchContent(query: string) {
     if (!query.trim()) return;
@@ -114,7 +115,9 @@ function DocumentsContent() {
     try {
       const folderParam = selectedFolder ? `&folder=${encodeURIComponent(selectedFolder)}` : "";
       const modeParam = searchMode === "semantic" ? "&mode=semantic" : "";
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${folderParam}${modeParam}`);
+      const scoreMap = { high: 0.85, medium: 0.75, low: 0.7 };
+      const minScoreParam = searchMode === "semantic" ? `&minScore=${scoreMap[semanticMinScore]}` : "";
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${folderParam}${modeParam}${minScoreParam}`);
       const data = await res.json();
       if (data.success) {
         setContentSearchResults(data.data.results);
@@ -462,6 +465,19 @@ function DocumentsContent() {
             </div>
           )}
         </div>
+
+        {/* 시맨틱 유사도 수준 선택 */}
+        {searchMode === "semantic" && (
+          <select
+            value={semanticMinScore}
+            onChange={(e) => setSemanticMinScore(e.target.value as "high" | "medium" | "low")}
+            className="h-9 rounded-md border bg-card px-2 text-sm text-foreground cursor-pointer"
+          >
+            <option value="high">높은 유사도</option>
+            <option value="medium">보통 유사도</option>
+            <option value="low">낮은 유사도</option>
+          </select>
+        )}
       </div>
 
       {/* Tag Filter Inputs */}
