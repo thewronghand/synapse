@@ -193,11 +193,14 @@ export default function NotePage() {
   }, [document, setDocumentContext]);
 
   // 텍스트 선택 감지
+  // 텍스트 선택 감지 (포커스 이동 시 이전 선택 유지)
   useEffect(() => {
     const handleSelectionChange = () => {
       const selection = window.getSelection();
       const text = selection?.toString().trim() || "";
-      setSelectedText(text);
+      if (text) {
+        setSelectedText(text);
+      }
     };
 
     globalThis.document?.addEventListener("selectionchange", handleSelectionChange);
