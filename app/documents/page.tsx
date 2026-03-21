@@ -437,7 +437,7 @@ function DocumentsContent() {
                 setShowSearchSuggestions(false);
               }
             }}
-            className="pl-20 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="pl-28 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           />
 
           {/* Search Suggestions Dropdown (title mode only) */}
