@@ -1,49 +1,35 @@
 import { Memory } from "@mastra/memory";
 import { LibSQLStore, LibSQLVector } from "@mastra/libsql";
+import { createVertex } from "@ai-sdk/google-vertex";
 import path from "path";
 import { getSynapseRootDir } from "@/lib/notes-path";
+import { loadGcpServiceAccount } from "@/lib/gcp-service-account";
 
 // Mastra 데이터 저장 경로
 function getMastraDataDir(): string {
   return path.join(getSynapseRootDir(), ".synapse", "mastra");
 }
 
-// Memory 인스턴스 생성 (lazy initialization)
+// Memory 인스턴스 (SA 유무에 따라 2가지 버전)
 let memoryInstance: Memory | null = null;
 
+// 기본 Memory (Semantic Recall 없이)
 export function getMemory(): Memory {
   if (memoryInstance) {
     return memoryInstance;
   }
 
   const dataDir = getMastraDataDir();
-
   const dbUrl = `file:${path.join(dataDir, "memory.db")}`;
 
   memoryInstance = new Memory({
-    // 메시지 저장소 (LibSQL)
     storage: new LibSQLStore({
       id: "synapse-memory",
       url: dbUrl,
     }),
 
-    // Semantic Recall용 벡터 스토어 + 임베딩 모델
-    vector: new LibSQLVector({
-      id: "synapse-memory-vector",
-      url: dbUrl,
-    }),
-    embedder: "google/text-embedding-004",
-
     options: {
-      // 최근 메시지 개수
       lastMessages: 20,
-
-      // Semantic Recall: 과거 대화에서 의미적으로 관련된 메시지 검색
-      semanticRecall: {
-        topK: 3,
-        messageRange: 2,
-        scope: "resource",
-      },
 
       // Observational Memory: 대화에서 사실 추출 및 장기 기억
       // Claude의 Memory/Compact와 유사
@@ -88,9 +74,96 @@ export function getMemory(): Memory {
   return memoryInstance;
 }
 
+// Semantic Recall이 포함된 Memory (SA 필요, 비동기)
+let memoryWithRecallInstance: Memory | null = null;
+
+export async function getMemoryWithSemanticRecall(): Promise<Memory> {
+  if (memoryWithRecallInstance) return memoryWithRecallInstance;
+
+  const sa = await loadGcpServiceAccount();
+  if (!sa) {
+    // SA 없으면 기본 메모리 반환
+    return getMemory();
+  }
+
+  const dataDir = getMastraDataDir();
+  const dbUrl = `file:${path.join(dataDir, "memory.db")}`;
+
+  const vertex = createVertex({
+    project: sa.project_id,
+    location: "us-central1",
+    googleAuthOptions: {
+      credentials: {
+        client_email: sa.client_email,
+        private_key: sa.private_key,
+      },
+    },
+  });
+
+  memoryWithRecallInstance = new Memory({
+    storage: new LibSQLStore({
+      id: "synapse-memory",
+      url: dbUrl,
+    }),
+    vector: new LibSQLVector({
+      id: "synapse-memory-vector",
+      url: dbUrl,
+    }),
+    embedder: vertex.embeddingModel("text-embedding-004"),
+
+    options: {
+      lastMessages: 20,
+
+      semanticRecall: {
+        topK: 3,
+        messageRange: 2,
+        scope: "resource",
+      },
+
+      observationalMemory: {
+        model: "google/gemini-2.5-flash",
+        scope: "resource",
+        observation: {
+          messageTokens: 50_000,
+        },
+        reflection: {
+          observationTokens: 60_000,
+        },
+      },
+
+      workingMemory: {
+        enabled: true,
+        scope: "resource",
+        template: `# 사용자 프로필
+- **이름**:
+- **직업/역할**:
+- **기술 수준**: (초급/중급/고급)
+
+# 관심사 및 프로젝트
+- **주요 관심 분야**:
+- **진행 중인 프로젝트**:
+- **자주 다루는 주제**:
+
+# 선호도
+- **응답 스타일**: (간결/상세/코드 중심)
+- **언어 선호**: (한국어/영어/혼합)
+- **기술 설명 수준**: (비유 사용/기술적 정확도 우선)
+
+# 중요 컨텍스트
+- **반복적으로 언급된 사항**:
+- **특별 요청사항**:
+`,
+      },
+    },
+  });
+
+  return memoryWithRecallInstance;
+}
+
 // 테스트/개발용: 메모리 인스턴스 초기화
 export function resetMemory(): void {
   memoryInstance = null;
+  memoryWithRecallInstance = null;
 }
 
 // Working Memory 조회
