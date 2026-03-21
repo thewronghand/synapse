@@ -10,202 +10,7 @@ function getMastraDataDir(): string {
   return path.join(getSynapseRootDir(), ".synapse", "mastra");
 }
 
-// Memory 인스턴스 (SA 유무에 따라 2가지 버전)
-let memoryInstance: Memory | null = null;
-
-// 기본 Memory (Semantic Recall 없이)
-export function getMemory(): Memory {
-  if (memoryInstance) {
-    return memoryInstance;
-  }
-
-  const dataDir = getMastraDataDir();
-  const dbUrl = `file:${path.join(dataDir, "memory.db")}`;
-
-  memoryInstance = new Memory({
-    storage: new LibSQLStore({
-      id: "synapse-memory",
-      url: dbUrl,
-    }),
-
-    options: {
-      lastMessages: 20,
-
-      // Observational Memory: 대화에서 사실 추출 및 장기 기억
-      // Claude의 Memory/Compact와 유사
-      observationalMemory: {
-        model: "google/gemini-2.5-flash",
-        scope: "resource",
-        observation: {
-          messageTokens: 50_000,
-        },
-        reflection: {
-          observationTokens: 60_000,
-        },
-      },
-
-      // Working Memory: 세션 간 지속되는 사용자 정보
-      workingMemory: {
-        enabled: true,
-        scope: "resource",
-        template: `# 사용자 프로필
-- **이름**:
-- **직업/역할**:
-- **기술 수준**: (초급/중급/고급)
-
-# 관심사 및 프로젝트
-- **주요 관심 분야**:
-- **진행 중인 프로젝트**:
-- **자주 다루는 주제**:
-
-# 선호도
-- **응답 스타일**: (간결/상세/코드 중심)
-- **언어 선호**: (한국어/영어/혼합)
-- **기술 설명 수준**: (비유 사용/기술적 정확도 우선)
-
-# 중요 컨텍스트
-- **반복적으로 언급된 사항**:
-- **특별 요청사항**:
-`,
-      },
-    },
-  });
-
-  return memoryInstance;
-}
-
-// Semantic Recall이 포함된 Memory (SA 필요, 비동기)
-let memoryWithRecallInstance: Memory | null = null;
-
-export async function getMemoryWithSemanticRecall(): Promise<Memory> {
-  if (memoryWithRecallInstance) return memoryWithRecallInstance;
-
-  const sa = await loadGcpServiceAccount();
-  if (!sa) {
-    // SA 없으면 기본 메모리 반환
-    return getMemory();
-  }
-
-  const dataDir = getMastraDataDir();
-  const dbUrl = `file:${path.join(dataDir, "memory.db")}`;
-
-  const vertex = createVertex({
-    project: sa.project_id,
-    location: "us-central1",
-    googleAuthOptions: {
-      credentials: {
-        client_email: sa.client_email,
-        private_key: sa.private_key,
-      },
-    },
-  });
-
-  memoryWithRecallInstance = new Memory({
-    storage: new LibSQLStore({
-      id: "synapse-memory",
-      url: dbUrl,
-    }),
-    vector: new LibSQLVector({
-      id: "synapse-memory-vector",
-      url: dbUrl,
-    }),
-    embedder: vertex.embeddingModel("text-embedding-004"),
-
-    options: {
-      lastMessages: 20,
-
-      semanticRecall: {
-        topK: 3,
-        messageRange: 2,
-        scope: "resource",
-      },
-
-      observationalMemory: {
-        model: "google/gemini-2.5-flash",
-        scope: "resource",
-        observation: {
-          messageTokens: 50_000,
-        },
-        reflection: {
-          observationTokens: 60_000,
-        },
-      },
-
-      workingMemory: {
-        enabled: true,
-        scope: "resource",
-        template: `# 사용자 프로필
-- **이름**:
-- **직업/역할**:
-- **기술 수준**: (초급/중급/고급)
-
-# 관심사 및 프로젝트
-- **주요 관심 분야**:
-- **진행 중인 프로젝트**:
-- **자주 다루는 주제**:
-
-# 선호도
-- **응답 스타일**: (간결/상세/코드 중심)
-- **언어 선호**: (한국어/영어/혼합)
-- **기술 설명 수준**: (비유 사용/기술적 정확도 우선)
-
-# 중요 컨텍스트
-- **반복적으로 언급된 사항**:
-- **특별 요청사항**:
-`,
-      },
-    },
-  });
-
-  return memoryWithRecallInstance;
-}
-
-// 테스트/개발용: 메모리 인스턴스 초기화
-export function resetMemory(): void {
-  memoryInstance = null;
-  memoryWithRecallInstance = null;
-}
-
-// Working Memory 조회
-export async function getWorkingMemory(
-  resourceId: string
-): Promise<string | null> {
-  const memory = getMemory();
-  // resource-scoped working memory는 threadId 없이 resourceId만으로 조회
-  // 임의의 threadId를 사용하되 resource 범위의 메모리를 가져옴
-  const result = await memory.getWorkingMemory({
-    threadId: `resource-${resourceId}`,
-    resourceId,
-  });
-  return result;
-}
-
-// Working Memory 수정
-export async function updateWorkingMemory(
-  resourceId: string,
-  content: string
-): Promise<void> {
-  const memory = getMemory();
-  await memory.updateWorkingMemory({
-    threadId: `resource-${resourceId}`,
-    resourceId,
-    workingMemory: content,
-  });
-}
-
-// Working Memory 리셋 (빈 문자열로 초기화)
-export async function resetWorkingMemory(resourceId: string): Promise<void> {
-  const memory = getMemory();
-  await memory.updateWorkingMemory({
-    threadId: `resource-${resourceId}`,
-    resourceId,
-    workingMemory: "",
-  });
-}
-
-// Working Memory 템플릿 조회
-export function getWorkingMemoryTemplate(): string {
-  return `# 사용자 프로필
+const WORKING_MEMORY_TEMPLATE = `# 사용자 프로필
 - **이름**:
 - **직업/역할**:
 - **기술 수준**: (초급/중급/고급)
@@ -224,4 +29,147 @@ export function getWorkingMemoryTemplate(): string {
 - **반복적으로 언급된 사항**:
 - **특별 요청사항**:
 `;
+
+// Memory 인스턴스 (하나만 유지)
+let memoryInstance: Memory | null = null;
+let memoryInitPromise: Promise<Memory> | null = null;
+
+// Memory 생성 (비동기 — SA가 있으면 Semantic Recall 포함)
+async function createMemoryInstance(): Promise<Memory> {
+  const dataDir = getMastraDataDir();
+  const dbUrl = `file:${path.join(dataDir, "memory.db")}`;
+
+  const sa = await loadGcpServiceAccount();
+
+  // SA가 있으면 Vertex AI 모델을 사용한 풀 기능 Memory
+  if (sa) {
+    const vertex = createVertex({
+      project: sa.project_id,
+      location: "us-central1",
+      googleAuthOptions: {
+        credentials: {
+          client_email: sa.client_email,
+          private_key: sa.private_key,
+        },
+      },
+    });
+
+    return new Memory({
+      storage: new LibSQLStore({
+        id: "synapse-memory",
+        url: dbUrl,
+      }),
+      vector: new LibSQLVector({
+        id: "synapse-memory-vector",
+        url: dbUrl,
+      }),
+      embedder: vertex.embeddingModel("text-embedding-004"),
+
+      options: {
+        lastMessages: 20,
+
+        semanticRecall: {
+          topK: 3,
+          messageRange: 2,
+          scope: "resource",
+        },
+
+        observationalMemory: {
+          model: vertex("gemini-2.0-flash"),
+          scope: "resource",
+          observation: {
+            messageTokens: 50_000,
+          },
+          reflection: {
+            observationTokens: 60_000,
+          },
+        },
+
+        workingMemory: {
+          enabled: true,
+          scope: "resource",
+          template: WORKING_MEMORY_TEMPLATE,
+        },
+      },
+    });
+  }
+
+  // SA 없으면 기본 Memory (Semantic Recall, Observational Memory 없이)
+  return new Memory({
+    storage: new LibSQLStore({
+      id: "synapse-memory",
+      url: dbUrl,
+    }),
+
+    options: {
+      lastMessages: 20,
+
+      workingMemory: {
+        enabled: true,
+        scope: "resource",
+        template: WORKING_MEMORY_TEMPLATE,
+      },
+    },
+  });
+}
+
+// Memory 가져오기 (비동기, 한번만 생성)
+export async function getMemory(): Promise<Memory> {
+  if (memoryInstance) return memoryInstance;
+
+  if (!memoryInitPromise) {
+    memoryInitPromise = createMemoryInstance().then((m) => {
+      memoryInstance = m;
+      memoryInitPromise = null;
+      return m;
+    });
+  }
+
+  return memoryInitPromise;
+}
+
+// 테스트/개발용: 메모리 인스턴스 초기화
+export function resetMemory(): void {
+  memoryInstance = null;
+  memoryInitPromise = null;
+}
+
+// Working Memory 조회
+export async function getWorkingMemory(
+  resourceId: string
+): Promise<string | null> {
+  const memory = await getMemory();
+  const result = await memory.getWorkingMemory({
+    threadId: `resource-${resourceId}`,
+    resourceId,
+  });
+  return result;
+}
+
+// Working Memory 수정
+export async function updateWorkingMemory(
+  resourceId: string,
+  content: string
+): Promise<void> {
+  const memory = await getMemory();
+  await memory.updateWorkingMemory({
+    threadId: `resource-${resourceId}`,
+    resourceId,
+    workingMemory: content,
+  });
+}
+
+// Working Memory 리셋 (빈 문자열로 초기화)
+export async function resetWorkingMemory(resourceId: string): Promise<void> {
+  const memory = await getMemory();
+  await memory.updateWorkingMemory({
+    threadId: `resource-${resourceId}`,
+    resourceId,
+    workingMemory: "",
+  });
+}
+
+// Working Memory 템플릿 조회
+export function getWorkingMemoryTemplate(): string {
+  return WORKING_MEMORY_TEMPLATE;
 }

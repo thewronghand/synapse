@@ -1,7 +1,7 @@
 import { Agent } from "@mastra/core/agent";
 import { TokenLimiterProcessor } from "@mastra/core/processors";
 import { createVertex } from "@ai-sdk/google-vertex";
-import { getMemoryWithSemanticRecall } from "@/lib/mastra/memory";
+import { getMemory } from "@/lib/mastra/memory";
 import { neuroTools } from "@/lib/mastra/tools";
 import {
   loadGcpServiceAccount,
@@ -66,7 +66,7 @@ async function createNeuroAgentInternal(): Promise<Agent> {
   const model = await createVertexModel();
   const vertex = await getVertexProvider();
   console.log("[Neuro] createVertexModel 완료, Agent 생성 시작...");
-  const memory = await getMemoryWithSemanticRecall();
+  const memory = await getMemory();
 
   // 외부 설정 파일에서 프롬프트 로드 (기본 + 커스텀 지시사항)
   const instructions = await buildNeuroInstructions();
