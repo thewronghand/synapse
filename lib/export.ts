@@ -6,6 +6,7 @@ import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename,
 import { getNotesDir } from './notes-path';
 import { ensureDefaultFolder } from './folder-utils';
 import { getExportDataDir, ensureExportDataDir } from './data-path';
+import { generateEmbeddingsForExport } from './mastra/embedding';
 
 const NOTES_DIR = getNotesDir();
 
@@ -348,6 +349,26 @@ export async function exportToJSON(excludedFolders: string[] = []) {
     JSON.stringify(foldersArray, null, 2)
   );
   console.log(`[Export] Exported ${foldersArray.length} folders`);
+
+  // 7. Export embeddings for published mode chatbot
+  try {
+    console.log('[Export] Generating embeddings...');
+    const embeddingDocs = documents.map((doc) => ({
+      title: doc.title,
+      folder: doc.folder || '',
+      content: doc.contentWithoutFrontmatter || doc.content,
+    }));
+
+    const embeddings = await generateEmbeddingsForExport(embeddingDocs);
+
+    await fs.writeFile(
+      path.join(exportDir, 'embeddings.json'),
+      JSON.stringify(embeddings)
+    );
+    console.log(`[Export] Exported ${embeddings.length} embedding chunks`);
+  } catch (err) {
+    console.error('[Export] Embedding export failed (skipping):', err);
+  }
 
   console.log('[Export] Export complete!');
 

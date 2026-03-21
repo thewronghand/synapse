@@ -3,7 +3,9 @@
 import { createContext, useContext, useState, useCallback } from "react";
 import { usePathname } from "next/navigation";
 import { ChatOverlay } from "@/components/chat/ChatOverlay";
+import { PublishedChatOverlay } from "@/components/chat/PublishedChatOverlay";
 import { ChatFab } from "@/components/chat/ChatFab";
+import { isPublishedMode } from "@/lib/env";
 
 interface ChatOverlayContextType {
   isOpen: boolean;
@@ -38,12 +40,17 @@ export function ChatOverlayProvider({ children }: ChatOverlayProviderProps) {
 
   // /chat 페이지에서는 FAB 숨김
   const isChatPage = pathname === "/chat";
+  const published = isPublishedMode();
 
   return (
     <ChatOverlayContext.Provider value={{ isOpen, toggle }}>
       {children}
       {!isChatPage && <ChatFab onClick={toggle} />}
-      {isOpen && !isChatPage && <ChatOverlay onClose={close} />}
+      {isOpen && !isChatPage && (
+        published
+          ? <PublishedChatOverlay onClose={close} />
+          : <ChatOverlay onClose={close} />
+      )}
     </ChatOverlayContext.Provider>
   );
 }
