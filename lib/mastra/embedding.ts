@@ -65,6 +65,24 @@ async function chunkMarkdown(
     .filter((chunk) => chunk.text.trim().length >= MIN_CHUNK_LENGTH);
 }
 
+// 배치 임베딩 생성 (토큰 제한 방지)
+const EMBED_BATCH_SIZE = 20;
+
+async function embedInBatches(
+  model: Awaited<ReturnType<typeof getEmbeddingModel>>,
+  texts: string[]
+): Promise<number[][]> {
+  const allEmbeddings: number[][] = [];
+
+  for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
+    const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
+    const { embeddings } = await embedMany({ model, values: batch });
+    allEmbeddings.push(...embeddings);
+  }
+
+  return allEmbeddings;
+}
+
 // 문서 임베딩 생성 및 저장
 export async function embedDocument(
   content: string,
@@ -85,11 +103,11 @@ export async function embedDocument(
     return;
   }
 
-  // 임베딩 생성
-  const { embeddings } = await embedMany({
+  // 임베딩 생성 (배치)
+  const embeddings = await embedInBatches(
     model,
-    values: chunks.map((c) => c.text),
-  });
+    chunks.map((c) => c.text)
+  );
 
   // 메타데이터 구성
   const documentPath = `${folder}/${filename}`;
@@ -190,10 +208,10 @@ export async function generateEmbeddingsForExport(
     const chunks = await chunkMarkdown(doc.content);
     if (chunks.length === 0) continue;
 
-    const { embeddings } = await embedMany({
+    const embeddings = await embedInBatches(
       model,
-      values: chunks.map((c) => c.text),
-    });
+      chunks.map((c) => c.text)
+    );
 
     for (let i = 0; i < chunks.length; i++) {
       allChunks.push({
