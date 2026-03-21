@@ -10,6 +10,7 @@ import { RecordingProvider } from "@/components/voice-memo/RecordingProvider";
 import { ChatOverlayProvider } from "@/components/chat/ChatOverlayProvider";
 import { NavigationGuardProvider } from "@/contexts/NavigationGuardContext";
 import { Sidebar } from "@/components/layout/Sidebar";
+import { SelectionPopover } from "@/components/ui/SelectionPopover";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -63,6 +64,7 @@ export default function RootLayout({
             <NavigationGuardProvider>
               <RecordingProvider>
                 <ChatOverlayProvider>
+                  <SelectionPopover />
                   <Sidebar />
                   <div className="pl-11 md:pl-14">
                     <FindInPage />

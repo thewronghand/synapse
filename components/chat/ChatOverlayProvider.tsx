@@ -8,13 +8,9 @@ import { ChatFab } from "@/components/chat/ChatFab";
 import { isPublishedMode } from "@/lib/env";
 
 export interface DocumentContext {
-  // 현재 보고 있는 문서 제목
   title: string;
-  // 현재 보고 있는 문서 폴더
   folder: string;
-  // 문서 내용 (앞부분만 포함 가능)
   content?: string;
-  // 사용자가 드래그로 선택한 텍스트
   selectedText?: string;
 }
 
@@ -24,6 +20,11 @@ interface ChatOverlayContextType {
   documentContext: DocumentContext | null;
   setDocumentContext: (ctx: DocumentContext | null) => void;
   setSelectedText: (text: string) => void;
+  // 선택 텍스트를 인용으로 Neuro 채팅에 보내기
+  sendToNeuro: (text: string) => void;
+  // 인용된 텍스트 (ChatOverlay 입력창 위에 표시)
+  quotedText: string | null;
+  clearQuotedText: () => void;
 }
 
 const ChatOverlayContext = createContext<ChatOverlayContextType | null>(null);
@@ -43,6 +44,7 @@ interface ChatOverlayProviderProps {
 export function ChatOverlayProvider({ children }: ChatOverlayProviderProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [documentContext, setDocumentContext] = useState<DocumentContext | null>(null);
+  const [quotedText, setQuotedText] = useState<string | null>(null);
   const pathname = usePathname();
 
   const toggle = useCallback(() => {
@@ -59,13 +61,32 @@ export function ChatOverlayProvider({ children }: ChatOverlayProviderProps) {
     );
   }, []);
 
+  const sendToNeuro = useCallback((text: string) => {
+    setSelectedText(text);
+    setQuotedText(text);
+    setIsOpen(true);
+  }, [setSelectedText]);
+
+  const clearQuotedText = useCallback(() => {
+    setQuotedText(null);
+  }, []);
+
   // /chat 페이지에서는 FAB 숨김
   const isChatPage = pathname === "/chat";
   const published = isPublishedMode();
 
   return (
     <ChatOverlayContext.Provider
-      value={{ isOpen, toggle, documentContext, setDocumentContext, setSelectedText }}
+      value={{
+        isOpen,
+        toggle,
+        documentContext,
+        setDocumentContext,
+        setSelectedText,
+        sendToNeuro,
+        quotedText,
+        clearQuotedText,
+      }}
     >
       {children}
       {!isChatPage && <ChatFab onClick={toggle} />}
