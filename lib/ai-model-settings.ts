@@ -19,16 +19,21 @@ export const AI_MODELS: AIModelOption[] = [
   {
     id: "gemini-3-flash-preview",
     label: "Gemini 3 Flash (Preview)",
-    description: "빠르고 효율적인 최신 모델 (기본값)",
+    description: "빠르고 효율적인 모델",
   },
   {
     id: "gemini-3-pro-preview",
     label: "Gemini 3 Pro (Preview)",
     description: "더 높은 품질의 응답 (느림)",
   },
-];;
+  {
+    id: "gemini-3.1-pro-preview",
+    label: "Gemini 3.1 Pro (Preview)",
+    description: "최신 추론 모델 (기본값)",
+  },
+];
 
-export const DEFAULT_MODEL_ID = "gemini-3-flash-preview";;
+export const DEFAULT_MODEL_ID = "gemini-3.1-pro-preview";
 
 interface AIModelSettings {
   modelId: string;
