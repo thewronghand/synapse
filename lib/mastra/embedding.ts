@@ -53,11 +53,16 @@ async function chunkMarkdown(
     overlap: 50,
   });
 
-  return chunks.map((chunk) => ({
-    text: typeof chunk === "string" ? chunk : chunk.text,
-    metadata:
-      typeof chunk === "string" ? {} : (chunk.metadata as Record<string, string>) || {},
-  }));
+  // 짧은 청크 필터 (헤딩만 있는 등 의미 없는 청크 제외)
+  const MIN_CHUNK_LENGTH = 20;
+
+  return chunks
+    .map((chunk) => ({
+      text: typeof chunk === "string" ? chunk : chunk.text,
+      metadata:
+        typeof chunk === "string" ? {} : (chunk.metadata as Record<string, string>) || {},
+    }))
+    .filter((chunk) => chunk.text.trim().length >= MIN_CHUNK_LENGTH);
 }
 
 // 문서 임베딩 생성 및 저장
