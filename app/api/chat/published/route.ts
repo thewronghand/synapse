@@ -16,6 +16,51 @@ function getServiceAccount() {
   }
 }
 
+// 환경변수에서 커스텀 지시사항 로드
+function getCustomInstructions(): string {
+  const raw = process.env.PUBLISHED_CHATBOT_INSTRUCTIONS;
+  if (!raw) return "";
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return raw;
+  }
+}
+
+// 일일 사용량 추적 (인메모리, 서버리스 환경에서는 인스턴스별)
+const usageMap = new Map<string, { count: number; date: string }>();
+
+function checkDailyLimit(): boolean {
+  const limit = parseInt(process.env.PUBLISHED_CHATBOT_DAILY_LIMIT || "50", 10);
+  if (limit === 0) return true; // 0 = 무제한
+
+  const today = new Date().toISOString().slice(0, 10);
+  const usage = usageMap.get("global") || { count: 0, date: today };
+
+  // 날짜가 바뀌었으면 리셋
+  if (usage.date !== today) {
+    usageMap.set("global", { count: 1, date: today });
+    return true;
+  }
+
+  if (usage.count >= limit) return false;
+
+  usage.count++;
+  usageMap.set("global", usage);
+  return true;
+}
+
+function getRemainingUsage(): number {
+  const limit = parseInt(process.env.PUBLISHED_CHATBOT_DAILY_LIMIT || "50", 10);
+  if (limit === 0) return -1; // 무제한
+
+  const today = new Date().toISOString().slice(0, 10);
+  const usage = usageMap.get("global") || { count: 0, date: today };
+
+  if (usage.date !== today) return limit;
+  return Math.max(0, limit - usage.count);
+}
+
 // 퍼블리시 모드 전용 프롬프트
 const PUBLISHED_CHAT_INSTRUCTIONS = `You are Neuro(뉴로), an AI assistant on this published Synapse site.
 You help visitors explore and understand the documents published on this site.
@@ -39,6 +84,22 @@ export async function POST(req: NextRequest) {
     return NextResponse.json(
       { success: false, error: "이 API는 퍼블리시 모드에서만 사용 가능합니다." },
       { status: 403 }
+    );
+  }
+
+  // 챗봇 비활성화 확인
+  if (process.env.PUBLISHED_CHATBOT_ENABLED !== "true") {
+    return NextResponse.json(
+      { success: false, error: "챗봇이 비활성화되어 있습니다." },
+      { status: 403 }
+    );
+  }
+
+  // 일일 사용량 확인
+  if (!checkDailyLimit()) {
+    return NextResponse.json(
+      { success: false, error: "오늘의 사용량 한도에 도달했습니다. 내일 다시 시도해주세요." },
+      { status: 429 }
     );
   }
 
@@ -107,10 +168,13 @@ export async function POST(req: NextRequest) {
           .join("\n\n")
       : "관련 문서를 찾지 못했습니다.";
 
-    const systemPrompt = `${PUBLISHED_CHAT_INSTRUCTIONS}
+    // 커스텀 지시사항 적용
+    const customInstructions = getCustomInstructions();
+    const basePrompt = customInstructions
+      ? `${PUBLISHED_CHAT_INSTRUCTIONS}\n\n## Additional Instructions\n${customInstructions}`
+      : PUBLISHED_CHAT_INSTRUCTIONS;
 
-## Document Context
-${context}`;
+    const systemPrompt = `${basePrompt}\n\n## Document Context\n${context}`;
 
     // 스트리밍 응답
     const result = streamText({
@@ -130,4 +194,28 @@ ${context}`;
       { status: 500 }
     );
   }
+}
+
+/**
+ * GET /api/chat/published
+ * 챗봇 상태 확인 (활성화 여부, 남은 사용량)
+ */
+export async function GET() {
+  if (!isPublishedMode()) {
+    return NextResponse.json(
+      { success: false, error: "퍼블리시 모드에서만 사용 가능합니다." },
+      { status: 403 }
+    );
+  }
+
+  const enabled = process.env.PUBLISHED_CHATBOT_ENABLED === "true";
+  const remaining = getRemainingUsage();
+
+  return NextResponse.json({
+    success: true,
+    data: {
+      enabled,
+      remainingUsage: remaining,
+    },
+  });
 }
