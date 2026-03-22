@@ -53,11 +53,34 @@ async function chunkMarkdown(
     overlap: 50,
   });
 
-  return chunks.map((chunk) => ({
-    text: typeof chunk === "string" ? chunk : chunk.text,
-    metadata:
-      typeof chunk === "string" ? {} : (chunk.metadata as Record<string, string>) || {},
-  }));
+  // 짧은 청크 필터 (헤딩만 있는 등 의미 없는 청크 제외)
+  const MIN_CHUNK_LENGTH = 20;
+
+  return chunks
+    .map((chunk) => ({
+      text: typeof chunk === "string" ? chunk : chunk.text,
+      metadata:
+        typeof chunk === "string" ? {} : (chunk.metadata as Record<string, string>) || {},
+    }))
+    .filter((chunk) => chunk.text.trim().length >= MIN_CHUNK_LENGTH);
+}
+
+// 배치 임베딩 생성 (토큰 제한 방지)
+const EMBED_BATCH_SIZE = 20;
+
+async function embedInBatches(
+  model: Awaited<ReturnType<typeof getEmbeddingModel>>,
+  texts: string[]
+): Promise<number[][]> {
+  const allEmbeddings: number[][] = [];
+
+  for (let i = 0; i < texts.length; i += EMBED_BATCH_SIZE) {
+    const batch = texts.slice(i, i + EMBED_BATCH_SIZE);
+    const { embeddings } = await embedMany({ model, values: batch });
+    allEmbeddings.push(...embeddings);
+  }
+
+  return allEmbeddings;
 }
 
 // 문서 임베딩 생성 및 저장
@@ -80,11 +103,11 @@ export async function embedDocument(
     return;
   }
 
-  // 임베딩 생성
-  const { embeddings } = await embedMany({
+  // 임베딩 생성 (배치)
+  const embeddings = await embedInBatches(
     model,
-    values: chunks.map((c) => c.text),
-  });
+    chunks.map((c) => c.text)
+  );
 
   // 메타데이터 구성
   const documentPath = `${folder}/${filename}`;
@@ -160,6 +183,47 @@ export async function searchByEmbedding(
     folder: r.metadata?.folder || "",
     score: r.score,
   }));
+}
+
+// 문서 목록을 임베딩하여 JSON export용 데이터 생성
+export async function generateEmbeddingsForExport(
+  documents: { title: string; folder: string; content: string }[]
+): Promise<
+  {
+    text: string;
+    vector: number[];
+    title: string;
+    folder: string;
+  }[]
+> {
+  const model = await getEmbeddingModel();
+  const allChunks: {
+    text: string;
+    vector: number[];
+    title: string;
+    folder: string;
+  }[] = [];
+
+  for (const doc of documents) {
+    const chunks = await chunkMarkdown(doc.content);
+    if (chunks.length === 0) continue;
+
+    const embeddings = await embedInBatches(
+      model,
+      chunks.map((c) => c.text)
+    );
+
+    for (let i = 0; i < chunks.length; i++) {
+      allChunks.push({
+        text: chunks[i].text,
+        vector: embeddings[i],
+        title: doc.title,
+        folder: doc.folder,
+      });
+    }
+  }
+
+  return allChunks;
 }
 
 // SA 캐시 초기화

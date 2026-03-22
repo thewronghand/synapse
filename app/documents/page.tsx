@@ -9,7 +9,7 @@ import { Card, CardHeader, CardTitle, CardDescription } from "@/components/ui/ca
 import { Badge } from "@/components/ui/badge";
 import { TagInput } from "@/components/ui/tag-input";
 import { FolderTabs } from "@/components/ui/FolderTabs";
-import { Search, Folder, FileText, Type, Plus, ArrowUpDown } from "lucide-react";
+import { Search, Folder, FileText, Type, Plus, ArrowUpDown, Brain } from "lucide-react";
 import AppHeader from "@/components/layout/AppHeader";
 import { isPublishedMode } from "@/lib/env";
 import { LoadingScreen } from "@/components/ui/spinner";
@@ -41,7 +41,8 @@ function DocumentsContent() {
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(0);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedFolder, setSelectedFolder] = useState<string | null>(null);
-  const [searchMode, setSearchMode] = useState<"title" | "content">("title");
+  const [searchMode, setSearchMode] = useState<"title" | "content" | "semantic">("title");
+  const [semanticMinScore, setSemanticMinScore] = useState<"high" | "medium" | "low">("medium");
   const [contentSearchResults, setContentSearchResults] = useState<SearchResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [sortBy, setSortBy] = useState<"title-asc" | "title-desc" | "created-desc" | "created-asc" | "updated-desc" | "updated-asc">("updated-desc");
@@ -98,14 +99,14 @@ function DocumentsContent() {
     return () => clearTimeout(timer);
   }, [searchInput]);
 
-  // Content search when query changes and mode is content
+  // Content/Semantic search when query changes
   useEffect(() => {
-    if (searchMode === "content" && searchQuery.trim()) {
+    if ((searchMode === "content" || searchMode === "semantic") && searchQuery.trim()) {
       searchContent(searchQuery);
     } else {
       setContentSearchResults([]);
     }
-  }, [searchQuery, searchMode, selectedFolder]);
+  }, [searchQuery, searchMode, selectedFolder, semanticMinScore]);
 
   async function searchContent(query: string) {
     if (!query.trim()) return;
@@ -113,13 +114,16 @@ function DocumentsContent() {
     setIsSearching(true);
     try {
       const folderParam = selectedFolder ? `&folder=${encodeURIComponent(selectedFolder)}` : "";
-      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${folderParam}`);
+      const modeParam = searchMode === "semantic" ? "&mode=semantic" : "";
+      const scoreMap = { high: 0.85, medium: 0.75, low: 0.7 };
+      const minScoreParam = searchMode === "semantic" ? `&minScore=${scoreMap[semanticMinScore]}` : "";
+      const res = await fetch(`/api/search?q=${encodeURIComponent(query)}${folderParam}${modeParam}${minScoreParam}`);
       const data = await res.json();
       if (data.success) {
         setContentSearchResults(data.data.results);
       }
     } catch (err) {
-      console.error("Failed to search content:", err);
+      console.error("Failed to search:", err);
     } finally {
       setIsSearching(false);
     }
@@ -385,7 +389,7 @@ function DocumentsContent() {
             <button
               onClick={() => setSearchMode("content")}
               className={cn(
-                "p-1.5 rounded-r transition-colors",
+                "p-1.5 border-r transition-colors",
                 searchMode === "content"
                   ? "bg-primary/10 text-primary"
                   : "text-muted-foreground hover:text-foreground hover:bg-muted"
@@ -394,10 +398,22 @@ function DocumentsContent() {
             >
               <FileText className="w-4 h-4" />
             </button>
+            <button
+              onClick={() => setSearchMode("semantic")}
+              className={cn(
+                "p-1.5 rounded-r transition-colors",
+                searchMode === "semantic"
+                  ? "bg-primary/10 text-primary"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
+              )}
+              title="의미 검색"
+            >
+              <Brain className="w-4 h-4" />
+            </button>
           </div>
           <Input
             type="text"
-            placeholder={searchMode === "title" ? "제목으로 검색..." : "내용으로 검색..."}
+            placeholder={searchMode === "title" ? "제목으로 검색..." : searchMode === "content" ? "내용으로 검색..." : "의미로 검색... (예: 지난 회의에서 논의한 내용)"}
             value={searchInput}
             onChange={(e) => {
               setSearchInput(e.target.value);
@@ -424,7 +440,7 @@ function DocumentsContent() {
                 setShowSearchSuggestions(false);
               }
             }}
-            className="pl-20 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+            className="pl-28 bg-card border-border focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
           />
 
           {/* Search Suggestions Dropdown (title mode only) */}
@@ -449,6 +465,19 @@ function DocumentsContent() {
             </div>
           )}
         </div>
+
+        {/* 시맨틱 유사도 수준 선택 */}
+        {searchMode === "semantic" && (
+          <select
+            value={semanticMinScore}
+            onChange={(e) => setSemanticMinScore(e.target.value as "high" | "medium" | "low")}
+            className="h-9 rounded-md border bg-card px-2 text-sm text-foreground cursor-pointer"
+          >
+            <option value="high">높은 유사도</option>
+            <option value="medium">보통 유사도</option>
+            <option value="low">낮은 유사도</option>
+          </select>
+        )}
       </div>
 
       {/* Tag Filter Inputs */}
@@ -489,7 +518,7 @@ function DocumentsContent() {
       {/* Stats + Sort */}
       <div className="mb-6 flex items-center justify-between">
         <div className="text-sm text-muted-foreground">
-        {searchMode === "content" && searchQuery ? (
+        {(searchMode === "content" || searchMode === "semantic") && searchQuery ? (
           isSearching ? (
             "검색 중..."
           ) : (() => {
@@ -544,7 +573,7 @@ function DocumentsContent() {
       )}
 
       {/* Content Search Results */}
-      {searchMode === "content" && searchQuery && (
+      {(searchMode === "content" || searchMode === "semantic") && searchQuery && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
           {contentSearchResults
             .filter((result) => {
@@ -697,19 +726,25 @@ function DocumentsContent() {
       )}
 
       {/* No Search Results - Content mode */}
-      {searchMode === "content" && searchQuery && !isSearching && contentSearchResults.length === 0 && (
+      {(searchMode === "content" || searchMode === "semantic") && searchQuery && !isSearching && contentSearchResults.length === 0 && (
         <div className="text-center py-12">
           <p className="font-medium mb-2">"{searchQuery}"에 대한 검색 결과가 없습니다</p>
           <p className="text-sm text-muted-foreground">다른 키워드로 검색해보세요</p>
         </div>
       )}
 
-      {/* Content mode - No search query yet */}
-      {searchMode === "content" && !searchQuery && (
+      {/* Content/Semantic mode - No search query yet */}
+      {(searchMode === "content" || searchMode === "semantic") && !searchQuery && (
         <div className="text-center py-12">
           <Search className="w-12 h-12 mx-auto text-muted-foreground/50 mb-4" />
-          <p className="font-medium mb-2">내용 검색</p>
-          <p className="text-sm text-muted-foreground">검색어를 입력하면 문서 내용에서 검색합니다</p>
+          <p className="font-medium mb-2">
+            {searchMode === "semantic" ? "의미 검색" : "내용 검색"}
+          </p>
+          <p className="text-sm text-muted-foreground">
+            {searchMode === "semantic"
+              ? "자연어로 검색하면 의미적으로 관련된 문서를 찾습니다"
+              : "검색어를 입력하면 문서 내용에서 검색합니다"}
+          </p>
         </div>
       )}
       </main>

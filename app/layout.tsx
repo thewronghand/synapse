@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import "spoqa-han-sans/css/SpoqaHanSansNeo.css";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";
@@ -10,11 +11,7 @@ import { RecordingProvider } from "@/components/voice-memo/RecordingProvider";
 import { ChatOverlayProvider } from "@/components/chat/ChatOverlayProvider";
 import { NavigationGuardProvider } from "@/contexts/NavigationGuardContext";
 import { Sidebar } from "@/components/layout/Sidebar";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
+import { SelectionPopover } from "@/components/ui/SelectionPopover";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -56,13 +53,14 @@ export default function RootLayout({
   return (
     <html lang="ko" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistMono.variable} antialiased`}
       >
         <ThemeProvider>
           <ConfirmProvider>
             <NavigationGuardProvider>
               <RecordingProvider>
                 <ChatOverlayProvider>
+                  <SelectionPopover />
                   <Sidebar />
                   <div className="pl-11 md:pl-14">
                     <FindInPage />

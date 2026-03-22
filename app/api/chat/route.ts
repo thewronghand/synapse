@@ -32,9 +32,16 @@ export async function POST(req: NextRequest) {
     const {
       messages: uiMessages,
       sessionId,
+      documentContext,
     }: {
       messages: UIMessage[];
       sessionId?: string;
+      documentContext?: {
+        title: string;
+        folder: string;
+        content?: string;
+        selectedText?: string;
+      };
     } = body;
 
     // Mastra Agent 생성 (동적 모델 로딩)
@@ -61,6 +68,20 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    // 문서 컨텍스트가 있으면 메시지에 주입
+    let enrichedMessage = userMessage;
+    if (documentContext) {
+      const contextParts: string[] = [];
+      contextParts.push(`[현재 보고 있는 문서: "${documentContext.title}" (${documentContext.folder} 폴더)]`);
+      if (documentContext.selectedText) {
+        contextParts.push(`[선택한 텍스트: "${documentContext.selectedText}"]`);
+      }
+      if (documentContext.content) {
+        contextParts.push(`[문서 내용 일부:\n${documentContext.content.slice(0, 2000)}]`);
+      }
+      enrichedMessage = `${contextParts.join("\n")}\n\n${userMessage}`;
+    }
+
     // Mastra Agent 스트리밍 호출
     // Mastra Memory가 자체적으로 대화 이력을 관리함
     // thread: 세션 ID (대화 이력 저장)
@@ -68,8 +89,8 @@ export async function POST(req: NextRequest) {
     const threadId = sessionId || crypto.randomUUID();
     const resourceId = "default-user"; // TODO: 다중 사용자 지원 시 변경
 
-    console.log("[Chat] 스트리밍 시작...", { userMessage, threadId, resourceId });
-    const mastraOutput = await agent.stream(userMessage, {
+    console.log("[Chat] 스트리밍 시작...", { enrichedMessage: enrichedMessage.slice(0, 100), threadId, resourceId });
+    const mastraOutput = await agent.stream(enrichedMessage, {
       memory: {
         thread: threadId,
         resource: resourceId,
@@ -198,6 +219,27 @@ export async function POST(req: NextRequest) {
                     output: result,
                   })}\n\n`)
                 );
+                break;
+              }
+
+              case "source": {
+                // Grounding 검색 결과 출처
+                const payload = chunk.payload as {
+                  id?: string;
+                  url?: string;
+                  title?: string;
+                  sourceType?: string;
+                } | undefined;
+                if (payload?.url) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({
+                      type: "source",
+                      id: payload.id,
+                      url: payload.url,
+                      title: payload.title || "",
+                    })}\n\n`)
+                  );
+                }
                 break;
               }
 

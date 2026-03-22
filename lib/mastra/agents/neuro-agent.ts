@@ -16,8 +16,13 @@ let cachedSa: GcpServiceAccountInfo | null = null;
 // 캐시된 Agent (성능 최적화)
 let cachedAgent: Agent | null = null;
 
-// Vertex AI 모델 생성 (동적)
-async function createVertexModel() {
+// 캐시된 Vertex 프로바이더 인스턴스
+let cachedVertex: ReturnType<typeof createVertex> | null = null;
+
+// Vertex AI 프로바이더 생성 (동적)
+async function getVertexProvider() {
+  if (cachedVertex) return cachedVertex;
+
   // SA 로드 (캐시 활용)
   if (!cachedSa) {
     cachedSa = await loadGcpServiceAccount();
@@ -34,7 +39,7 @@ async function createVertexModel() {
   const isGemini3 = aiSettings.modelId.startsWith("gemini-3");
   const location = isGemini3 ? "global" : "us-central1";
 
-  const vertex = createVertex({
+  cachedVertex = createVertex({
     project: cachedSa.project_id,
     location,
     googleAuthOptions: {
@@ -45,6 +50,13 @@ async function createVertexModel() {
     },
   });
 
+  return cachedVertex;
+}
+
+// Vertex AI 모델 생성 (동적)
+async function createVertexModel() {
+  const vertex = await getVertexProvider();
+  const aiSettings = await loadAIModelSettings();
   return vertex(aiSettings.modelId);
 }
 
@@ -52,8 +64,9 @@ async function createVertexModel() {
 async function createNeuroAgentInternal(): Promise<Agent> {
   console.log("[Neuro] createVertexModel 시작...");
   const model = await createVertexModel();
+  const vertex = await getVertexProvider();
   console.log("[Neuro] createVertexModel 완료, Agent 생성 시작...");
-  const memory = getMemory();
+  const memory = await getMemory();
 
   // 외부 설정 파일에서 프롬프트 로드 (기본 + 커스텀 지시사항)
   const instructions = await buildNeuroInstructions();
@@ -67,8 +80,11 @@ async function createNeuroAgentInternal(): Promise<Agent> {
     // TokenLimiter: 컨텍스트 윈도우 초과 시 오래된 메시지 필터링
     // Gemini 2.0 Flash: 1M 토큰, 80% = 800,000 토큰
     inputProcessors: [new TokenLimiterProcessor(800000)],
-    // 문서 CRUD Tools
-    tools: neuroTools,
+    // 문서 CRUD Tools + Google Search Grounding
+    tools: {
+      ...neuroTools,
+      googleSearch: vertex.tools.googleSearch({}),
+    },
   });
   console.log("[Neuro] Agent 생성 완료");
   return agent;
@@ -116,6 +132,7 @@ export const neuroAgent = new Agent({
 export function clearNeuroCache(): void {
   cachedSa = null;
   cachedAgent = null;
+  cachedVertex = null;
   console.log("[Neuro] 캐시 초기화됨");
 }
 

@@ -110,6 +110,12 @@ export interface PhraseSetStore {
 
 // Chat types
 
+export interface ChatSource {
+  id: string;
+  url: string;
+  title: string;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant" | "system";
@@ -117,6 +123,8 @@ export interface ChatMessage {
   createdAt: string; // ISO 8601
   /** Tool 호출 정보 (assistant 메시지에서 사용) */
   toolInvocations?: ToolInvocation[];
+  /** Grounding 검색 출처 */
+  sources?: ChatSource[];
 }
 
 /** Tool 호출 상태 (AI SDK v6 Data Stream Protocol) */

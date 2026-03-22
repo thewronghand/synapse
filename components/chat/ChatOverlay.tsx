@@ -15,6 +15,7 @@ import {
 import { ChatMessageList } from "@/components/chat/ChatMessageList";
 import { ChatInput } from "@/components/chat/ChatInput";
 import type { ChatMessage, ChatSessionMeta, ToolInvocation } from "@/types";
+import { useChatOverlay } from "@/components/chat/ChatOverlayProvider";
 
 interface ChatOverlayProps {
   onClose: () => void;
@@ -22,6 +23,7 @@ interface ChatOverlayProps {
 
 export function ChatOverlay({ onClose }: ChatOverlayProps) {
   const router = useRouter();
+  const { documentContext, quotedText, clearQuotedText } = useChatOverlay();
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [sessions, setSessions] = useState<ChatSessionMeta[]>([]);
   const [gcpConnected, setGcpConnected] = useState<boolean | null>(null);
@@ -308,6 +310,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
         body: JSON.stringify({
           messages: uiMessages,
           sessionId,
+          documentContext: documentContext || undefined,
         }),
         signal: abortController.signal,
       });
@@ -326,6 +329,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
       let buffer = "";
       let fullText = "";
       const toolInvocationsMap = new Map<string, ToolInvocation>();
+      const sources: { id: string; url: string; title: string }[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -394,6 +398,18 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
                 break;
               }
 
+              case "source": {
+                // Grounding 검색 출처
+                if (event.url) {
+                  sources.push({
+                    id: event.id || crypto.randomUUID(),
+                    url: event.url,
+                    title: event.title || "",
+                  });
+                }
+                break;
+              }
+
               case "tool-output-error": {
                 const existing = toolInvocationsMap.get(event.toolCallId);
                 if (existing) {
@@ -413,6 +429,15 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
             // JSON 파싱 실패 - 무시
           }
         }
+      }
+
+      // Grounding 출처를 assistant 메시지에 반영
+      if (sources.length > 0) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessageId ? { ...m, sources } : m
+          )
+        );
       }
 
       // 스트리밍 완료 후 세션 정보 업데이트
@@ -732,8 +757,38 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
             </DropdownMenu>
           </div>
         )}
+        {/* 인용된 텍스트 블록 */}
+        {quotedText && (
+          <div className="mx-3 mb-1 rounded-md border-l-2 border-primary/50 bg-muted/50 px-3 py-2">
+            <div className="flex items-center justify-between mb-1">
+              <span className="text-[10px] font-medium text-muted-foreground">인용된 텍스트</span>
+              <button
+                onClick={clearQuotedText}
+                className="text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+            <div className="max-h-20 overflow-y-auto text-xs text-muted-foreground italic whitespace-pre-wrap">
+              {quotedText}
+            </div>
+            {quotedText.length > 2000 && (
+              <p className="text-[10px] text-amber-500 mt-1">
+                긴 텍스트는 2,000자까지만 전송됩니다
+              </p>
+            )}
+          </div>
+        )}
         <ChatInput
-          onSend={handleSendMessage}
+          onSend={(text) => {
+            if (quotedText) {
+              const trimmed = quotedText.slice(0, 2000);
+              handleSendMessage(`[인용: "${trimmed}"]\n\n${text}`);
+              clearQuotedText();
+            } else {
+              handleSendMessage(text);
+            }
+          }}
           isLoading={isSending}
           disabled={isGcpNotConnected}
           disabledMessage={
