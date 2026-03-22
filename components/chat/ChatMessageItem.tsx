@@ -100,6 +100,7 @@ export function ChatMessageItem({
   onRegenerateResponse,
   isProcessing = false,
 }: ChatMessageItemProps) {
+  const router = useRouter();
   const isUser = message.role === "user";
   const isAssistant = message.role === "assistant";
 
@@ -232,7 +233,7 @@ export function ChatMessageItem({
                               className="text-primary underline inline-flex items-center gap-0.5 cursor-pointer"
                               onClick={(e) => {
                                 e.preventDefault();
-                                window.location.href = href;
+                                router.push(href);
                               }}
                             >
                               {children}
