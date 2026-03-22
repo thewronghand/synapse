@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import fss from 'fs';
 import path from 'path';
-import { Document } from '@/types';
+import { Document, DigitalGardenNode, GraphEdge } from '@/types';
 import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename, titlesMatch } from '@/lib/document-parser';
 import { getNotesDir } from '@/lib/notes-path';
 import { ensureDefaultFolder } from '@/lib/folder-utils';
@@ -152,8 +152,8 @@ function calculateBacklinksByTitle(documents: Document[]): Map<string, string[]>
  * Edges and neighbors are now folder-scoped (folder isolation)
  */
 function buildGraph(documents: Document[]) {
-  const nodesObject: { [url: string]: any } = {};
-  const links: any[] = [];
+  const nodesObject: { [url: string]: DigitalGardenNode } = {};
+  const links: GraphEdge[] = [];
   let nodeId = 0;
 
   // Create a map for quick title+folder lookup

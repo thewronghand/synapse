@@ -22,6 +22,28 @@ export interface GitHubUser {
   name: string;
 }
 
+interface GitRef {
+  object: { sha: string };
+}
+
+interface GitCommit {
+  sha: string;
+  tree: { sha: string };
+}
+
+interface GitBlob {
+  sha: string;
+}
+
+interface GitTree {
+  sha: string;
+}
+
+interface GitFileContent {
+  content: string;
+  sha: string;
+}
+
 export class GitHubClient {
   private accessToken: string;
 
@@ -163,7 +185,7 @@ export class GitHubClient {
     path: string
   ): Promise<{ content: string; sha: string } | null> {
     try {
-      const response: any = await this.request(`/repos/${owner}/${repo}/contents/${path}`);
+      const response = await this.request<GitFileContent>(`/repos/${owner}/${repo}/contents/${path}`);
       return {
         content: Buffer.from(response.content, 'base64').toString('utf-8'),
         sha: response.sha,
@@ -191,11 +213,11 @@ export class GitHubClient {
     const branch = repoInfo.default_branch;
 
     // Get the latest commit SHA
-    const ref: any = await this.request(`/repos/${owner}/${repo}/git/ref/heads/${branch}`);
+    const ref = await this.request<GitRef>(`/repos/${owner}/${repo}/git/ref/heads/${branch}`);
     const latestCommitSha = ref.object.sha;
 
     // Get the tree SHA from the latest commit
-    const commit: any = await this.request(`/repos/${owner}/${repo}/git/commits/${latestCommitSha}`);
+    const commit = await this.request<GitCommit>(`/repos/${owner}/${repo}/git/commits/${latestCommitSha}`);
     const baseTreeSha = commit.tree.sha;
 
     // Create blobs for each file
@@ -207,7 +229,7 @@ export class GitHubClient {
           ? file.content
           : Buffer.from(file.content).toString('base64');
 
-        const blob: any = await this.request(`/repos/${owner}/${repo}/git/blobs`, {
+        const blob = await this.request<GitBlob>(`/repos/${owner}/${repo}/git/blobs`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -226,7 +248,7 @@ export class GitHubClient {
     );
 
     // Create a new tree
-    const newTree: any = await this.request(`/repos/${owner}/${repo}/git/trees`, {
+    const newTree = await this.request<GitTree>(`/repos/${owner}/${repo}/git/trees`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -236,7 +258,7 @@ export class GitHubClient {
     });
 
     // Create a new commit
-    const newCommit: any = await this.request(`/repos/${owner}/${repo}/git/commits`, {
+    const newCommit = await this.request<GitCommit>(`/repos/${owner}/${repo}/git/commits`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

@@ -46,6 +46,7 @@ export interface DigitalGardenNode {
   color: string; // node color
   hide: boolean; // visibility flag
   tags?: string[]; // document tags
+  folder?: string; // document folder
 }
 
 export interface Graph {

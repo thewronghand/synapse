@@ -284,7 +284,7 @@ export default function D3ForceGraph({
           .transition()
           .duration(750)
           .call(
-            zoom.transform as (selection: any, transform: d3.ZoomTransform) => void,
+            zoom.transform as unknown as (transition: d3.Transition<SVGSVGElement, unknown, null, undefined>, transform: d3.ZoomTransform) => void,
             d3.zoomIdentity.translate(translate[0], translate[1]).scale(scale)
           );
       }
