@@ -86,7 +86,7 @@
   --color-destructive-muted: var(--destructive-muted);
   --color-primary-bg: var(--primary-bg);
   --color-secondary-bg: var(--secondary-bg);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "Spoqa Han Sans Neo", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: var(--font-geist-mono);
   --default-border-color: var(--border);
   --animate-neuro-tilt: neuro-tilt 2.5s ease-in-out infinite;
@@ -97,7 +97,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Spoqa Han Sans Neo", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 html,
@@ -105,6 +105,12 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* 타이포그래피 계층 */
+h1 { font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-weight: 700; letter-spacing: -0.01em; }
+h3 { font-weight: 600; }
+h4, h5, h6 { font-weight: 600; }
 
 /* 스크롤바 숨기기 유틸리티 */
 .scrollbar-hide {

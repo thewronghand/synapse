@@ -17,8 +17,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useConfirm } from "@/components/ui/confirm-provider";
-import { ArrowLeft, Upload, Trash2, Ghost, Cloud, FolderSync, Bot } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Ghost, Cloud, FolderSync, Bot, Palette, Check, Download } from "lucide-react";
 import { TrashManager } from "@/components/settings/TrashManager";
+import { UISettings } from "@/components/settings/UISettings";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface MigrationResult {
@@ -1021,6 +1022,10 @@ function SettingsContent() {
               <Trash2 className="h-4 w-4" />
               휴지통
             </TabsTrigger>
+            <TabsTrigger value="ui" className="gap-1.5">
+              <Palette className="h-4 w-4" />
+              UI
+            </TabsTrigger>
           </TabsList>
 
           {/* Publish Tab */}
@@ -1676,7 +1681,8 @@ function SettingsContent() {
                           </p>
                         </div>
                         {aiModelId === model.id && (
-                          <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            <Check className="w-3 h-3" />
                             사용 중
                           </div>
                         )}
@@ -2089,6 +2095,11 @@ function SettingsContent() {
 
           <TrashManager />
         </section>
+          </TabsContent>
+
+          {/* UI Tab */}
+          <TabsContent value="ui" className="space-y-8">
+            <UISettings />
           </TabsContent>
         </Tabs>
       </div>
