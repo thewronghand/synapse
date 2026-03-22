@@ -60,22 +60,22 @@ function SettingsContent() {
           </TabsList>
 
           {/* Publish Tab */}
-          <TabsContent value="publish" className="space-y-8">
+          <TabsContent value="publish" className="space-y-8 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-200">
             <PublishSettings />
           </TabsContent>
 
           {/* Migration Tab */}
-          <TabsContent value="migration" className="space-y-8">
+          <TabsContent value="migration" className="space-y-8 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-200">
             <MigrationSettings />
           </TabsContent>
 
           {/* Neuro AI Tab */}
-          <TabsContent value="neuro" className="space-y-8">
+          <TabsContent value="neuro" className="space-y-8 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-200">
             <NeuroSettings />
           </TabsContent>
 
           {/* Trash Tab */}
-          <TabsContent value="trash">
+          <TabsContent value="trash" className="data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-200">
             {/* 휴지통 관리 섹션 */}
             <section className="bg-card rounded-lg border p-6">
               <div className="flex items-center gap-2 mb-1">
@@ -91,7 +91,7 @@ function SettingsContent() {
           </TabsContent>
 
           {/* UI Tab */}
-          <TabsContent value="ui" className="space-y-8">
+          <TabsContent value="ui" className="space-y-8 data-[state=active]:animate-in data-[state=active]:fade-in-0 data-[state=active]:slide-in-from-bottom-2 data-[state=active]:duration-200">
             <UISettings />
           </TabsContent>
         </Tabs>

@@ -1,5 +1,6 @@
 "use client";
 
+import { motion } from "motion/react";
 import { Ghost, X, Plus, Maximize2, ChevronDown } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
@@ -45,11 +46,21 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
   return (
     <>
       {/* 모바일 백드롭 */}
-      <div
-        className="fixed inset-0 z-40 bg-black/30 md:hidden animate-in fade-in-0 duration-200"
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.2 }}
+        className="fixed inset-0 z-40 bg-black/30 md:hidden"
         onClick={onClose}
       />
-      <div className="fixed z-50 bottom-20 right-4 w-96 h-[600px] max-md:inset-x-4 max-md:bottom-4 max-md:top-auto max-md:w-auto max-md:h-[50vh] rounded-2xl shadow-2xl border bg-background flex flex-col overflow-hidden animate-in fade-in-0 slide-in-from-bottom-4 duration-300">
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        exit={{ opacity: 0, y: 16 }}
+        transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
+        className="fixed z-50 bottom-20 right-4 w-96 h-[600px] max-md:inset-x-4 max-md:bottom-4 max-md:top-auto max-md:w-auto max-md:h-[50vh] rounded-2xl shadow-2xl border bg-background flex flex-col overflow-hidden"
+      >
       {/* 헤더 */}
       <div className="shrink-0 flex items-center justify-between px-4 py-3 border-b">
         <DropdownMenu modal={false} onOpenChange={(open) => { if (open) chat.fetchSessions(); }}>
@@ -210,7 +221,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
           }
         />
       </div>
-    </div>
+    </motion.div>
     </>
   );
 }
