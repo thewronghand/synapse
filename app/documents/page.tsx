@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState, useRef, useCallback } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "motion/react";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -642,9 +643,14 @@ function DocumentsContent() {
       {/* Documents List (title search mode) */}
       {searchMode === "title" && (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {paginatedDocuments.map((doc) => (
-            <Card
+          {paginatedDocuments.map((doc, index) => (
+            <motion.div
               key={doc.title}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.25, delay: Math.min(index * 0.03, 0.5), ease: [0.25, 1, 0.5, 1] }}
+            >
+            <Card
               className="cursor-pointer hover:bg-accent transition-colors"
               onClick={() => router.push(`/note/${encodeURIComponent(doc.title)}`)}
             >
@@ -692,6 +698,7 @@ function DocumentsContent() {
                 </CardDescription>
               </CardHeader>
             </Card>
+            </motion.div>
           ))}
         </div>
       )}

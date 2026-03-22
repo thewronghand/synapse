@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback } from "react";
+import { AnimatePresence } from "motion/react";
 import { usePathname } from "next/navigation";
 import { ChatOverlay } from "@/components/chat/ChatOverlay";
 import { PublishedChatOverlay } from "@/components/chat/PublishedChatOverlay";
@@ -90,11 +91,13 @@ export function ChatOverlayProvider({ children }: ChatOverlayProviderProps) {
     >
       {children}
       {!isChatPage && <ChatFab onClick={toggle} />}
-      {isOpen && !isChatPage && (
-        published
-          ? <PublishedChatOverlay onClose={close} />
-          : <ChatOverlay onClose={close} />
-      )}
+      <AnimatePresence>
+        {isOpen && !isChatPage && (
+          published
+            ? <PublishedChatOverlay key="chat-overlay" onClose={close} />
+            : <ChatOverlay key="chat-overlay" onClose={close} />
+        )}
+      </AnimatePresence>
     </ChatOverlayContext.Provider>
   );
 }
