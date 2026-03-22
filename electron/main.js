@@ -424,7 +424,8 @@ function startNextServer() {
       // In production, start the Next.js standalone server
       // Use app.getAppPath() to get the correct resource path
       const appPath = app.getAppPath();
-      const serverPath = path.join(appPath, '.next/standalone/server.js');
+      // Next.js 16 standalone 구조: .next/standalone/{프로젝트폴더명}/server.js
+      const serverPath = path.join(appPath, '.next/standalone/synapse/server.js');
       console.log('App path:', appPath);
       console.log('Starting Next.js server from:', serverPath);
 
