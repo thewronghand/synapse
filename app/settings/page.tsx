@@ -1681,7 +1681,8 @@ function SettingsContent() {
                           </p>
                         </div>
                         {aiModelId === model.id && (
-                          <div className="px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary">
+                            <Check className="w-3 h-3" />
                             사용 중
                           </div>
                         )}
