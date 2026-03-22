@@ -116,8 +116,8 @@ interface MarkdownViewerProps {
 }
 
 
-// Simple frontmatter parser for preview
-function parseFrontmatter(content: string): {
+// 클라이언트용 frontmatter 파서 (gray-matter는 Node.js 전용이므로 직접 구현)
+function parseFrontmatterClient(content: string): {
   frontmatter: { title?: string; tags?: string[] };
   contentWithoutFrontmatter: string;
 } {
@@ -131,19 +131,34 @@ function parseFrontmatter(content: string): {
   const frontmatterText = match[1];
   const contentWithoutFrontmatter = content.slice(match[0].length);
 
-  // Parse YAML-like frontmatter (simple version)
   const frontmatter: { title?: string; tags?: string[] } = {};
 
+  // title 파싱: 따옴표 감싸기 지원, 숫자 제목 → 문자열 변환
   const titleMatch = frontmatterText.match(/title:\s*(.+)/);
   if (titleMatch) {
-    frontmatter.title = titleMatch[1].trim();
+    let title = titleMatch[1].trim();
+    // 따옴표로 감싸진 경우 제거 (콜론 포함 제목 등)
+    if ((title.startsWith('"') && title.endsWith('"')) || (title.startsWith("'") && title.endsWith("'"))) {
+      title = title.slice(1, -1);
+    }
+    frontmatter.title = String(title);
   }
 
-  const tagsMatch = frontmatterText.match(/tags:\s*\[(.+)\]/);
-  if (tagsMatch) {
-    frontmatter.tags = tagsMatch[1]
+  // tags 파싱: 인라인 배열 [tag1, tag2] 및 멀티라인 지원
+  const inlineTagsMatch = frontmatterText.match(/tags:\s*\[(.+)\]/);
+  if (inlineTagsMatch) {
+    frontmatter.tags = inlineTagsMatch[1]
       .split(',')
       .map((tag) => tag.trim().replace(/['"]/g, ''));
+  } else {
+    // 멀티라인 tags (YAML 리스트 형식)
+    const multilineTagsMatch = frontmatterText.match(/tags:\s*\n((?:\s+-\s+.+\n?)+)/);
+    if (multilineTagsMatch) {
+      frontmatter.tags = multilineTagsMatch[1]
+        .split('\n')
+        .map((line) => line.replace(/^\s+-\s+/, '').trim().replace(/['"]/g, ''))
+        .filter(Boolean);
+    }
   }
 
   return { frontmatter, contentWithoutFrontmatter };
@@ -155,7 +170,7 @@ function MarkdownViewer({
   existingTitles,
   isPreview = false
 }: MarkdownViewerProps) {
-  const { frontmatter, contentWithoutFrontmatter } = parseFrontmatter(content);
+  const { frontmatter, contentWithoutFrontmatter } = parseFrontmatterClient(content);
 
   // 링크에 커스텀 툴팁을 적용하는 헬퍼 함수
   const renderLinkWithTooltip = (

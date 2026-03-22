@@ -1,4 +1,4 @@
-import { loadVercelToken } from './vercel-token';
+import { loadVercelToken } from '@/lib/vercel-token';
 
 export interface VercelProject {
   id: string;

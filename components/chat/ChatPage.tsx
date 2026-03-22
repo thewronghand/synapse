@@ -383,7 +383,6 @@ export function ChatPage() {
 
   // SSE 스트리밍 채팅 함수
   async function streamChat(sessionId: string, text: string) {
-    console.log("[ChatPage] streamChat 시작:", { sessionId, text });
     if (!text.trim()) return;
 
     // 기존 스트리밍 중단
@@ -431,7 +430,6 @@ export function ChatPage() {
         parts: [{ type: "text" as const, text }],
       });
 
-      console.log("[ChatPage] fetch 시작...");
       const response = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -442,15 +440,13 @@ export function ChatPage() {
         signal: abortController.signal,
       });
 
-      console.log("[ChatPage] fetch 완료, status:", response.status);
       if (!response.ok) {
         const errorData = await response.json();
         throw new Error(errorData.error || "AI 응답 생성에 실패했습니다");
       }
 
       const reader = response.body?.getReader();
-      if (!reader) throw new Error("스트림을 읽을 수 없습니다");
-      console.log("[ChatPage] reader 획득, 스트리밍 시작");
+      if (!reader) throw new Error("스트림을 읽을 수 없습니다");;
 
       const decoder = new TextDecoder();
       let buffer = "";
@@ -472,7 +468,6 @@ export function ChatPage() {
 
           try {
             const event = JSON.parse(data);
-            console.log("[ChatPage] SSE event:", event.type, event);
 
             switch (event.type) {
               case "text-delta": {
@@ -488,7 +483,6 @@ export function ChatPage() {
               }
 
               case "tool-input-start": {
-                console.log("[ChatPage] tool-input-start:", event);
                 const invocation: ToolInvocation = {
                   toolCallId: event.toolCallId,
                   toolName: event.toolName,

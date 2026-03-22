@@ -1,4 +1,4 @@
-import { loadGitHubToken } from './github-token';
+import { loadGitHubToken } from '@/lib/github-token';
 
 export interface GitHubRepo {
   id: number;

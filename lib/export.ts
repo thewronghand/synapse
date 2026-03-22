@@ -2,11 +2,11 @@ import fs from 'fs/promises';
 import fss from 'fs';
 import path from 'path';
 import { Document } from '@/types';
-import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename, titlesMatch } from './document-parser';
-import { getNotesDir } from './notes-path';
-import { ensureDefaultFolder } from './folder-utils';
-import { getExportDataDir, ensureExportDataDir } from './data-path';
-import { generateEmbeddingsForExport } from './mastra/embedding';
+import { parseFrontmatter, extractTitle, extractWikiLinks, getTitleFromFilename, titlesMatch } from '@/lib/document-parser';
+import { getNotesDir } from '@/lib/notes-path';
+import { ensureDefaultFolder } from '@/lib/folder-utils';
+import { getExportDataDir, ensureExportDataDir } from '@/lib/data-path';
+import { generateEmbeddingsForExport } from '@/lib/mastra/embedding';
 
 const NOTES_DIR = getNotesDir();
 

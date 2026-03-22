@@ -1,6 +1,6 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { getFolderImagesDir, getFolderTempImagesDir } from './notes-path';
+import { getFolderImagesDir, getFolderTempImagesDir } from '@/lib/notes-path';
 
 /**
  * Ensure folder images directories exist
