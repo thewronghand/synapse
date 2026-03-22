@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
+import { motion } from "motion/react";
 import MarkdownViewer from "@/components/editor/MarkdownViewer";
 import ForceGraphView from "@/components/graph/ForceGraphView";
 import { Document, Graph, DigitalGardenNode, GraphEdge } from "@/types";
@@ -423,13 +424,19 @@ export default function NotePage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
           <div className="lg:col-span-2">
-            <div className="prose prose-lg dark:prose-invert max-w-none">
-              <MarkdownViewer
-                content={document.contentWithoutFrontmatter}
-                onWikiLinkClick={handleWikiLinkClick}
-                existingTitles={folderTitles}
-              />
-            </div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
+            >
+              <div className="prose prose-lg dark:prose-invert max-w-none">
+                <MarkdownViewer
+                  content={document.contentWithoutFrontmatter}
+                  onWikiLinkClick={handleWikiLinkClick}
+                  existingTitles={folderTitles}
+                />
+              </div>
+            </motion.div>
           </div>
 
           {/* Sidebar: Local Graph + TOC */}
@@ -538,7 +545,11 @@ export default function NotePage() {
 
           {/* Backlinks - these are now titles, not slugs */}
           {document.backlinks.length > 0 && (
-            <div>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, ease: [0.25, 1, 0.5, 1] }}
+            >
               <h3 className="text-sm font-semibold mb-2">
                 역링크 ({document.backlinks.length})
               </h3>
@@ -555,7 +566,7 @@ export default function NotePage() {
                   </button>
                 ))}
               </div>
-            </div>
+            </motion.div>
           )}
         </div>
       </footer>

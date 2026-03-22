@@ -6,7 +6,7 @@
  */
 export function isPublishedMode(): boolean {
   // Check if running in Electron app
-  if (typeof window !== 'undefined' && (window as any).electron) {
+  if (typeof window !== 'undefined' && window.electron) {
     return false; // Electron app is always editable
   }
 

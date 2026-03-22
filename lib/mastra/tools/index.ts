@@ -13,15 +13,15 @@
  * - deleteFolder: 폴더 삭제
  */
 
-export { listFoldersTool } from "./list-folders";
-export { listNotesTool } from "./list-notes";
-export { readNoteTool } from "./read-note";
-export { searchNotesTool } from "./search-notes";
-export { createNoteTool } from "./create-note";
-export { updateNoteTool } from "./update-note";
-export { deleteNoteTool } from "./delete-note";
-export { moveNoteTool } from "./move-note";
-export { deleteFolderTool } from "./delete-folder";
+export { listFoldersTool } from "@/lib/mastra/tools/list-folders";
+export { listNotesTool } from "@/lib/mastra/tools/list-notes";
+export { readNoteTool } from "@/lib/mastra/tools/read-note";
+export { searchNotesTool } from "@/lib/mastra/tools/search-notes";
+export { createNoteTool } from "@/lib/mastra/tools/create-note";
+export { updateNoteTool } from "@/lib/mastra/tools/update-note";
+export { deleteNoteTool } from "@/lib/mastra/tools/delete-note";
+export { moveNoteTool } from "@/lib/mastra/tools/move-note";
+export { deleteFolderTool } from "@/lib/mastra/tools/delete-folder";
 
 // 모든 Tools를 하나의 객체로 export
-export { neuroTools } from "./all-tools";
+export { neuroTools } from "@/lib/mastra/tools/all-tools";

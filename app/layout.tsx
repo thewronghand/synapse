@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
-import "spoqa-han-sans/css/SpoqaHanSansNeo.css";
+import "@/public/fonts/spoqa-han-sans-neo.css";
 import "./globals.css";
 import { ThemeProvider } from "@/components/providers/ThemeProvider";
 import { Toaster } from "@/components/ui/sonner";

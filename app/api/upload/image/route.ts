@@ -15,11 +15,11 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const folder = searchParams.get('folder');
 
-    if (!folder) {
+    if (!folder || /[\/\\~]|\.\./.test(folder)) {
       return NextResponse.json(
         {
           success: false,
-          error: 'Folder parameter is required',
+          error: 'Invalid folder parameter',
         },
         { status: 400 }
       );

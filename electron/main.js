@@ -1,4 +1,4 @@
-const { app, BrowserWindow, shell, ipcMain, Menu, dialog } = require('electron');
+const { app, BrowserWindow, shell, ipcMain, Menu, dialog, systemPreferences } = require('electron');
 const path = require('path');
 const { fork } = require('child_process');
 const fs = require('fs');
@@ -130,6 +130,15 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
     },
     title: 'Synapse',
+  });
+
+  // 마이크 권한 허용 (음성 메모 녹음용)
+  mainWindow.webContents.session.setPermissionRequestHandler((webContents, permission, callback) => {
+    if (permission === 'media') {
+      callback(true);
+    } else {
+      callback(false);
+    }
   });
 
   // Load the app
@@ -424,7 +433,8 @@ function startNextServer() {
       // In production, start the Next.js standalone server
       // Use app.getAppPath() to get the correct resource path
       const appPath = app.getAppPath();
-      const serverPath = path.join(appPath, '.next/standalone/server.js');
+      // Next.js 16 standalone 구조: .next/standalone/{프로젝트폴더명}/server.js
+      const serverPath = path.join(appPath, '.next/standalone/synapse/server.js');
       console.log('App path:', appPath);
       console.log('Starting Next.js server from:', serverPath);
 
@@ -520,6 +530,15 @@ app.whenReady().then(async () => {
     }
 
     await startNextServer();
+
+    // macOS 마이크 권한 요청 (음성 메모 녹음용)
+    if (process.platform === 'darwin') {
+      const micStatus = systemPreferences.getMediaAccessStatus('microphone');
+      if (micStatus !== 'granted') {
+        await systemPreferences.askForMediaAccess('microphone');
+      }
+    }
+
     createMenu();
     createWindow();
 

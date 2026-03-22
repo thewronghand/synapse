@@ -13,7 +13,9 @@ interface ForceGraphInstance {
   nodeId: (accessor: string | ((node: DigitalGardenNode) => string | number)) => ForceGraphInstance;
   nodeLabel: (accessor: string | ((node: DigitalGardenNode) => string)) => ForceGraphInstance;
   nodeVal: (accessor: (node: DigitalGardenNode) => number) => ForceGraphInstance;
-  nodeColor: (accessor: (node: DigitalGardenNode) => string) => ForceGraphInstance;
+  nodeColor(accessor: (node: DigitalGardenNode) => string): ForceGraphInstance;
+  nodeColor(): ForceGraphInstance;
+  nodeColor(accessor?: (node: DigitalGardenNode) => string): ForceGraphInstance;
   nodeCanvasObject: (renderer: (node: DigitalGardenNode, ctx: CanvasRenderingContext2D, globalScale: number) => void) => ForceGraphInstance;
   nodeCanvasObjectMode: (mode: () => string) => ForceGraphInstance;
   linkColor: (accessor: (link: GraphEdge) => string) => ForceGraphInstance;
@@ -35,9 +37,43 @@ interface ForceGraphInstance {
   zoomToFit: (duration?: number, padding?: number) => ForceGraphInstance;
   centerAt: (x: number, y: number, duration?: number) => ForceGraphInstance;
   onEngineStop: (callback: () => void) => ForceGraphInstance;
-  d3Force: (forceName: string) => any;
+  d3Force: (forceName: string, force?: unknown) => unknown;
   _destructor: () => void;
   _zoomFitted?: boolean;
+  _ctx?: CanvasRenderingContext2D;
+}
+
+// D3 시뮬레이션 후 link의 source/target이 노드 객체로 교체됨
+interface D3SimulatedNode extends DigitalGardenNode {
+  x: number;
+  y: number;
+  fx?: number | null;
+  fy?: number | null;
+  vx?: number;
+  vy?: number;
+  index?: number;
+}
+
+type D3LinkSource = string | number | D3SimulatedNode;
+
+function getNodeId(node: D3LinkSource): string | number {
+  return typeof node === "object" && node !== null ? node.id : node;
+}
+
+// force-graph: kapsule 패턴 — default export는 함수, 호출하면 (elem) => instance 반환
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ForceGraphModule = (...args: any[]) => (elem: HTMLElement) => ForceGraphInstance;
+
+// D3 force 타입 정의
+interface D3ChargeForce {
+  strength(val: number): D3ChargeForce;
+  distanceMax(val: number): D3ChargeForce;
+  distanceMin(val: number): D3ChargeForce;
+}
+
+interface D3LinkForce {
+  distance(val: number): D3LinkForce;
+  strength(fn: (link: { source: D3LinkSource; target: D3LinkSource }) => number): D3LinkForce;
 }
 
 interface FilteredGraphData {
@@ -300,8 +336,8 @@ export default function ForceGraphView({
     const linkPairs = new Map<string, boolean>();
 
     linksArray.forEach((link: GraphEdge) => {
-      const sourceId = typeof link.source === 'object' ? (link.source as any).id : link.source;
-      const targetId = typeof link.target === 'object' ? (link.target as any).id : link.target;
+      const sourceId = getNodeId(link.source as D3LinkSource);
+      const targetId = getNodeId(link.target as D3LinkSource);
       const forwardKey = `${sourceId}-${targetId}`;
       const reverseKey = `${targetId}-${sourceId}`;
 
@@ -322,7 +358,7 @@ export default function ForceGraphView({
       }
 
       // Create graph instance
-      const graph = (ForceGraph as any)()(containerRef.current!)
+      const graph = (ForceGraph as unknown as ForceGraphModule)()(containerRef.current!)
       .graphData({ nodes: nodesArray, links: linksArray })
       .nodeId("id")
       .nodeLabel("title")
@@ -349,7 +385,7 @@ export default function ForceGraphView({
         return nodeColors.noConnections;
       })
       .nodeCanvasObject((node: DigitalGardenNode, ctx: CanvasRenderingContext2D) => {
-        const nodeWithPos = node as any;
+        const nodeWithPos = node as D3SimulatedNode;
         const { x, y, title, size, url } = nodeWithPos;
         const radius = size || 2;
         // Compare with URL decoding for Korean slugs
@@ -445,8 +481,8 @@ export default function ForceGraphView({
         // Only draw particles for highlighted links
         if (!highlightLinksRef.current.has(link)) return;
 
-        const sourceNode = link.source as any;
-        const targetNode = link.target as any;
+        const sourceNode = link.source as unknown as D3SimulatedNode;
+        const targetNode = link.target as unknown as D3SimulatedNode;
 
         if (!sourceNode.x || !targetNode.x) return;
 
@@ -573,10 +609,10 @@ export default function ForceGraphView({
             // Force graph to re-render by triggering a redraw
             if (graphRef.current && hoveredNodeRef.current) {
               // Access internal method to force re-render
-              const g = graphRef.current as any;
+              const g = graphRef.current as ForceGraphInstance;
               if (g._ctx) {
-                // Direct canvas refresh
-                g.nodeColor(g.nodeColor());
+                // Direct canvas refresh (re-passing accessor triggers redraw)
+                g.nodeColor(g.nodeColor() as unknown as (node: DigitalGardenNode) => string);
               }
               animationFrameRef.current = requestAnimationFrame(animate);
             }
@@ -593,8 +629,8 @@ export default function ForceGraphView({
 
         // Trigger re-render of the graph
         if (graphRef.current) {
-          const g = graphRef.current as any;
-          g.nodeColor(g.nodeColor());
+          const g = graphRef.current as ForceGraphInstance;
+          g.nodeColor(g.nodeColor() as unknown as (node: DigitalGardenNode) => string);
         }
       })
       .width(containerWidth)
@@ -619,7 +655,7 @@ export default function ForceGraphView({
 
       // Charge force (repulsion) - Coulomb's law
       // Stronger repulsion to keep clusters well separated
-      const chargeForce = graph.d3Force('charge');
+      const chargeForce = graph.d3Force('charge') as D3ChargeForce | null;
       if (chargeForce) {
         // Stronger repulsion to prevent overlapping
         const baseCharge = Math.min(-70, -50 - (nodeCount / 15));
@@ -630,16 +666,16 @@ export default function ForceGraphView({
 
       // Link force (spring) - Hooke's law
       // Fixed distance + dynamic strength (D3/Obsidian default approach)
-      const linkForce = graph.d3Force('link');
+      const linkForce = graph.d3Force('link') as D3LinkForce | null;
       if (linkForce) {
         // Fixed link distance (D3 default is 30, we use slightly larger for readability)
         linkForce.distance(50);
 
         // Link strength: weaker for highly connected nodes (D3/Obsidian formula)
         // This creates natural clustering - hub nodes don't pull too hard
-        linkForce.strength((link: any) => {
-          const sourceId = typeof link.source === 'object' ? link.source.id : link.source;
-          const targetId = typeof link.target === 'object' ? link.target.id : link.target;
+        linkForce.strength((link: { source: D3LinkSource; target: D3LinkSource }) => {
+          const sourceId = getNodeId(link.source);
+          const targetId = getNodeId(link.target);
 
           const sourceConnections = connectionCounts.get(String(sourceId)) || 1;
           const targetConnections = connectionCounts.get(String(targetId)) || 1;
@@ -654,7 +690,7 @@ export default function ForceGraphView({
       // Initialize nodes in a circular layout to prevent "folded" initial state
       // This helps the simulation start from an unfolded position
       const radius = Math.max(100, nodeCount * 3);
-      nodesArray.forEach((node: any, i: number) => {
+      (nodesArray as D3SimulatedNode[]).forEach((node: D3SimulatedNode, i: number) => {
         const angle = (2 * Math.PI * i) / nodeCount;
         if (node.x === undefined) node.x = radius * Math.cos(angle);
         if (node.y === undefined) node.y = radius * Math.sin(angle);

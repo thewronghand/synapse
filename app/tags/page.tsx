@@ -2,6 +2,7 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { motion } from "motion/react";
 import { Document } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -137,22 +138,28 @@ function TagsContent() {
 
       {/* Tags */}
       <div className="flex flex-wrap gap-2">
-        {sortedTags.map(({ tag, count }) => (
-          <Badge
+        {sortedTags.map(({ tag, count }, index) => (
+          <motion.div
             key={tag}
-            className="cursor-pointer bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 px-3 py-2 text-sm transition-colors"
-            onClick={() => {
-              const params = new URLSearchParams();
-              params.set("tags", tag);
-              if (selectedFolder) {
-                params.set("folder", selectedFolder);
-              }
-              router.push(`/documents?${params.toString()}`);
-            }}
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ duration: 0.2, delay: Math.min(index * 0.03, 0.5), ease: [0.25, 1, 0.5, 1] }}
           >
-            <span className="font-medium">{tag}</span>
-            <span className="ml-2 opacity-70">{count}</span>
-          </Badge>
+            <Badge
+              className="cursor-pointer bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 px-3 py-2 text-sm transition-colors"
+              onClick={() => {
+                const params = new URLSearchParams();
+                params.set("tags", tag);
+                if (selectedFolder) {
+                  params.set("folder", selectedFolder);
+                }
+                router.push(`/documents?${params.toString()}`);
+              }}
+            >
+              <span className="font-medium">{tag}</span>
+              <span className="ml-2 opacity-70">{count}</span>
+            </Badge>
+          </motion.div>
         ))}
       </div>
 

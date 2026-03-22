@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect, type KeyboardEvent } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Plus, Trash2, MoreHorizontal, Pencil } from "lucide-react";
@@ -117,9 +118,16 @@ export function ChatSessionList({
             </p>
           ) : (
             <div className="p-2 space-y-1">
+              <AnimatePresence>
               {sessions.map((session) => (
-                <div
+                <motion.div
                   key={session.id}
+                  initial={{ opacity: 0, x: -8 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -8, height: 0 }}
+                  transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+                >
+                <div
                   className={cn(
                     "group flex items-center gap-2 rounded-lg px-3 py-2.5 text-sm cursor-pointer hover:bg-accent transition-colors",
                     activeSessionId === session.id && "bg-accent"
@@ -187,7 +195,9 @@ export function ChatSessionList({
                     </DropdownMenu>
                   )}
                 </div>
+                </motion.div>
               ))}
+              </AnimatePresence>
             </div>
           )}
         </div>

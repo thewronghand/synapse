@@ -2,8 +2,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { VercelClient } from '@/lib/vercel-client';
 import { deleteVercelToken } from '@/lib/vercel-token';
 import { getExportDataDir } from '@/lib/data-path';
-import { loadGcpServiceAccount } from '@/lib/gcp-service-account';
-import { loadPublishedChatbotSettings } from '@/lib/published-chatbot-settings';
 import fs from 'fs/promises';
 import path from 'path';
 
@@ -212,18 +210,9 @@ export async function POST(request: NextRequest) {
       encoding: 'utf-8',
     });
 
-    // Add .env file with publish mode config + SA + chatbot settings
-    const sa = await loadGcpServiceAccount();
-    const chatbotSettings = await loadPublishedChatbotSettings();
+    // Add .env file with publish mode config
+    // 챗봇 기능은 rate limit 보안 문제로 일시 비활성화
     const envLines = ['NEXT_PUBLIC_IS_PUBLISHED=true'];
-    if (sa && chatbotSettings.enabled) {
-      envLines.push(`GCP_SA_JSON=${JSON.stringify(JSON.stringify(sa))}`);
-      envLines.push(`PUBLISHED_CHATBOT_ENABLED=true`);
-      envLines.push(`PUBLISHED_CHATBOT_DAILY_LIMIT=${chatbotSettings.dailyLimit}`);
-      if (chatbotSettings.customInstructions.trim()) {
-        envLines.push(`PUBLISHED_CHATBOT_INSTRUCTIONS=${JSON.stringify(chatbotSettings.customInstructions)}`);
-      }
-    }
     filesToPush.push({
       path: '.env',
       content: envLines.join('\n') + '\n',

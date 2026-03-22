@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
+import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -46,12 +47,17 @@ function ToolInvocationItem({ invocation }: { invocation: ToolInvocation }) {
   };
 
   return (
-    <div className={cn(
-      "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs",
-      isRunning && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
-      isComplete && "bg-green-500/10 text-green-700 dark:text-green-400",
-      isError && "bg-red-500/10 text-red-700 dark:text-red-400"
-    )}>
+    <motion.div
+      initial={{ opacity: 0, y: 6 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.2, ease: [0.25, 1, 0.5, 1] }}
+      className={cn(
+        "flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs",
+        isRunning && "bg-amber-500/10 text-amber-700 dark:text-amber-400",
+        isComplete && "bg-green-500/10 text-green-700 dark:text-green-400",
+        isError && "bg-red-500/10 text-red-700 dark:text-red-400"
+      )}
+    >
       {/* 상태 아이콘 */}
       {isRunning && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
       {isComplete && <CheckCircle2 className="w-3.5 h-3.5" />}
@@ -72,7 +78,7 @@ function ToolInvocationItem({ invocation }: { invocation: ToolInvocation }) {
       {isError && invocation.errorText && (
         <span className="text-red-600 dark:text-red-400">{invocation.errorText}</span>
       )}
-    </div>
+    </motion.div>
   );
 }
 
@@ -89,6 +95,8 @@ interface ChatMessageItemProps {
   onRegenerateResponse?: () => void;
   /** 현재 로딩/스트리밍 중인지 (버튼 비활성화용) */
   isProcessing?: boolean;
+  /** 새로 도착한 메시지인지 (입장 애니메이션 여부) */
+  animate?: boolean;
 }
 
 export function ChatMessageItem({
@@ -99,6 +107,7 @@ export function ChatMessageItem({
   onEditUserMessage,
   onRegenerateResponse,
   isProcessing = false,
+  animate = false,
 }: ChatMessageItemProps) {
   const router = useRouter();
   const isUser = message.role === "user";
@@ -151,7 +160,10 @@ export function ChatMessageItem({
   const showRegenerateButton = isAssistant && isLastAssistantMessage && onRegenerateResponse && !isProcessing && !isStreaming;
 
   return (
-    <div
+    <motion.div
+      initial={animate ? { opacity: 0, y: 12 } : false}
+      animate={animate ? { opacity: 1, y: 0 } : undefined}
+      transition={{ duration: 0.25, ease: [0.25, 1, 0.5, 1] }}
       className={cn("group flex w-full gap-2.5", isUser ? "justify-end" : "justify-start")}
     >
       {/* AI 아이콘 (왼쪽) */}
@@ -344,7 +356,7 @@ export function ChatMessageItem({
           <User className="w-4 h-4 text-secondary" />
         </div>
       )}
-    </div>
+    </motion.div>
   );
 }
 

@@ -177,6 +177,7 @@ export function ChatMessageList({
             onEditUserMessage={onEditUserMessage}
             onRegenerateResponse={onRegenerateResponse}
             isProcessing={isLoading}
+            animate={isNewlyArrived || message.id === streamingMessageId}
           />
         );
       })}

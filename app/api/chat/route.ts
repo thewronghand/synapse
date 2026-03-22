@@ -45,9 +45,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Mastra Agent 생성 (동적 모델 로딩)
-    console.log("[Chat] Agent 생성 시작...");
     const agent = await createNeuroAgent();
-    console.log("[Chat] Agent 생성 완료");
 
     // UIMessage에서 마지막 사용자 메시지 추출
     const lastMessage = uiMessages[uiMessages.length - 1];
@@ -89,15 +87,12 @@ export async function POST(req: NextRequest) {
     const threadId = sessionId || crypto.randomUUID();
     const resourceId = "default-user"; // TODO: 다중 사용자 지원 시 변경
 
-    console.log("[Chat] 스트리밍 시작...", { enrichedMessage: enrichedMessage.slice(0, 100), threadId, resourceId });
     const mastraOutput = await agent.stream(enrichedMessage, {
       memory: {
         thread: threadId,
         resource: resourceId,
       },
     });
-    console.log("[Chat] 스트리밍 응답 수신");
-
     // Mastra fullStream을 사용하여 tool 이벤트 포함 스트리밍
     // fullStream: text, tool-call, tool-result 등 모든 청크 타입 포함
     const fullStream = mastraOutput.fullStream;
@@ -172,8 +167,6 @@ export async function POST(req: NextRequest) {
                   break;
                 }
 
-                console.log(`[Chat] Tool call: ${toolName}`, args);
-
                 // tool-input-start: Tool 호출 시작 신호
                 controller.enqueue(
                   encoder.encode(`data: ${JSON.stringify({
@@ -201,15 +194,12 @@ export async function POST(req: NextRequest) {
                 if (!payload) break;
 
                 const toolCallId = payload.toolCallId ?? "";
-                const toolName = payload.toolName ?? "";
                 const result = payload.result;
 
                 if (!toolCallId) {
                   console.warn(`[Chat] Invalid tool-result chunk:`, chunk);
                   break;
                 }
-
-                console.log(`[Chat] Tool result: ${toolName}`, result);
 
                 // tool-output-available: Tool 결과 전송
                 controller.enqueue(
@@ -264,10 +254,15 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
 
           // 스트리밍 완료 후 AI 응답 저장 (백그라운드)
-          if (sessionId && fullResponse) {
-            saveAssistantMessage(sessionId, messageId, fullResponse).catch((err) => {
-              console.error("[Chat] AI 응답 저장 실패:", err);
-            });
+          if (sessionId) {
+            if (fullResponse) {
+              saveAssistantMessage(sessionId, messageId, fullResponse).catch((err) => {
+                console.error("[Chat] AI 응답 저장 실패:", err);
+              });
+            } else {
+              // 빈 응답이어도 pendingResponse 해제
+              clearPendingResponse(sessionId).catch(() => {});
+            }
           }
         } catch (err) {
           console.error("[Chat] 스트리밍 중 오류:", err);
@@ -278,6 +273,16 @@ export async function POST(req: NextRequest) {
       },
     });
 
+    // pendingResponse 해제 (빈 응답 시)
+    async function clearPendingResponse(sid: string) {
+      const session = await loadSession(sid);
+      if (session) {
+        session.pendingResponse = false;
+        session.updatedAt = new Date().toISOString();
+        await saveSession(session);
+      }
+    }
+
     // AI 응답을 세션에 저장하는 헬퍼 함수
     async function saveAssistantMessage(sid: string, msgId: string, content: string) {
       const session = await loadSession(sid);
@@ -285,7 +290,6 @@ export async function POST(req: NextRequest) {
 
       // 이미 같은 ID의 메시지가 있으면 중복 저장 방지
       if (session.messages.some((m) => m.id === msgId)) {
-        console.log("[Chat] AI 응답 이미 저장됨, 스킵:", msgId);
         return;
       }
 
@@ -300,7 +304,6 @@ export async function POST(req: NextRequest) {
       session.pendingResponse = false; // 응답 완료
       session.updatedAt = now;
       await saveSession(session);
-      console.log("[Chat] AI 응답 저장 완료:", sid);
 
       // 대화가 6개 이상이고 아직 AI 제목 생성 안 했으면 생성
       if (session.messages.length >= 6 && !session.titleGenerated) {
@@ -330,7 +333,6 @@ export async function POST(req: NextRequest) {
           session.title = title;
           session.titleGenerated = true;
           await saveSession(session);
-          console.log("[Chat] AI 제목 생성 완료:", title);
         }
       } catch (err) {
         console.error("[Chat] AI 제목 생성 중 오류:", err);

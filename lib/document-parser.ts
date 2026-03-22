@@ -173,75 +173,7 @@ export function updateWikiLinksInContent(
     'gi'
   );
 
-  return content.replace(pattern, (match, suffix) => {
+  return content.replace(pattern, (_match, suffix) => {
     return `[[${newTitle}${suffix || ''}]]`;
   });
-}
-
-// ============================================
-// DEPRECATED FUNCTIONS (kept for compatibility during migration)
-// These will be removed after full migration
-// ============================================
-
-/**
- * @deprecated Use getTitleFromFilename instead
- * Normalize a string to a valid slug
- */
-export function normalizeSlug(text: string): string {
-  return text
-    .normalize('NFC')
-    .toLowerCase()
-    .trim()
-    .replace(/\s+/g, '-')
-    .replace(/[^\p{L}\p{N}-]/gu, '')
-    .replace(/-+/g, '-')
-    .replace(/^-|-$/g, '');
-}
-
-/**
- * @deprecated No longer needed - use title directly
- */
-export function getFilePathFromSlug(slug: string): string {
-  return `notes/${slug}.md`;
-}
-
-/**
- * @deprecated Use getTitleFromFilename instead
- */
-export function getSlugFromFilePath(filePath: string): string {
-  const filename = filePath
-    .replace(/^notes\//, '')
-    .replace(/\.md$/, '');
-  return normalizeSlug(filename);
-}
-
-/**
- * @deprecated No longer needed
- */
-export function buildSlugToFilenameMap(filenames: string[]): Map<string, string> {
-  const map = new Map<string, string>();
-  for (const filename of filenames) {
-    const originalSlug = filename.replace(/\.md$/, '');
-    const normalizedSlug = normalizeSlug(originalSlug);
-    map.set(normalizedSlug, filename);
-  }
-  return map;
-}
-
-/**
- * @deprecated No longer needed
- */
-export function findFilenameBySlug(
-  normalizedSlug: string,
-  slugToFilenameMap: Map<string, string>
-): string | undefined {
-  return slugToFilenameMap.get(normalizedSlug);
-}
-
-/**
- * @deprecated No longer needed - titles must be unique
- */
-export function createUniqueSlug(title: string): string {
-  // Now just returns sanitized filename (no UUID)
-  return sanitizeFilename(title);
 }

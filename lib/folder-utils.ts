@@ -1,7 +1,7 @@
 import fs from 'fs/promises';
 import fss from 'fs';
 import path from 'path';
-import { getNotesDir } from './notes-path';
+import { getNotesDir } from '@/lib/notes-path';
 
 const DEFAULT_FOLDER = 'default';
 export const TRASH_FOLDER = '.trash';

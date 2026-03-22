@@ -87,8 +87,9 @@ export function Sidebar() {
                     <button
                       onClick={() => setNewNoteOpen(true)}
                       className={cn(
-                        "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors",
-                        "hover:bg-accent hover:text-accent-foreground",
+                        "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors transition-transform",
+                        "hover:bg-accent hover:text-accent-foreground hover:scale-105",
+                        "active:scale-90",
                         "text-muted-foreground"
                       )}
                     >
@@ -110,8 +111,9 @@ export function Sidebar() {
                       onClick={startRecording}
                       disabled={recordingState.isRecording}
                       className={cn(
-                        "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors",
-                        "hover:bg-accent hover:text-accent-foreground",
+                        "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors transition-transform",
+                        "hover:bg-accent hover:text-accent-foreground hover:scale-105",
+                        "active:scale-90",
                         recordingState.isRecording
                           ? "text-destructive"
                           : "text-muted-foreground"
@@ -133,8 +135,9 @@ export function Sidebar() {
                   <button
                     onClick={() => handleNavigation(item.href!)}
                     className={cn(
-                      "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors",
-                      "hover:bg-accent hover:text-accent-foreground",
+                      "flex h-8 w-8 md:h-10 md:w-10 items-center justify-center rounded-lg transition-colors transition-transform",
+                      "hover:bg-accent hover:text-accent-foreground hover:scale-105",
+                      "active:scale-90",
                       active
                         ? "bg-accent text-accent-foreground"
                         : "text-muted-foreground"

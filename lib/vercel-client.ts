@@ -1,4 +1,4 @@
-import { loadVercelToken } from './vercel-token';
+import { loadVercelToken } from '@/lib/vercel-token';
 
 export interface VercelProject {
   id: string;
@@ -165,7 +165,7 @@ export class VercelClient {
     framework?: string,
     gitRepository?: { owner: string; repo: string }
   ): Promise<VercelProject> {
-    const body: any = {
+    const body: Record<string, unknown> = {
       name,
       framework: framework || 'nextjs',
       buildCommand: 'npm run build',

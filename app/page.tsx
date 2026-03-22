@@ -12,6 +12,11 @@ import { LoadingScreen } from "@/components/ui/spinner";
 import { Plus } from "lucide-react";
 import { useNotesWatcher } from "@/hooks/useNotesWatcher";
 
+// Helper to get node ID from a D3 link endpoint (after simulation, source/target become objects)
+function getLinkNodeId(node: string | number | { id: string | number }): string | number {
+  return typeof node === 'object' ? node.id : node;
+}
+
 // Filter graph nodes and links by folder
 function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
   if (!folder || !graph.nodes) {
@@ -26,7 +31,7 @@ function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
 
     Object.entries(graph.nodes).forEach(([url, node]) => {
       const dgNode = node as DigitalGardenNode;
-      nodeIdToFolder.set(dgNode.id, (dgNode as any).folder || '');
+      nodeIdToFolder.set(dgNode.id, dgNode.folder || '');
       nodeIdToUrl.set(dgNode.id, url);
     });
 
@@ -36,7 +41,7 @@ function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
 
     Object.entries(graph.nodes).forEach(([url, node]) => {
       const dgNode = node as DigitalGardenNode;
-      if ((dgNode as any).folder === folder) {
+      if (dgNode.folder === folder) {
         // Deep clone the node to avoid mutating original
         filteredNodesObj[url] = JSON.parse(JSON.stringify(dgNode));
         oldIdsInFolder.add(dgNode.id);
@@ -45,10 +50,10 @@ function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
 
     // Filter links BEFORE remapping IDs (use original IDs)
     const filteredLinks = (graph.links || []).filter((link) => {
-      const sourceId = typeof link.source === 'number' ? link.source : (link.source as any).id;
-      const targetId = typeof link.target === 'number' ? link.target : (link.target as any).id;
+      const sourceId = getLinkNodeId(link.source);
+      const targetId = getLinkNodeId(link.target);
 
-      return oldIdsInFolder.has(sourceId) && oldIdsInFolder.has(targetId);
+      return oldIdsInFolder.has(sourceId as number) && oldIdsInFolder.has(targetId as number);
     });
 
     // Now create ID mapping and remap
@@ -62,8 +67,8 @@ function filterGraphByFolder(graph: Graph, folder: string | null): Graph {
 
     // Remap link IDs
     const remappedLinks = filteredLinks.map((link) => {
-      const sourceId = typeof link.source === 'number' ? link.source : (link.source as any).id;
-      const targetId = typeof link.target === 'number' ? link.target : (link.target as any).id;
+      const sourceId = getLinkNodeId(link.source) as number;
+      const targetId = getLinkNodeId(link.target) as number;
 
       return {
         source: nodeIdMapping.get(sourceId) ?? sourceId,
