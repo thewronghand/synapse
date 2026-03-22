@@ -222,6 +222,27 @@ export async function POST(req: NextRequest) {
                 break;
               }
 
+              case "source": {
+                // Grounding 검색 결과 출처
+                const payload = chunk.payload as {
+                  id?: string;
+                  url?: string;
+                  title?: string;
+                  sourceType?: string;
+                } | undefined;
+                if (payload?.url) {
+                  controller.enqueue(
+                    encoder.encode(`data: ${JSON.stringify({
+                      type: "source",
+                      id: payload.id,
+                      url: payload.url,
+                      title: payload.title || "",
+                    })}\n\n`)
+                  );
+                }
+                break;
+              }
+
               // tool-call-input-streaming-start, tool-call-delta 등은 무시 (최종 tool-call만 처리)
               default:
                 // 기타 청크는 무시

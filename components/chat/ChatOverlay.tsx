@@ -329,6 +329,7 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
       let buffer = "";
       let fullText = "";
       const toolInvocationsMap = new Map<string, ToolInvocation>();
+      const sources: { id: string; url: string; title: string }[] = [];
 
       while (true) {
         const { done, value } = await reader.read();
@@ -397,6 +398,18 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
                 break;
               }
 
+              case "source": {
+                // Grounding 검색 출처
+                if (event.url) {
+                  sources.push({
+                    id: event.id || crypto.randomUUID(),
+                    url: event.url,
+                    title: event.title || "",
+                  });
+                }
+                break;
+              }
+
               case "tool-output-error": {
                 const existing = toolInvocationsMap.get(event.toolCallId);
                 if (existing) {
@@ -416,6 +429,15 @@ export function ChatOverlay({ onClose }: ChatOverlayProps) {
             // JSON 파싱 실패 - 무시
           }
         }
+      }
+
+      // Grounding 출처를 assistant 메시지에 반영
+      if (sources.length > 0) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantMessageId ? { ...m, sources } : m
+          )
+        );
       }
 
       // 스트리밍 완료 후 세션 정보 업데이트
