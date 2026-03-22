@@ -92,9 +92,25 @@
       "notes/**/*",
       "!**/node_modules/js-tiktoken/**",
       "!**/node_modules/web-streams-polyfill/**",
-      "!**/node_modules/spoqa-han-sans/**"
+      "!**/node_modules/spoqa-han-sans/**",
+      "!**/node_modules/@next/swc-*/**",
+      "!**/node_modules/next/dist/compiled/react-dom-experimental/**",
+      "!**/node_modules/next/dist/compiled/react-server-dom-*-experimental/**",
+      "!**/node_modules/next/dist/compiled/next-devtools/**",
+      "!**/node_modules/next/dist/compiled/webpack/**",
+      "!**/node_modules/next/dist/compiled/babel/**",
+      "!**/node_modules/next/dist/compiled/babel-packages/**",
+      "!**/node_modules/next/dist/build/**",
+      "!**/node_modules/next/dist/docs/**",
+      "!**/node_modules/next/dist/bundle-analyzer/**",
+      "!**/node_modules/lucide-react/**"
     ],
-    "asar": false,
+    "asar": true,
+    "asarUnpack": [
+      "**/node_modules/@libsql/**",
+      "**/node_modules/@img/**",
+      "**/node_modules/sharp/**"
+    ],
     "directories": {
       "buildResources": "assets"
     },
