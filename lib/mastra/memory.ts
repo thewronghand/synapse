@@ -75,7 +75,7 @@ async function createMemoryInstance(): Promise<Memory> {
         },
 
         observationalMemory: {
-          model: vertex("gemini-2.0-flash"),
+          model: vertex("gemini-2.5-flash"),
           scope: "resource",
           observation: {
             messageTokens: 50_000,
