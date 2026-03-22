@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     } = body;
 
     // Mastra Agent 생성 (동적 모델 로딩)
-    const agent = await createNeuroAgent();;
+    const agent = await createNeuroAgent();
 
     // UIMessage에서 마지막 사용자 메시지 추출
     const lastMessage = uiMessages[uiMessages.length - 1];
