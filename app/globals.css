@@ -86,7 +86,7 @@
   --color-destructive-muted: var(--destructive-muted);
   --color-primary-bg: var(--primary-bg);
   --color-secondary-bg: var(--secondary-bg);
-  --font-sans: var(--font-geist-sans);
+  --font-sans: "Spoqa Han Sans Neo", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-mono: var(--font-geist-mono);
   --default-border-color: var(--border);
   --animate-neuro-tilt: neuro-tilt 2.5s ease-in-out infinite;
@@ -97,7 +97,7 @@
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: "Spoqa Han Sans Neo", -apple-system, BlinkMacSystemFont, sans-serif;
 }
 
 html,

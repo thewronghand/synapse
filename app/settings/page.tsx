@@ -17,8 +17,9 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useConfirm } from "@/components/ui/confirm-provider";
-import { ArrowLeft, Upload, Trash2, Ghost, Cloud, FolderSync, Bot } from "lucide-react";
+import { ArrowLeft, Upload, Trash2, Ghost, Cloud, FolderSync, Bot, Palette, Check, Download } from "lucide-react";
 import { TrashManager } from "@/components/settings/TrashManager";
+import { UISettings } from "@/components/settings/UISettings";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface MigrationResult {
@@ -1020,6 +1021,10 @@ function SettingsContent() {
             <TabsTrigger value="trash" className="gap-1.5">
               <Trash2 className="h-4 w-4" />
               휴지통
+            </TabsTrigger>
+            <TabsTrigger value="ui" className="gap-1.5">
+              <Palette className="h-4 w-4" />
+              UI
             </TabsTrigger>
           </TabsList>
 
@@ -2089,6 +2094,11 @@ function SettingsContent() {
 
           <TrashManager />
         </section>
+          </TabsContent>
+
+          {/* UI Tab */}
+          <TabsContent value="ui" className="space-y-8">
+            <UISettings />
           </TabsContent>
         </Tabs>
       </div>
