@@ -853,10 +853,18 @@ export function NeuroSettings() {
       </section>
 
       {/* 퍼블리시 챗봇 설정 */}
-      <section className="bg-card rounded-lg border p-6">
+      <section className="bg-card rounded-lg border p-6 opacity-60">
         <div className="flex items-center gap-2 mb-1">
           <Bot className="h-5 w-5" />
           <h2 className="text-xl font-bold">퍼블리시 챗봇</h2>
+        </div>
+        <div className="rounded-md bg-amber-500/10 border border-amber-500/30 px-4 py-3 mb-4">
+          <p className="text-sm font-medium text-amber-600 dark:text-amber-400">
+            이 기능은 보안 개선 작업 중으로 일시적으로 비활성화되어 있습니다.
+          </p>
+          <p className="text-xs text-muted-foreground mt-1">
+            서버리스 환경에서의 사용량 제한 안정성을 개선한 후 다시 활성화될 예정입니다.
+          </p>
         </div>
         <p className="text-sm text-muted-foreground mb-4">
           퍼블리시된 사이트에서 방문자가 문서에 대해 질문할 수 있는 챗봇을 설정합니다.
@@ -865,7 +873,7 @@ export function NeuroSettings() {
         {publishedChatLoading ? (
           <Spinner className="h-6 w-6" />
         ) : (
-          <div className="space-y-4">
+          <div className="space-y-4 pointer-events-none">
             {/* 활성화 토글 */}
             <div className="flex items-center justify-between">
               <div>
