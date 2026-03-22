@@ -7,7 +7,9 @@ import remarkGfm from "remark-gfm";
 import remarkBreaks from "remark-breaks";
 import { Ghost, User, Pencil, RefreshCw, Check, X, Loader2, CheckCircle2, XCircle, FileText, FolderPlus, FolderMinus, FilePlus, FileEdit, Trash2, FolderInput } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import type { ChatMessage, ToolInvocation } from "@/types";
+import type { ChatMessage, ChatSource, ToolInvocation } from "@/types";
+import { useRouter } from "next/navigation";
+import { ExternalLink, FileText as FileTextIcon } from "lucide-react";
 
 // Tool 이름을 한글로 매핑
 const TOOL_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
@@ -218,9 +220,75 @@ export function ChatMessageItem({
               {/* 텍스트 콘텐츠 */}
               {renderedContent && (
                 <div className="prose prose-sm dark:prose-invert max-w-none [&>*:first-child]:mt-0 [&>*:last-child]:mb-0">
-                  <ReactMarkdown remarkPlugins={[remarkGfm, remarkBreaks]}>
-                    {renderedContent}
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkBreaks]}
+                    components={{
+                      a: ({ href, children }) => {
+                        // 내부 문서 링크: 앱 내 이동 (ChatOverlay는 열린 채로)
+                        if (href?.startsWith("/note/")) {
+                          return (
+                            <a
+                              href={href}
+                              className="text-primary underline inline-flex items-center gap-0.5 cursor-pointer"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                window.location.href = href;
+                              }}
+                            >
+                              {children}
+                            </a>
+                          );
+                        }
+                        // 외부 링크: 브라우저 새 창으로
+                        if (href?.startsWith("http")) {
+                          return (
+                            <a
+                              href={href}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary underline inline-flex items-center gap-0.5"
+                              onClick={(e) => {
+                                e.preventDefault();
+                                window.open(href, "_blank");
+                              }}
+                            >
+                              {children}
+                              <ExternalLink className="w-3 h-3 inline" />
+                            </a>
+                          );
+                        }
+                        return <a href={href}>{children}</a>;
+                      },
+                    }}
+                  >
+                    {renderWikiLinks(renderedContent)}
                   </ReactMarkdown>
+                </div>
+
+              )}
+
+              {/* Grounding 출처 */}
+              {message.sources && message.sources.length > 0 && (
+                <div className="mt-2 border-t border-border/50 pt-2">
+                  <p className="text-[10px] font-medium text-muted-foreground mb-1">출처</p>
+                  <div className="flex flex-wrap gap-1">
+                    {message.sources.map((source) => (
+                      <a
+                        key={source.id}
+                        href={source.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => {
+                          e.preventDefault();
+                          window.open(source.url, "_blank");
+                        }}
+                        className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-muted text-[10px] text-muted-foreground hover:text-foreground hover:bg-muted/80 transition-colors"
+                      >
+                        <ExternalLink className="w-2.5 h-2.5" />
+                        {source.title || new URL(source.url).hostname}
+                      </a>
+                    ))}
+                  </div>
                 </div>
               )}
 
@@ -299,4 +367,12 @@ function UserMessageContent({ content }: { content: string }) {
   }
 
   return <p className="whitespace-pre-wrap text-sm">{content}</p>;
+}
+
+// [[문서명]] 위키링크를 마크다운 링크로 변환 (앱 내부 이동용)
+function renderWikiLinks(content: string): string {
+  return content.replace(
+    /\[\[([^\]|#]+)(?:[|#][^\]]+)?\]\]/g,
+    (_, title) => `[📄 ${title}](/note/${encodeURIComponent(title)})`
+  );
 }
