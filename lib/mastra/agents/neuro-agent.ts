@@ -10,14 +10,21 @@ import {
 import { loadAIModelSettings } from "@/lib/ai-model-settings";
 import { buildNeuroInstructions, NEURO_BASE_INSTRUCTIONS } from "@/lib/neuro-prompt";
 
+// globalThis에 캐시를 저장하여 Next.js 핫 리로드/모듈 리로드 시에도 유지
+const globalCache = globalThis as typeof globalThis & {
+  __neuro_cached_sa?: GcpServiceAccountInfo | null;
+  __neuro_cached_agent?: Agent | null;
+  __neuro_cached_vertex?: ReturnType<typeof createVertex> | null;
+};
+
 // 캐시된 SA 정보
-let cachedSa: GcpServiceAccountInfo | null = null;
+let cachedSa: GcpServiceAccountInfo | null = globalCache.__neuro_cached_sa ?? null;
 
 // 캐시된 Agent (성능 최적화)
-let cachedAgent: Agent | null = null;
+let cachedAgent: Agent | null = globalCache.__neuro_cached_agent ?? null;
 
 // 캐시된 Vertex 프로바이더 인스턴스
-let cachedVertex: ReturnType<typeof createVertex> | null = null;
+let cachedVertex: ReturnType<typeof createVertex> | null = globalCache.__neuro_cached_vertex ?? null;
 
 // Vertex AI 프로바이더 생성 (동적)
 async function getVertexProvider() {
@@ -26,6 +33,7 @@ async function getVertexProvider() {
   // SA 로드 (캐시 활용)
   if (!cachedSa) {
     cachedSa = await loadGcpServiceAccount();
+    globalCache.__neuro_cached_sa = cachedSa;
   }
 
   if (!cachedSa) {
@@ -49,6 +57,7 @@ async function getVertexProvider() {
       },
     },
   });
+  globalCache.__neuro_cached_vertex = cachedVertex;
 
   return cachedVertex;
 }
@@ -95,6 +104,7 @@ async function createNeuroAgentInternal(): Promise<Agent> {
 export async function getOrCreateNeuroAgent(): Promise<Agent> {
   if (!cachedAgent) {
     cachedAgent = await createNeuroAgentInternal();
+    globalCache.__neuro_cached_agent = cachedAgent;
   }
   return cachedAgent;
 }
@@ -133,7 +143,9 @@ export function clearNeuroCache(): void {
   cachedSa = null;
   cachedAgent = null;
   cachedVertex = null;
-  console.log("[Neuro] 캐시 초기화됨");
+  globalCache.__neuro_cached_sa = null;
+  globalCache.__neuro_cached_agent = null;
+  globalCache.__neuro_cached_vertex = null;
 }
 
 // @deprecated clearNeuroCache() 사용 권장

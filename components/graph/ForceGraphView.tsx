@@ -60,8 +60,9 @@ function getNodeId(node: D3LinkSource): string | number {
   return typeof node === "object" && node !== null ? node.id : node;
 }
 
-// force-graph 라이브러리 타입 정의
-type ForceGraphFactory = (elem: HTMLElement) => ForceGraphInstance;
+// force-graph: kapsule 패턴 — default export는 함수, 호출하면 (elem) => instance 반환
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ForceGraphModule = (...args: any[]) => (elem: HTMLElement) => ForceGraphInstance;
 
 // D3 force 타입 정의
 interface D3ChargeForce {
@@ -357,7 +358,7 @@ export default function ForceGraphView({
       }
 
       // Create graph instance
-      const graph = (ForceGraph as unknown as ForceGraphFactory)(containerRef.current!)
+      const graph = (ForceGraph as unknown as ForceGraphModule)()(containerRef.current!)
       .graphData({ nodes: nodesArray, links: linksArray })
       .nodeId("id")
       .nodeLabel("title")
