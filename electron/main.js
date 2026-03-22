@@ -433,17 +433,34 @@ function startNextServer() {
       // In production, start the Next.js standalone server
       // Use app.getAppPath() to get the correct resource path
       const appPath = app.getAppPath();
-      // Next.js 16 standalone 구조: .next/standalone/{프로젝트폴더명}/server.js
-      const serverPath = path.join(appPath, '.next/standalone/synapse/server.js');
+      // Next.js 16 standalone 구조: server.js가 하위 폴더 또는 standalone 루트에 존재
+      const standaloneDir = path.join(appPath, '.next', 'standalone');
+      let serverPath;
+
+      // 하위 폴더에서 server.js 찾기
+      const entries = fs.readdirSync(standaloneDir).filter((entry) => {
+        const fullPath = path.join(standaloneDir, entry);
+        return fs.statSync(fullPath).isDirectory() &&
+          !['node_modules', '.next', 'public'].includes(entry);
+      });
+      const projectDir = entries.find((dir) =>
+        fs.existsSync(path.join(standaloneDir, dir, 'server.js'))
+      );
+
+      if (projectDir) {
+        serverPath = path.join(standaloneDir, projectDir, 'server.js');
+      } else if (fs.existsSync(path.join(standaloneDir, 'server.js'))) {
+        serverPath = path.join(standaloneDir, 'server.js');
+      }
+
       console.log('App path:', appPath);
       console.log('Starting Next.js server from:', serverPath);
 
       // Check if server.js exists
-      const fs = require('fs');
-      if (!fs.existsSync(serverPath)) {
-        console.error('Server file not found at:', serverPath);
+      if (!serverPath || !fs.existsSync(serverPath)) {
+        console.error('Server file not found in standalone output');
         try {
-          console.error('Listing app directory:', fs.readdirSync(appPath));
+          console.error('Standalone entries:', fs.readdirSync(standaloneDir));
         } catch (e) {
           console.error('Cannot list directory');
         }
