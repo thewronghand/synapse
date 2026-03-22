@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
+import { motion } from "motion/react";
 import { Mic, BookOpen } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { FolderTabs } from "@/components/ui/FolderTabs";
@@ -170,15 +171,21 @@ function VoiceMemosContent() {
           </div>
         ) : (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {memos.map((memo) => (
-              <VoiceMemoCard
+            {memos.map((memo, index) => (
+              <motion.div
                 key={memo.id}
-                memo={memo}
-                showFolder={selectedFolder === null}
-                onProcess={handleProcess}
-                onDeleted={handleDeleted}
-                onUpdated={handleUpdated}
-              />
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.25, delay: Math.min(index * 0.04, 0.5), ease: [0.25, 1, 0.5, 1] }}
+              >
+                <VoiceMemoCard
+                  memo={memo}
+                  showFolder={selectedFolder === null}
+                  onProcess={handleProcess}
+                  onDeleted={handleDeleted}
+                  onUpdated={handleUpdated}
+                />
+              </motion.div>
             ))}
           </div>
         )}
