@@ -311,7 +311,7 @@ export default function MarkdownEditor({
     } else {
       onChange(value + markdownText);
     }
-  };;;;
+  }
 
   const handlePaste = async (event: React.ClipboardEvent) => {
     const items = event.clipboardData?.items;

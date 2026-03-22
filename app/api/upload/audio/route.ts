@@ -28,9 +28,9 @@ export async function POST(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const folder = searchParams.get("folder");
 
-    if (!folder) {
+    if (!folder || /[\/\\~]|\.\./.test(folder)) {
       return NextResponse.json(
-        { success: false, error: "folder 파라미터가 필요합니다" },
+        { success: false, error: "유효하지 않은 folder 파라미터입니다" },
         { status: 400 }
       );
     }

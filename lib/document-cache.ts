@@ -1,10 +1,9 @@
 import fs from 'fs/promises';
-import fss from 'fs';
 import path from 'path';
-import { parseFrontmatter, extractTitle, getTitleFromFilename } from './document-parser';
-import { getNotesDir } from './notes-path';
-import { isPublishedMode } from './env';
-import { ensureDefaultFolder, DEFAULT_FOLDER_NAME, TRASH_FOLDER } from './folder-utils';
+import { parseFrontmatter, extractTitle, getTitleFromFilename } from '@/lib/document-parser';
+import { getNotesDir } from '@/lib/notes-path';
+import { isPublishedMode } from '@/lib/env';
+import { ensureDefaultFolder, DEFAULT_FOLDER_NAME, TRASH_FOLDER } from '@/lib/folder-utils';
 
 const NOTES_DIR = getNotesDir();
 

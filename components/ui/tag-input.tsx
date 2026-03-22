@@ -2,8 +2,7 @@
 
 import { useState, useRef, useEffect, KeyboardEvent } from "react";
 import { X } from "lucide-react";
-import { Input } from "./input";
-import { Badge } from "./badge";
+import { Badge } from "@/components/ui/badge";
 
 interface TagInputProps {
   tags: string[];
@@ -37,11 +36,6 @@ export function TagInput({
       suggestion.toLowerCase().includes(inputValue.toLowerCase()) &&
       !tags.includes(suggestion) &&
       suggestion !== inputValue
-  );
-
-  // Add current input if it matches exactly
-  const exactMatch = suggestions.find(
-    (s) => s.toLowerCase() === inputValue.toLowerCase()
   );
 
   const displaySuggestions = inputValue.trim()

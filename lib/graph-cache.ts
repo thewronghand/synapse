@@ -6,12 +6,11 @@ import {
   extractWikiLinks,
   calculateBacklinks,
   getTitleFromFilename,
-  titlesMatch,
-} from './document-parser';
-import { getNotesDir } from './notes-path';
-import { isPublishedMode } from './env';
+} from '@/lib/document-parser';
+import { getNotesDir } from '@/lib/notes-path';
+import { isPublishedMode } from '@/lib/env';
 import { Graph, GraphEdge, DigitalGardenNode } from '@/types';
-import { TRASH_FOLDER } from './folder-utils';
+import { TRASH_FOLDER } from '@/lib/folder-utils';
 
 const NOTES_DIR = getNotesDir();
 
@@ -290,7 +289,7 @@ class GraphCache {
   /**
    * Invalidate cache for a specific document or entire cache
    */
-  invalidate(title?: string): void {
+  invalidate(_title?: string): void {
     this.isDirty = true;
     this.graph = null;
   }

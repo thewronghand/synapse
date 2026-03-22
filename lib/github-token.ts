@@ -1,5 +1,5 @@
 import fs from 'fs/promises';
-import { getDataFilePath, ensureUserDataDir } from './data-path';
+import { getDataFilePath, ensureUserDataDir } from '@/lib/data-path';
 
 export interface GitHubTokenInfo {
   accessToken: string;

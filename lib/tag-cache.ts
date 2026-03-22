@@ -1,8 +1,8 @@
 import fs from 'fs/promises';
 import path from 'path';
-import { parseFrontmatter } from './document-parser';
-import { getNotesDir } from './notes-path';
-import { isPublishedMode } from './env';
+import { parseFrontmatter } from '@/lib/document-parser';
+import { getNotesDir } from '@/lib/notes-path';
+import { isPublishedMode } from '@/lib/env';
 
 const NOTES_DIR = getNotesDir();
 

@@ -10,6 +10,32 @@ import { v2 } from "@google-cloud/speech";
 // chirp_3는 "us" 멀티 리전에서 모든 피처(화자 분리 포함) 지원이 확인됨
 const LOCATION = "us";
 
+interface SpeechRecognitionAlternative {
+  transcript?: string;
+  confidence?: number;
+  words?: WordInfo[];
+}
+
+interface SpeechRecognitionResult {
+  alternatives?: SpeechRecognitionAlternative[];
+  languageCode?: string;
+}
+
+interface BatchRecognizeFileResult {
+  transcript?: {
+    results?: SpeechRecognitionResult[];
+  };
+  error?: {
+    code?: number;
+    message?: string;
+  };
+  uri?: string;
+}
+
+interface BatchRecognizeResponse {
+  results?: Record<string, BatchRecognizeFileResult>;
+}
+
 interface WordInfo {
   word?: string | null;
   speakerLabel?: string | null;
@@ -219,19 +245,16 @@ export async function POST(request: NextRequest) {
           return pollResult.result;
         });
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const batchResponse = response as any;
+        const batchResponse = response as BatchRecognizeResponse;
 
         // batchRecognize 응답: results 맵에서 transcript 추출
         const inlineResults = batchResponse?.results;
         if (inlineResults) {
           // 파일별 에러 체크
           for (const [uri, fileResult] of Object.entries(inlineResults)) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            const fr = fileResult as any;
-            if (fr.error?.message) {
-              console.error(`[Transcribe] 파일 에러 (${uri}): ${fr.error.message}`);
-              throw new Error(fr.error.message);
+            if (fileResult.error?.message) {
+              console.error(`[Transcribe] 파일 에러 (${uri}): ${fileResult.error.message}`);
+              throw new Error(fileResult.error.message);
             }
           }
 
@@ -239,12 +262,10 @@ export async function POST(request: NextRequest) {
             // 화자 분리: 모든 결과에서 words를 모아서 화자별로 조합
             const allWords: WordInfo[] = [];
             for (const [, fileResult] of Object.entries(inlineResults)) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const fr = fileResult as any;
-              for (const result of fr.transcript?.results ?? []) {
+              for (const result of fileResult.transcript?.results ?? []) {
                 const words = result.alternatives?.[0]?.words;
                 if (words) {
-                  allWords.push(...(words as WordInfo[]));
+                  allWords.push(...words);
                 }
               }
             }
@@ -254,11 +275,8 @@ export async function POST(request: NextRequest) {
           } else {
             const transcripts: string[] = [];
             for (const [, fileResult] of Object.entries(inlineResults)) {
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              const fr = fileResult as any;
-              const resultTranscript = fr.transcript?.results
-                // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                ?.map((result: any) => result.alternatives?.[0]?.transcript)
+              const resultTranscript = fileResult.transcript?.results
+                ?.map((result: SpeechRecognitionResult) => result.alternatives?.[0]?.transcript)
                 .filter(Boolean)
                 .join("\n");
               if (resultTranscript) {
