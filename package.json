@@ -90,7 +90,6 @@
       ".next/static/**/*",
       "public/**/*",
       "notes/**/*",
-      "!**/node_modules/js-tiktoken/**",
       "!**/node_modules/web-streams-polyfill/**",
       "!**/node_modules/spoqa-han-sans/**"
     ],
