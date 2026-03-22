@@ -60,7 +60,6 @@
     "remark-math": "^6.0.0",
     "remark-wiki-link": "^2.0.1",
     "sonner": "^2.0.7",
-    "spoqa-han-sans": "^3.3.0",
     "tailwind-merge": "^3.5.0",
     "tw-animate-css": "^1.4.0",
     "zod": "^4.3.6"
@@ -90,7 +89,10 @@
       ".next/standalone/**/*",
       ".next/static/**/*",
       "public/**/*",
-      "notes/**/*"
+      "notes/**/*",
+      "!**/node_modules/js-tiktoken/**",
+      "!**/node_modules/web-streams-polyfill/**",
+      "!**/node_modules/spoqa-han-sans/**"
     ],
     "asar": false,
     "directories": {
