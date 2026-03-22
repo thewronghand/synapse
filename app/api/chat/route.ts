@@ -254,10 +254,15 @@ export async function POST(req: NextRequest) {
           controller.enqueue(encoder.encode(`data: [DONE]\n\n`));
 
           // 스트리밍 완료 후 AI 응답 저장 (백그라운드)
-          if (sessionId && fullResponse) {
-            saveAssistantMessage(sessionId, messageId, fullResponse).catch((err) => {
-              console.error("[Chat] AI 응답 저장 실패:", err);
-            });
+          if (sessionId) {
+            if (fullResponse) {
+              saveAssistantMessage(sessionId, messageId, fullResponse).catch((err) => {
+                console.error("[Chat] AI 응답 저장 실패:", err);
+              });
+            } else {
+              // 빈 응답이어도 pendingResponse 해제
+              clearPendingResponse(sessionId).catch(() => {});
+            }
           }
         } catch (err) {
           console.error("[Chat] 스트리밍 중 오류:", err);
@@ -267,6 +272,16 @@ export async function POST(req: NextRequest) {
         }
       },
     });
+
+    // pendingResponse 해제 (빈 응답 시)
+    async function clearPendingResponse(sid: string) {
+      const session = await loadSession(sid);
+      if (session) {
+        session.pendingResponse = false;
+        session.updatedAt = new Date().toISOString();
+        await saveSession(session);
+      }
+    }
 
     // AI 응답을 세션에 저장하는 헬퍼 함수
     async function saveAssistantMessage(sid: string, msgId: string, content: string) {
